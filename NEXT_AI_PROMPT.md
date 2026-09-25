@@ -9,7 +9,7 @@ Written 2026-09-25 at the Claude -> Codex handoff. Source authority is the REPOS
 
 You are continuing development of **BeamShift** (Godot 4.7.1, GDScript, Android/portrait-first deterministic laser-reflection puzzle) on branch **`dev_abhilas`**.
 
-**Current task: PHASE S3.1 - V5 J/K DIFFICULTY REFINEMENT (Levels 2601-3000), follow-up certification.** Not S4. Do not build an APK.
+**Current task: PHASE S3.1 - V5 J/K DIFFICULTY REFINEMENT (Levels 2601-3000), manual approval gate.** Not S4. Do not build an APK unless the user explicitly approves S4 after manual V5 play.
 
 Read first, in order: `CLAUDE.md` (esp. "V5 generator rules"), `CURRENT_STATUS.md`, `PROJECT_HANDOFF.md`, this file, `DECISIONS.md` (D108, D109, D110), `ARCHITECTURE.md`, `PROCEDURAL_GENERATION.md` (section 20), `TEST_PLAN.md` (last section), `CHANGELOG.md`, `TUTORIAL_SYSTEM.md`, `ROADMAP.md`. Then run `git status`, `git log -1`, and read the code listed in section 6.
 
@@ -26,7 +26,7 @@ Hard rules (do not violate):
 - Branch `dev_abhilas`, HEAD `20c2947` ("BeamShift full project checkpoint"). **Nothing from S1/S2/S3 is committed** (git proves it: 32 modified tracked files, 37 untracked entries at handoff).
 - **S1 COMPLETE**: mechanic `TileType.SPLITTER_SELECTOR` + 6 puzzles behind Main Menu "SELECTOR TEST" (`SelectorQaSet`, `levels/selector_qa/`), `scripts/tools/selector_verify.tscn`.
 - **S2 COMPLETE**: tutorials T29-T34 (`levels/tutorial/t29.gd`-`t34.gd`), hand-authored hint entries `t29`-`t34` in `levels/hint_solutions.json`, `scripts/tools/selector_tutorial_verify.tscn`.
-- **S3 IMPLEMENTED BUT NOT CERTIFIED/APPROVED**: generator V5 (Levels 2001-3000) exists and generates; `MAX_LEVEL`/`INITIAL_CERTIFIED_LEVEL_TARGET` = 3000 (the CURRENT boundary, not a permanent ceiling); 2000 -> 2001 works; V1-V4 fingerprints unchanged; Selector frequency targets met; Save/Continue, Hint, stars, QA +50 (through 3000) work. **S3.1 pass 1 reduced J/K demotion in bounded samples but did not complete full 50-level windows inside the QA budget; do not describe Levels 2001-3000 as certified.**
+- **S3 IMPLEMENTED / DESKTOP S3.1 VERIFIED / AWAITING MANUAL APPROVAL**: generator V5 (Levels 2001-3000) exists and generates; `MAX_LEVEL`/`INITIAL_CERTIFIED_LEVEL_TARGET` = 3000 (the CURRENT boundary, not a permanent ceiling); 2000 -> 2001 works; V1-V4 fingerprints unchanged; Selector frequency targets met; Save/Continue, Hint, stars, QA +50 (through 3000) work. **S3.1 final verification completed split deterministic J/K windows: J 50/50 generated with `band_demoted=4` (8.0%); K 50/50 generated with `band_demoted=0`. Do not start S4 until the user manually approves the V5 TEST difficulty/readability.**
 - **S4 (Android APK) NOT STARTED and must wait for S3.1 + the user's manual approval.**
 - `export_presets.cfg` is modified but that modification is PRE-EXISTING and NOT from S1/S2/S3 (`version/code=69`, `version/name="4.8.3-OFFICE-BRANCH-QA"` vs committed 68 / `4.8.2-HINT-ATTENTION-PULSE-QA`). Leave it alone.
 
@@ -50,6 +50,8 @@ Depth avg G-K 11.0/11.9/12.9/13.7/14.6; 0 fallbacks; greedy beam-following solve
 
 **S3.1 pass 1 update (Codex, 2026-09-25):** implemented S-M ("Selector -> target continuation") using the existing `TM`/`target` site, added it to J/K selector pools, raised `MAX_ATTEMPTS_V5` to 64, kept J demotion at 32 attempts, and gave K a stricter 48-attempt runway before band demotion. V1-V4 fingerprint stayed identical (`271eb766be20a12446676a947b49a3f1`). Post-change bounded windows with `hist=1`, `budget=90000`: J generated 36/50 before budget, `band_demoted=3` (8.3%); K generated 37/50 before budget, `band_demoted=0` (0%). 0 fallbacks and greedy accepted 0 in both. **Remaining issue:** full 50-level J/K windows still exceed the QA budget, and phone generation time/readability remain unmeasured.
 
+**S3.1 final verification update (Codex, 2026-09-25):** no generator redesign or target loosening after pass 1. Full-equivalent deterministic split windows with `hist=1`: J = 50/50 generated, `band_demoted=4` (8.0%), shortcut rejections 5, minimality rejections 3, greedy accepted 0/50, fallbacks 0, avg gen 1950.1 ms, max 3522 ms; K = 50/50 generated, `band_demoted=0`, shortcut rejections 6, minimality rejections 17, greedy accepted 0/50, fallbacks 0, avg gen 2551.6 ms, max 5383 ms. QA budget root cause is dev-only verification overhead: final shortcut probe dominates, then repeated build/probe/minimality/check work from rejected candidates. Late-game manual QA set: 2500, 2647 (nearest Selector-bearing replacement for non-Selector 2651), 2800, 2900, 3000. Selector QA passed; Fusion QA set passed via bounded temp verifier; 2000/2001/3000 boundary and `MAX_COLUMNS=8` reconfirmed. `selector_tutorial_verify`/bounded T29-T34 smoke were attempted but did not complete in the practical headless QA window; prior S2 evidence remains the exhaustive source.
+
 Other findings (sample measurements, not guarantees):
 - `verified_optimal_moves` = -1 for every V5 level (exact optimum UNKNOWN at 20+ moves; `v5_verify` touched-tile BFS proves small levels only); `StarScoring` therefore uses `intended_moves`.
 - Replay through a real GridManager found (a) superfluous tile GROUPS in ~14% of unscreened Mastery boards and (b) 9-14-flip alternative solutions in ~2% of Entry/Branching boards. Fixed with `ProceduralMinimality` + one final wide probe, but they remain screens: an independent 6000-simulation/80-width probe still found a shortcut in ~3/72 Interlock-Consequence-Mastery levels (~4%, 12 flips vs 24+); random-order ddmin found a superfluous group in ~1/157 sampled levels. V4 has the same class (1/40 sampled) and is frozen.
@@ -63,9 +65,9 @@ Difficulty must come from: dependencies, interaction, backward reasoning, shared
 NOT from: tiny cells, giant boards, random clutter, padding rotations, meaningless mirrors, excessive blockers, trial-and-error guessing.
 `MAX_COLUMNS` stays 8; tiles stay square and mobile-readable. **A genuinely difficult 25-move puzzle beats a padded 30-move puzzle** - but do not lower the J/K targets before the architectural improvements below have been tried and measured. The question a manual tester should be able to answer "yes" to: does the puzzle require thinking about WHY a route must be chosen, not merely WHERE the beam points.
 
-## 5. S3.1 objectives
+## 5. S3.1 objectives/status
 
-1. Reduce J/K demotion (preferred <= 10% each) by improving the generator, not the labels.
+1. Reduce J/K demotion (preferred <= 10% each) by improving the generator, not the labels. **Done in desktop split-window verification: J 8.0%, K 0%.**
 2. Strengthen reasoning complexity and coupled dependencies; improve Selector downstream dependencies.
 3. Implement the missing Selector families where useful (section 7), and a **fair decoy/bait-route architecture** (a wrong Selector state that looks productive - lights something or reaches a mechanic - but breaks a later requirement; the current consequence metric only approximates this).
 4. Strengthen minimality and shortcut screening (residual leaks above) without blowing generation time; consider a cheaper/better probe strategy, seeded multi-order ddmin, exact checks on small sub-boards.
@@ -100,7 +102,7 @@ Tutorials: T29 "Select Path", T30 "Choose Output", T31 "Sel + Filter", T32 "Sel 
 
 ## 10. Manual QA (V5 TEST: Main Menu "V5 TEST", in-game "NEXT V5"; no saves/stars/ads)
 
-Levels: 2001, 2050, 2201, 2351, 2500, 2651, 2800, 2900, 3000 (all Selector-bearing at handoff; re-verify after generator changes - the list may need re-picking). The label may show `~DEMOTED`. Inspect especially 2500+, 2800, 2900, 3000: the player should have to reason WHY a route must be selected, not merely where the beam is pointing. The user does the manual play; do not claim approval.
+Levels: 2001, 2050, 2201, 2351, 2500, 2647, 2800, 2900, 3000. Level 2651 was checked in the final pass but generated without a Selector; 2647 is the nearest Selector-bearing replacement (tie with 2655, chosen for stronger downstream evidence). The label may show `~DEMOTED`. Inspect especially 2500+, 2800, 2900, 3000: the player should have to reason WHY a route must be selected, not merely where the beam is pointing. The user does the manual play; do not claim approval.
 
 ## 11. Documentation and git requirements
 
@@ -108,8 +110,8 @@ When S3.1 is done update: CLAUDE.md, README.md, CURRENT_STATUS.md, PROJECT_HANDO
 
 ## 12. Stop condition
 
-Stop when the J/K refinement is implemented and measured (or when you can show, with numbers, why a target cannot be met and what the user must decide), documentation is updated, and the user must play the V5 TEST levels. **Do not start S4, do not build an APK, do not commit.**
+Stop when the user has manually approved or rejected the V5 TEST difficulty/readability. **Do not start S4, do not build an APK, do not commit.**
 
 ## 13. First instruction
 
-Run `git status`, `git log -1`, read the files in the order above, re-run the V1-V4 fingerprint baseline and `v5_sample` band windows for J and K to reproduce the demotion rates, then start with the J/K demotion analysis (`hist=1` on J/K windows) before changing any code.
+Run `git status`, `git log -1`, read the files in the order above, then prepare/run the user's manual V5 TEST approval checklist. Do not redo generator tuning or S4 unless the user explicitly asks.
