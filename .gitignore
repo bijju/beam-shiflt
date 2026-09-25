@@ -20,3 +20,8 @@ mono_crash.*.json
 android/
 *.aab
 *.apk
+
+# BeamShift local/generated files
+/builds/
+_qa_tmp/
+eos_dev.env
