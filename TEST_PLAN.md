@@ -6350,3 +6350,21 @@ MANUAL TEST REQUIRED (Android): PLAY + QA +50 -> Level 201+ (first Fusion levels
 
 - **AUTOMATED - DONE.** Temporary driver (deleted; save backed up/restored): cases 1-10 of the brief plus double tap, Back = cancel, T21-unlock materialisation, all PASS. Production simulation Main Menu = CONTINUE / NEW GAME / TUTORIAL / SETTINGS / QUIT. Popup rendered at 540x960.
 - **MANUAL TEST REQUIRED (Android):** popup readability/tap targets on a phone, Back gesture on the popup, real fresh install and upgraded save.
+
+
+## Splitter Selector S1 + S2 (2026-09-25) - AUTOMATED/RENDERED, MANUAL pending
+
+- **AUTOMATED - DONE**: selector_verify.tscn (6 QA puzzles, exhaustive), selector_tutorial_verify.tscn (T29-T34 unique solution, min moves T34 = 5), 35-level solver regression (levels 1-15 + campaign sample), V1/V2/V3/V4 fingerprint identical (25 levels each, HEAD copy vs current).
+- **RENDERED - DONE (540x960)**: T29-T34 through the real game: message steps lock input, forced steps accept only the required tile, wrong taps rejected, Hint = required tile only (no move, no rotation), reset -> step 0, completion popup + save record, ad/star/progress state untouched, real GUI click on the selector; T01-T28 replay; SELECTOR TEST 1-6; FUSION TEST 1-6.
+- **MANUAL TEST REQUIRED**: feel/readability of T29-T34 and the selector art on a real phone; Android build of this pass (not built - Phase S4).
+
+
+## Selector Phase S3 - generator V5, Levels 2001-3000 (2026-09-25) - AUTOMATED/RENDERED, MANUAL pending
+
+- **AUTOMATED - DONE**: V1-V4 fingerprint (33 levels x 4 versions = 132 hashes of tiles + solution) identical before/after and after the last change; V5 fingerprint (22 anchors) identical across two separate processes; `v5_sample.tscn` per-band windows (50 levels each, stride 4: 0 fallbacks, Selector share 42/50/58/62/71%, greedy-solvable 0/250, demoted 0/5/9/26/31), 21 anchors clean under an independent 2500/40 probe, `v5_verify.tscn` (Selector brute force + determinism on ~40 levels: 0 problems; exact BFS proves 8/8 V3 levels, UNKNOWN on V5), levels 1-15 solver 15/15, campaign samples load, T01-T34 load, T29-T34 hint entries, SELECTOR TEST 1-6 / FUSION TEST 1-6 (start unsolved, solution solves), `selector_verify`/`selector_tutorial_verify` 0 problems.
+- **Real-game drivers (temporary, deleted)**: Save/Continue at 2001/2200/2500/2800/3000 exact (level, generator version 5, seed, every orientation incl. Selector states, move count, hint-used); Hint on a wrong Selector, no rotation/no move, hint-used caps stars at 2; intended solution replayed through a real GridManager (7 anchors: solved, taps == intended_moves, 3 stars); QA +50 (1951->2001, 2001->2051, 2951->3000, 3000 no-op, no stars/no real progression); 2000 -> 2001 Next Level V4 -> V5; version mapping 1999/2000 -> V4, 2001/2002/3000 -> V5; MAX_LEVEL 3000, MAX_COLUMNS 8.
+- **RENDERED - DONE (540x960)**: V5 TEST levels 5 and 9 through the real game scene.
+- **Known findings**: replay found group-redundant intended solutions (~14% unscreened Mastery) and shallow shortcuts (~2% Entry/Branching); fixed by `ProceduralMinimality` + final wide probe; residual documented in `PROCEDURAL_GENERATION.md` 20.6.
+- **MANUAL TEST REQUIRED**: play the V5 TEST levels (2001, 2050, 2201, 2351, 2500, 2651, 2800, 2900, 3000) for difficulty feel (does the puzzle require thinking about WHY a route must be chosen?), readability of 38-57-tile boards on a real phone, and on-device generation time. Android build not made (S4).
+
+- **Status note (2026-09-25 handoff)**: S3 is implemented but NOT certified; S3.1 (J/K refinement) is next and must re-run this whole S3 section plus the V1-V4 fingerprint. `NEXT_AI_PROMPT.md` section 9 lists the regression requirements.

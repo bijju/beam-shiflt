@@ -34,15 +34,16 @@ const _SPECIAL_KINDS := {
 	GridTypes.TileType.SPLITTER: "splitter",
 	GridTypes.TileType.ONE_WAY_REFLECTOR: "one_way",
 	GridTypes.TileType.FUSION: "fusion",
+	GridTypes.TileType.SPLITTER_SELECTOR: "selector",
 }
 
 ## Tiles a player can rotate. FUSION is 4-state (one tap = one clockwise step); the rest are two-state.
-const _ROTATABLE_KINDS := [GridTypes.TileType.MIRROR, GridTypes.TileType.SPLITTER, GridTypes.TileType.ONE_WAY_REFLECTOR, GridTypes.TileType.FUSION]
+const _ROTATABLE_KINDS := [GridTypes.TileType.MIRROR, GridTypes.TileType.SPLITTER, GridTypes.TileType.ONE_WAY_REFLECTOR, GridTypes.TileType.FUSION, GridTypes.TileType.SPLITTER_SELECTOR]
 
 
 ## One player tap on a rotatable tile: a two-state flip, or a Fusion Node's clockwise quarter-turn.
 static func tap_orientation(tile_type: int, current: int) -> int:
-	if tile_type == GridTypes.TileType.FUSION:
+	if tile_type == GridTypes.TileType.FUSION or tile_type == GridTypes.TileType.SPLITTER_SELECTOR:
 		return (current + 1) % 4
 	return GridTypes.MirrorOrientation.BACKSLASH if current == GridTypes.MirrorOrientation.SLASH else GridTypes.MirrorOrientation.SLASH
 
@@ -81,7 +82,7 @@ static func analyze(level: LevelData, solution_orientations: Dictionary, solver_
 
 	var m := {
 		"intended_move_count": 0, "required_rotatables": 0, "rotatable_count": 0,
-		"padding_moves": 0, "plain_route_moves": 0, "dependent_moves": 0,
+		"padding_moves": 0, "padding_positions": [], "plain_route_moves": 0, "dependent_moves": 0,
 		"optimal_moves": 0, "solver_states": -1, "shortest_solution_count": -1,
 		"meaningful_dependency_count": 0, "dependency_depth": 1,
 		"mechanic_interaction_count": 0, "mechanic_interaction_pairs": [],
@@ -90,7 +91,9 @@ static func analyze(level: LevelData, solution_orientations: Dictionary, solver_
 		"color_dependency_count": 0, "gate_switch_dependency_count": 0,
 		"portal_dependency_count": 0, "receiver_remote_dependency_count": 0,
 		"prism_branch_count": 0, "one_way_dependency_count": 0,
-		"splitter_dependency_count": 0, "fusion_dependency_count": 0, "prerequisite_chains": 0,
+		"splitter_dependency_count": 0, "fusion_dependency_count": 0, "selector_dependency_count": 0, "prerequisite_chains": 0,
+		"selector_count": 0, "selector_load_bearing_count": 0, "selector_interaction_count": 0,
+		"selector_equivalent_state_count": 0, "selector_downstream_depth": 0, "selector": {},
 		"convergence_count": 0, "independent_route_count": 0,
 		"required_target_count": 0, "emitter_count": 0, "decoy_count": 0,
 		"is_single_route": false, "solved": base["solved"], "load_bearing_units": [],
@@ -107,15 +110,21 @@ static func analyze(level: LevelData, solution_orientations: Dictionary, solver_
 	# --- Required moves: padding vs load-bearing, and which targets each
 	# one alone can lose. -------------------------------------------------
 	var affected_by_move: Dictionary = {} # pos -> Dictionary(target_pos -> true)
+	var four_state := {}
+	for t in level.tiles:
+		if t.tile_type == GridTypes.TileType.FUSION or t.tile_type == GridTypes.TileType.SPLITTER_SELECTOR:
+			four_state[t.position] = true
 	for pos in solution_orientations:
 		if authored.get(pos, GridTypes.MirrorOrientation.SLASH) == solution_orientations[pos]:
 			continue
-		m["intended_move_count"] += 1
+		# A 4-state tile (Fusion, Splitter Selector) costs its real clockwise tap distance (a Fusion start is always 1).
+		m["intended_move_count"] += posmod(int(solution_orientations[pos]) - int(authored[pos]), 4) if four_state.has(pos) else 1
 		var reverted: Dictionary = solved_orient.duplicate()
 		reverted[pos] = authored[pos]
 		var r: Dictionary = LaserSystem.simulate_until_stable(level, reverted)
 		if r["solved"]:
 			m["padding_moves"] += 1
+			m["padding_positions"].append(pos)
 			continue
 		m["required_rotatables"] += 1
 		affected_by_move[pos] = _subtract(base_targets, _as_set(r["activated_targets"]))
@@ -126,7 +135,7 @@ static func analyze(level: LevelData, solution_orientations: Dictionary, solver_
 	for unit in units:
 		# A Fusion Node is ablated into a BLOCKER (it still absorbs beams but emits nothing): deleting it would let its
 		# input beams run straight on through the empty cell, a counterfactual no player can ever reach (Phase 3, D101).
-		var ablated := _without(level, unit["positions"], unit["kind"] == "fusion")
+		var ablated := _without(level, unit["positions"], unit["kind"] == "fusion" or unit["kind"] == "selector")
 		var r: Dictionary = LaserSystem.simulate_until_stable(ablated, solved_orient)
 		var lost := _subtract(base_targets, _as_set(r["activated_targets"]))
 		if not lost.is_empty() or (base["solved"] and not r["solved"]):
@@ -148,7 +157,23 @@ static func analyze(level: LevelData, solution_orientations: Dictionary, solver_
 		kinds_per_target[tp] = {}
 		depth_per_target[tp] = 1
 
+	# Splitter Selectors (generator V5, D110): a Selector only counts as a mechanic kind / dependency / depth when
+	# ProceduralSelectorCheck finds it load-bearing AND not mirror-like (a wrong output meets a mechanic).
+	var sel_counted := {}
+	if ProceduralSelectorCheck.has_selector(level):
+		var sel: Dictionary = ProceduralSelectorCheck.analyze(level, solved_orient, base, load_bearing)
+		m["selector"] = sel
+		for spos in sel["by_pos"]:
+			sel_counted[spos] = sel["by_pos"][spos]["counted"]
+		m["selector_count"] = sel["selector_count"]
+		m["selector_load_bearing_count"] = sel["load_bearing_count"]
+		m["selector_interaction_count"] = sel["interaction_count"]
+		m["selector_equivalent_state_count"] = sel["equivalent_state_count"]
+		m["selector_downstream_depth"] = sel["max_downstream_depth"]
+
 	for unit in load_bearing:
+		if unit["kind"] == "selector" and not sel_counted.get(unit["positions"][0], false):
+			continue
 		var unit_kinds: Array[String] = [unit["kind"]]
 		var nodes := 1
 		match unit["kind"]:
@@ -172,6 +197,8 @@ static func analyze(level: LevelData, solution_orientations: Dictionary, solver_
 				m["splitter_dependency_count"] += 1
 			"fusion":
 				m["fusion_dependency_count"] += 1
+			"selector":
+				m["selector_dependency_count"] += 1
 		for k in unit_kinds:
 			kinds_all[k] = true
 		for tp in unit["lost"]:
@@ -250,7 +277,7 @@ static func analyze(level: LevelData, solution_orientations: Dictionary, solver_
 	m["meaningful_dependency_count"] = (
 		m["gate_switch_dependency_count"] + m["receiver_remote_dependency_count"]
 		+ m["portal_dependency_count"] + m["color_dependency_count"]
-		+ m["one_way_dependency_count"] + m["splitter_dependency_count"] + m["fusion_dependency_count"]
+		+ m["one_way_dependency_count"] + m["splitter_dependency_count"] + m["fusion_dependency_count"] + m["selector_dependency_count"]
 		+ m["shared_resource_count"] + m["convergence_count"]
 	)
 
@@ -354,7 +381,7 @@ static func _progress_score(level: LevelData, r: Dictionary) -> int:
 			special[c] = true
 	var reached := 0
 	for t in level.tiles:
-		if t.tile_type in [GridTypes.TileType.FILTER, GridTypes.TileType.PORTAL, GridTypes.TileType.PRISM, GridTypes.TileType.SPLITTER, GridTypes.TileType.ONE_WAY_REFLECTOR, GridTypes.TileType.GATE, GridTypes.TileType.FUSION] and special.has(t.position):
+		if t.tile_type in [GridTypes.TileType.FILTER, GridTypes.TileType.PORTAL, GridTypes.TileType.PRISM, GridTypes.TileType.SPLITTER, GridTypes.TileType.ONE_WAY_REFLECTOR, GridTypes.TileType.GATE, GridTypes.TileType.FUSION, GridTypes.TileType.SPLITTER_SELECTOR] and special.has(t.position):
 			reached += 1
 	return (r["activated_targets"].size() * 100 + (r["activated_switch_positions"].size() + r["activated_receiver_positions"].size()) * 10
 		+ reached * 3 + special.size())

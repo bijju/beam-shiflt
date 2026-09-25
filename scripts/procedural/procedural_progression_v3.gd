@@ -25,6 +25,24 @@ const GENERATOR_VERSION := 3
 ## Fusion-capable progression (Fusion Phase 2, D100): the same pipeline with the Fusion fragments and
 ## their per-band unlock table enabled. V3 stays frozen; V4 has its own seed space (version in the key).
 const GENERATOR_VERSION_FUSION := 4
+## Selector-capable progression (Selector Phase S3, D110): the V4 pipeline + Splitter Selector fragments, Levels
+## 2001-3000. A NEW version (not a mutation of V4): V1-V4 stay frozen and a saved puzzle regenerates under its own.
+const GENERATOR_VERSION_SELECTOR := 5
+## V5 boards carry up to ~34 required moves on 8x11/8x12, so more placement attempts are allowed than in V3/V4.
+const MAX_ATTEMPTS_V5 := 64
+## Attempts that keep trying the level's rolled Selector family before falling back to an ordinary V5 recipe
+## (the level then carries no Selector: `selector_dropped`, counted and reported - never hidden).
+const SELECTOR_ATTEMPTS := 30
+## V5: from this attempt on the level may fall back to the reasoning floors of the band below (see generate()).
+const V5_DEMOTE_AFTER := 32
+const V5_DEMOTE_AFTER_SELECTOR := 32
+const V5_DEMOTE_AFTER_K := 48
+const V5_RELAX_GRACE := 3
+## Consequence + Mastery bands: at least one Selector must have a wrong output that changes a state or meets a mechanic.
+const V5_STRICT_SELECTOR_FROM := 2601
+## Simulation budget / beam width of the ONE final shortcut probe a V5 candidate must survive.
+const V5_FINAL_PROBE_SIMS := 3200
+const V5_FINAL_PROBE_WIDTH := 48
 const MAX_ATTEMPTS := 12
 ## Dense late plans (Level 1301+; from 1001 in generator V4, D100) get a few more tries: ~2% of them need >12 attempts.
 const MAX_ATTEMPTS_LATE := 16
@@ -41,6 +59,10 @@ const FUSION_ROLL_STREAM := 90
 const _ATTEMPT_SEED_OFFSET := 100
 
 static var fallback_count: int = 0
+## V5: levels whose rolled Selector family could not be placed/accepted and that therefore carry no Selector.
+static var selector_dropped_count: int = 0
+## V5: levels accepted only under the demoted (band below) reasoning floors.
+static var band_demoted_count: int = 0
 ## Dev switch (v3_progression_sample.tscn `probe=0`) to measure the RAW shortcut rate
 ## of the composer without the runtime probe. Always true in the game.
 static var shortcut_probe_enabled: bool = true
@@ -56,22 +78,62 @@ static func generate(level_number: int, version: int = GENERATOR_VERSION) -> Dic
 	var fusion_recipe: Array[String] = []
 	if fusion_enabled:
 		fusion_recipe = ProceduralFragmentsV3.roll_fusion_recipe(level_number, ProceduralSeed.rng_for_attempt(level_number, version, FUSION_ROLL_STREAM))
+	# Generator V5 (D110): the level's ONE Selector roll (dedicated stream). A Fusion family forces a Fusion recipe.
+	var selector_spec: Dictionary = {}
+	if version >= GENERATOR_VERSION_SELECTOR:
+		selector_spec = ProceduralFragmentsV3.roll_selector(level_number, ProceduralSeed.rng_for_attempt(level_number, version, ProceduralFragmentsV3.SELECTOR_ROLL_STREAM), not fusion_recipe.is_empty())
+		if not selector_spec.is_empty() and selector_spec["fusion"] and fusion_recipe.is_empty():
+			fusion_recipe = ProceduralFragmentsV3.roll_fusion_recipe(level_number, ProceduralSeed.rng_for_attempt(level_number, version, FUSION_ROLL_STREAM + 1), true)
 	var fusion_attempts := FUSION_ATTEMPTS_LATE if level_number >= 1301 else FUSION_ATTEMPTS
+	var selector_attempts := SELECTOR_ATTEMPTS
+	if not selector_spec.is_empty() and selector_spec["fusion"]:
+		fusion_attempts = maxi(fusion_attempts, SELECTOR_ATTEMPTS) # a Fusion recipe FORCED by a Selector family gets the Selector's whole window
+	# A level demotes its reasoning floors only after a strict search window. K gets a longer runway: S3.1's measured
+	# failures were concentrated there, and delaying demotion preserves the band contract instead of lowering K's targets.
+	var demote_at := V5_DEMOTE_AFTER_SELECTOR if not selector_spec.is_empty() else V5_DEMOTE_AFTER
+	if level_number >= 2801:
+		demote_at = V5_DEMOTE_AFTER_K
+	var min_downstream := int(ProceduralDifficultyContract.selector_policy(level_number)["min_downstream_depth"])
 	var no_fusion: Array[String] = []
 	var req := ProceduralDifficultyContract.get_difficulty_requirements(level_number)
 	req["min_required_branches"] = 1
+	req["band_min_moves"] = req["min_optimal_moves"]
 	var rejections: Array = []
 	var layout_failures := 0
 	var soft_pick: Dictionary = {} # first candidate that passed every hard gate but was greedy-solvable
 
-	for attempt in range(MAX_ATTEMPTS_LATE if (level_number >= 1301 or (fusion_enabled and level_number >= 1001)) else MAX_ATTEMPTS):
+	var max_attempts := MAX_ATTEMPTS_V5 if version >= GENERATOR_VERSION_SELECTOR else (MAX_ATTEMPTS_LATE if (level_number >= 1301 or (fusion_enabled and level_number >= 1001)) else MAX_ATTEMPTS)
+	for attempt in range(max_attempts):
 		var rng := ProceduralSeed.rng_for_attempt(level_number, version, _ATTEMPT_SEED_OFFSET + attempt)
 		var t0 := Time.get_ticks_usec()
-		var composed := ProceduralFragmentsV3.compose(level_number, req, rng, layout_failures, fusion_recipe if attempt < fusion_attempts else no_fusion)
+		# Generator V5 (D110): a plan that is physically too dense for the board lowers the MOVE target (each layout
+		# failure by 1, at most V5_MOVE_RELAX_FRACTION of the band floor) - never the reasoning floors (depth,
+		# dependencies, interactions, kinds, Selector rules). Moves are the least meaningful metric; a level that lands
+		# below its band's move window is reported `moves_below_band` instead of padded.
+		var ra := req
+		var demoted := false
+		if version >= GENERATOR_VERSION_SELECTOR:
+			ra = req.duplicate()
+			if attempt >= demote_at:
+				# Last resort before the V2 fallback: the REASONING floors of the band below (never the Selector rules), so the
+				# level is still a real V5 puzzle - flagged `band_demoted`, counted and reported, never silent.
+				demoted = true
+				var lower := ProceduralDifficultyContract.get_difficulty_requirements(ProceduralDifficultyContract.band_start(level_number) - 1)
+				for key in ["min_optimal_moves", "max_optimal_moves", "min_meaningful_dependencies", "min_dependency_depth", "min_mechanic_interactions", "min_distinct_mechanics"]:
+					ra[key] = lower[key]
+				ra["band_min_moves"] = lower["min_optimal_moves"]
+			# The first three layout failures are ordinary retries (as in V3/V4); only persistent ones shave the move floor.
+			if layout_failures > V5_RELAX_GRACE:
+				var cap := int(round(float(ra["min_optimal_moves"]) * ProceduralFragmentsV3.V5_MOVE_RELAX_FRACTION))
+				ra["min_optimal_moves"] = maxi(3, int(ra["min_optimal_moves"]) - mini(cap, layout_failures - V5_RELAX_GRACE))
+		var composed := ProceduralFragmentsV3.compose(level_number, ra, rng, layout_failures, fusion_recipe if attempt < fusion_attempts else no_fusion, selector_spec if attempt < selector_attempts else {})
 		_tick("compose", t0)
 		if not composed["ok"]:
 			rejections.append({"attempt": attempt, "stage": "plan", "reasons": [composed["reason"]]})
 			continue
+		if version >= GENERATOR_VERSION_SELECTOR:
+			ra = ra.duplicate()
+			ra["min_optimal_moves"] = int(composed["min_moves"])
 		var plan: ProceduralPlanV3 = composed["plan"]
 		var boards: Array = req["preferred_board_profiles"]
 		var size := _board_for(level_number, attempt, boards)
@@ -88,7 +150,7 @@ static func generate(level_number: int, version: int = GENERATOR_VERSION) -> Dic
 		t0 = Time.get_ticks_usec()
 		var hardened := ProceduralComposerV3.harden(board)
 		_tick("harden", t0)
-		board.apply_keep_correct(rng, mini(int(composed["keep"]), maxi(0, board.solution.size() - int(req["min_optimal_moves"]))))
+		board.apply_keep_correct(rng, mini(int(composed["keep"]), maxi(0, board.solution.size() - int(ra["min_optimal_moves"]))))
 		var level := board.to_level_data(board.w, board.h)
 		var tiles_used := board.tiles.size()
 		level.level_id = level_number
@@ -97,7 +159,7 @@ static func generate(level_number: int, version: int = GENERATOR_VERSION) -> Dic
 		level.is_campaign_level = false
 
 		t0 = Time.get_ticks_usec()
-		var check := ProceduralGeneratorV3._check(level, board, plan, _req_for(req, composed))
+		var check := ProceduralGeneratorV3._check(level, board, plan, _req_for(ra, composed))
 		_tick("check", t0)
 		var metrics: Dictionary = check["metrics"]
 		var reasons: Array = check["reasons"].duplicate()
@@ -105,6 +167,17 @@ static func generate(level_number: int, version: int = GENERATOR_VERSION) -> Dic
 		var fusion_report := {}
 		if check["ok"]:
 			_extra_gates(level_number, level, board, req, metrics, composed, reasons)
+			if version >= GENERATOR_VERSION_SELECTOR:
+				# Splitter Selector (D110): every Selector load-bearing, non-equivalent, not mirror-like, with a live wrong
+				# output; several Selectors must be coupled; the deepest decision must feed enough mechanics.
+				var sel_metrics: Dictionary = metrics.get("selector", {})
+				if not sel_metrics.is_empty():
+					for sr in ProceduralSelectorCheck.reasons_for(sel_metrics, min_downstream, level_number >= V5_STRICT_SELECTOR_FROM and not demoted):
+						reasons.append("selector: %s" % sr)
+					if int(hardened.get("selector_unrepaired", 0)) > 0:
+						reasons.append("selector: %d wrong output(s) solve the board and have no room for a blocker" % int(hardened["selector_unrepaired"]))
+				if not composed["selectors"].is_empty() and sel_metrics.is_empty():
+					reasons.append("selector: the rolled family placed none")
 			if fusion_enabled and ProceduralFragmentsV3.fusion_fragment_of(composed["atoms"]) != "":
 				# Fusion (D100): per-input ablation, colour consumption, feedback (cycle) rejection and
 				# convergence of the start/solved/one-tap-away boards. Reject-and-retry, never "hope".
@@ -142,7 +215,9 @@ static func generate(level_number: int, version: int = GENERATOR_VERSION) -> Dic
 		# screen missed half of them.
 		var probe := {"shortcut": false}
 		if shortcut_probe_enabled:
-			if fusion_report.is_empty():
+			# Fusion and Selector boards (4-state tiles: alternate routes are likelier) get the wide probe. Generator V5 keeps the
+			# cheap default here (a pre-filter) and runs ONE much wider probe on the candidate that survives every other gate (below).
+			if fusion_report.is_empty() and (int(metrics["selector_count"]) == 0 or version >= GENERATOR_VERSION_SELECTOR):
 				probe = ProceduralShortcutProbe.probe(level, int(metrics["intended_move_count"]), board.solution)
 			else:
 				probe = ProceduralShortcutProbe.probe(level, int(metrics["intended_move_count"]), board.solution, FUSION_PROBE_SIMS, FUSION_PROBE_WIDTH)
@@ -156,6 +231,24 @@ static func generate(level_number: int, version: int = GENERATOR_VERSION) -> Dic
 			t0 = Time.get_ticks_usec()
 			greedy_solved = ProceduralComplexity.greedy_follow_solve(level)["solved"]
 			_tick("greedy", t0)
+		# Generator V5 (D110): the expensive last gate. A whole group of required-looking tiles that turns out superfluous (found
+		# by real-GridManager replay: ~14% of unscreened Mastery boards) means the intended move count overstates the difficulty.
+		if version >= GENERATOR_VERSION_SELECTOR:
+			t0 = Time.get_ticks_usec()
+			var minimal := ProceduralMinimality.find_cheaper(level, board.solution, board.tile_line)
+			_tick("minimality", t0)
+			if not minimal["cheaper"] and shortcut_probe_enabled:
+				# The final, wide shortcut probe (D110): an independent 2500-simulation probe found 9-14-flip alternatives in ~2% of
+				# Selector Entry/Branching boards that the runtime screens had accepted (whole sub-routes bypassed by a stray beam).
+				t0 = Time.get_ticks_usec()
+				var final_probe := ProceduralShortcutProbe.probe(level, int(metrics["intended_move_count"]), board.solution, V5_FINAL_PROBE_SIMS, V5_FINAL_PROBE_WIDTH)
+				_tick("final_probe", t0)
+				if final_probe["shortcut"]:
+					rejections.append({"attempt": attempt, "stage": "shortcut", "reasons": ["final probe: solvable in %d flips, intended %d" % [final_probe["depth"], metrics["intended_move_count"]]], "atoms": composed["atoms"], "board": size})
+					continue
+			if minimal["cheaper"]:
+				rejections.append({"attempt": attempt, "stage": "minimality", "reasons": ["solution not minimal: %d of %d required tiles are superfluous (%s)" % [minimal["saved"], minimal["required"], minimal["how"]]], "atoms": composed["atoms"], "board": size})
+				continue
 		level.optimal_moves = maxi(int(metrics["intended_move_count"]), 1)
 		var result := _result(level_number, level, hardened, board, plan, composed, metrics, check["verdict"], visibility, attempt, rejections, req, version)
 		result["greedy_solved"] = greedy_solved
@@ -166,8 +259,19 @@ static func generate(level_number: int, version: int = GENERATOR_VERSION) -> Dic
 		result["fusion_variant"] = str(plan.params.get("fusion_variant", ""))
 		result["fusion_report"] = fusion_report
 		result["fusion_present"] = not fusion_report.is_empty()
+		result["selector_present"] = ProceduralSelectorCheck.has_selector(level)
+		result["moves_below_band"] = int(metrics["intended_move_count"]) < int(req["min_optimal_moves"])
+		result["layout_failures"] = layout_failures
+		result["band_demoted"] = demoted
+		if demoted:
+			band_demoted_count += 1
+		result["selector_fragment"] = str(composed["selectors"].get("fragment", ""))
+		result["selector_info"] = composed["selectors"]
+		result["selector_dropped"] = not selector_spec.is_empty() and not bool(result["selector_present"])
+		if result["selector_dropped"]:
+			selector_dropped_count += 1
 		if greedy_solved and (policy == "prefer_reject" or policy == "reject"):
-			if soft_pick.is_empty():
+			if soft_pick.is_empty() and (version < GENERATOR_VERSION_SELECTOR or level_number <= 2200):
 				soft_pick = result
 			continue
 		return result
@@ -178,7 +282,7 @@ static func generate(level_number: int, version: int = GENERATOR_VERSION) -> Dic
 		return soft_pick
 
 	fallback_count += 1
-	push_warning("V3_GENERATION_FAILED level %d (%d attempts) - V2 fallback used" % [level_number, MAX_ATTEMPTS])
+	push_warning("%s level %d (%d attempts) - V2 fallback used" % ["V5_GENERATION_FAILED" if version >= GENERATOR_VERSION_SELECTOR else "V3_GENERATION_FAILED", level_number, max_attempts])
 	var fallback := ProceduralLevelGenerator.generate(level_number, 2)
 	fallback["fallback_used"] = true
 	fallback["v3_generation_failed"] = true
@@ -222,6 +326,7 @@ static func _result(level_number: int, level: LevelData, hardened: Dictionary, b
 		"metrics": metrics,
 		"verdict": verdict,
 		"start_visibility": visibility,
+		"tile_line": board.tile_line,
 		"ascii": ProceduralBoardV3.ascii(level),
 	}
 
@@ -255,7 +360,8 @@ static func _board_for(level_number: int, attempt: int, boards: Array) -> Vector
 		var top: Array = []
 		var best: int = by_area[0].x * by_area[0].y
 		for b in by_area:
-			if b.x * b.y * 10 >= best * 9:
+			# V5 (D110) uses only the largest shape (the reasoning floors are what fill the board; no smaller variant).
+			if b.x * b.y * 10 >= best * (10 if level_number > 2000 else 9):
 				top.append(b)
 		return top[(level_number + attempt) % top.size()]
 	return by_area[maxi(0, (level_number % by_area.size()) - attempt)]

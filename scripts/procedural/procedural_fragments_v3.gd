@@ -98,11 +98,21 @@ const FUSION_RECIPE_VARIANTS := {
 
 const _COLORS: Array[int] = [GridTypes.BeamColor.RED, GridTypes.BeamColor.GREEN, GridTypes.BeamColor.BLUE]
 const MAX_SLOT_TURNS := 3
+## Generator V5 escalation weight per atom = how reliably the composer lays it out (1 - measured failure rate, squared, D110).
+const V5_LAYOUT_WEIGHT := {"SO": 0.15, "SH": 0.2, "PG": 0.4, "OH": 0.5, "P": 0.6, "SB": 0.5, "GG": 0.8}
+## Composer search budgets for generator V5 boards (see compose()). Statics so a dev tool can tune them.
+static var v5_restarts: int = 8
+## Tile budget of a V5 plan (the composer places ~64-72% of an 8x10/8x11 board reliably; a hard ceiling on clutter).
+static var v5_tile_budget: int = 56
+## Share of a band's move floor a V5 plan may give up when the board cannot hold it (never the reasoning floors).
+const V5_MOVE_RELAX_FRACTION := 0.25
+static var v5_op_budget: int = 500
+static var v5_walk_budget: int = 120
 
 
 ## Returns {ok, reason, plan, atoms, predicted, moves, keep, plain_fraction}.
-static func compose(level_number: int, req: Dictionary, rng: RandomNumberGenerator, layout_failures: int = 0, fusion_recipe: Array[String] = []) -> Dictionary:
-	var atoms := choose_atoms(level_number, req, rng, fusion_recipe)
+static func compose(level_number: int, req: Dictionary, rng: RandomNumberGenerator, layout_failures: int = 0, fusion_recipe: Array[String] = [], selector_spec: Dictionary = {}) -> Dictionary:
+	var atoms := choose_atoms(level_number, req, rng, fusion_recipe, selector_spec)
 	if atoms.is_empty() and level_number > 8:
 		return {"ok": false, "reason": "no atom recipe satisfies the band"}
 	# Dense late puzzles can physically not fit the top of the move window on an 8-column
@@ -117,6 +127,31 @@ static func compose(level_number: int, req: Dictionary, rng: RandomNumberGenerat
 	var fixed := 0
 	for a in atoms:
 		fixed += int(ATOMS[a]["fixed"])
+	# Generator V5 (D110): turn the chosen sites into Splitter Selectors. A Selector is one of its slot's turns
+	# but costs its real clockwise tap distance, so the extra taps join the fixed (non-turn) moves.
+	var selectors_applied := {}
+	if not selector_spec.is_empty():
+		selectors_applied = _apply_selectors(plan, selector_spec, rng)
+		if not selectors_applied["ok"]:
+			return {"ok": false, "reason": selectors_applied["reason"]}
+		fixed += int(selectors_applied["extra_taps"])
+	# Generator V5 (D110): predict density BEFORE layout. tiles = BASE + turns + special-tile costs, and dense plans are
+	# what the composer cannot place; if the atoms leave room for fewer moves than the relaxed band floor the plan is
+	# redrawn (cheap), otherwise the move target (and floor) shrinks to what fits - moves are the least meaningful
+	# metric and are never padded.
+	var min_moves := int(req["min_optimal_moves"])
+	if level_number > 2000:
+		var cost := 0
+		for a in atoms:
+			cost += int(TILE_COST[a])
+		var kf := float(req["keep_correct_fraction"])
+		var fit := int(floor(float(v5_tile_budget - BASE_TILE_COST - cost + fixed) / (1.0 + kf)))
+		var hard_floor := int(ceil(float(req.get("band_min_moves", min_moves)) * (1.0 - V5_MOVE_RELAX_FRACTION)))
+		if fit < hard_floor:
+			return {"ok": false, "reason": "plan density: atoms leave room for %d moves < %d" % [fit, hard_floor]}
+		min_moves = mini(min_moves, fit)
+		moves = maxi(min_moves, mini(moves, fit))
+		keep = maxi(int(round(float(moves) * kf)), 1)
 	var max_slot := 4 if level_number <= 20 else MAX_SLOT_TURNS
 	var min_turns := 0
 	for s in slots:
@@ -125,8 +160,8 @@ static func compose(level_number: int, req: Dictionary, rng: RandomNumberGenerat
 	# routes of the first levels simply cap their own move count.
 	var capacity := slots.size() * max_slot
 	moves = mini(moves, capacity + fixed - keep)
-	if moves < int(req["min_optimal_moves"]):
-		return {"ok": false, "reason": "%d turn slots cannot hold the band's minimum of %d moves" % [slots.size(), int(req["min_optimal_moves"])]}
+	if moves < min_moves:
+		return {"ok": false, "reason": "%d turn slots cannot hold the band's minimum of %d moves" % [slots.size(), min_moves]}
 	# A plan with many turn slots may need more than the drawn move target (a slot needs at least
 	# one turn); raise the target to the plan's minimum when the band window still allows it.
 	moves = maxi(moves, mini(int(req["max_optimal_moves"]), min_turns + fixed - keep))
@@ -149,16 +184,23 @@ static func compose(level_number: int, req: Dictionary, rng: RandomNumberGenerat
 	plan.params["keep_correct"] = keep
 	# Hop-length bias: sparse early boards spread out, dense late boards pack tight.
 	plan.params["alpha"] = 0.3 if level_number <= 400 else (0.6 if level_number <= 1000 else 1.0)
+	if level_number > 2000:
+		# Generator V5 (D110): dense boards get a larger placement search (dev-tunable statics, see v5_sample.gd).
+		plan.params["restarts"] = v5_restarts
+		plan.params["op_budget"] = v5_op_budget
+		plan.params["walk_budget"] = v5_walk_budget
 	return {
-		"ok": true, "reason": "", "plan": plan, "atoms": atoms, "predicted": predict(atoms),
-		"tile_estimate": estimate_tiles(atoms, turn_budget), "moves": moves, "keep": keep, "plain_fraction": minf(1.0, float(plain) * required_share / float(maxi(moves, 1))),
+		"ok": true, "reason": "", "plan": plan, "atoms": atoms, "predicted": predict(atoms, int(selector_spec.get("count", 0))), "selectors": selectors_applied,
+		"tile_estimate": estimate_tiles(atoms, turn_budget), "moves": moves, "min_moves": min_moves, "keep": keep, "plain_fraction": minf(1.0, float(plain) * required_share / float(maxi(moves, 1))),
 	}
 
 
-static func predict(atoms: Array) -> Dictionary:
-	var nodes := 0
-	var deps := 0
+static func predict(atoms: Array, selector_count: int = 0) -> Dictionary:
+	var nodes := selector_count # each Selector is one load-bearing node (generator V5; 0 for V1-V4)
+	var deps := selector_count
 	var kinds := {}
+	if selector_count > 0:
+		kinds["selector"] = true
 	for a in atoms:
 		nodes += int(ATOMS[a]["nodes"])
 		deps += int(ATOMS[a]["deps"])
@@ -200,11 +242,16 @@ static func _cores_for(level_number: int) -> Array:
 		return [["SG", "F"], ["PR", "H", "F"], ["SO", "F"], ["OW", "H", "F"], ["PG", "F"], ["H", "G", "F"], ["GG", "F", "P"], ["OH", "SG", "F"]]
 	if level_number <= 1000:
 		return [["SG", "H", "F"], ["PG", "H", "F"], ["SO", "H", "F"], ["GG", "H", "F"], ["H", "G", "F", "P"], ["PR", "SG", "F"], ["OW", "SG", "F"]]
+	if level_number > 2000:
+		# Generator V5 (D110): cores chosen for depth per TILE (the board, not the plan, is the scarce resource).
+		return [["SG", "H", "F"], ["PR", "SG", "F"], ["OW", "SG", "F"], ["SG", "P", "F"], ["H", "G", "F", "P"], ["GG", "F"], ["G", "H", "OW", "F"], ["SG", "H", "G", "F"], ["PR", "H", "G", "F"], ["PG", "H", "F"], ["SO", "H", "F"]]
 	return [["SG", "H", "F"], ["PG", "H", "F"], ["SO", "H", "F"], ["GG", "H", "F"], ["PR", "SG", "H", "F"], ["OW", "GG", "F"], ["SH", "H", "H", "F"]]
 
 
-static func choose_atoms(level_number: int, req: Dictionary, rng: RandomNumberGenerator, fusion_recipe: Array[String] = []) -> Array[String]:
+static func choose_atoms(level_number: int, req: Dictionary, rng: RandomNumberGenerator, fusion_recipe: Array[String] = [], selector_spec: Dictionary = {}) -> Array[String]:
 	var avail := _available(level_number)
+	var sel_n := int(selector_spec.get("count", 0))
+	var sel_need: Array = selector_spec.get("need", [])
 	# Fusion (generator V4+): `fusion_recipe` is the level's ONE Fusion roll (see roll_fusion_recipe), passed
 	# in by the progression generator; [] = an ordinary recipe. No rng is consumed here for it, so V3 draws
 	# (which always pass []) are untouched.
@@ -226,20 +273,37 @@ static func choose_atoms(level_number: int, req: Dictionary, rng: RandomNumberGe
 			for a in core:
 				if avail.has(a):
 					filtered.append(a)
-			if _within_caps(predict(filtered), max_depth, max_deps):
+			if _within_caps(predict(filtered, sel_n), max_depth, max_deps):
 				usable.append(filtered)
 		if usable.is_empty():
 			return []
 	var atoms: Array[String] = []
 	if fusion_core.is_empty():
-		atoms.assign(usable[rng.randi_range(0, usable.size() - 1)])
+		var pool: Array = usable
+		if not sel_need.is_empty():
+			# Selector fragment (V5): prefer cores that already hold the mechanics its sites need.
+			var fitting: Array = []
+			for core in usable:
+				if _needs_missing(core, sel_need).is_empty():
+					fitting.append(core)
+			if not fitting.is_empty():
+				pool = fitting
+		atoms.assign(pool[rng.randi_range(0, pool.size() - 1)])
+		for group in _needs_missing(atoms, sel_need):
+			var opts: Array[String] = []
+			for a in group:
+				if avail.has(a) and _can_add(atoms, a):
+					opts.append(a)
+			if opts.is_empty():
+				return []
+			atoms.append(opts[rng.randi_range(0, opts.size() - 1)])
 	else:
 		atoms.assign(fusion_core)
-		if not _within_caps(predict(atoms), max_depth, max_deps):
+		if not _within_caps(predict(atoms, sel_n), max_depth, max_deps):
 			return []
 
 	for _i in range(12):
-		var p := predict(atoms)
+		var p := predict(atoms, sel_n)
 		if p["depth"] >= min_depth and p["kinds"] >= min_kinds and p["deps"] >= min_deps:
 			break
 		# Escalate: prefer atoms that add new kinds; when the dependency ceiling
@@ -267,6 +331,10 @@ static func choose_atoms(level_number: int, req: Dictionary, rng: RandomNumberGe
 			var w := 1.0 + 2.0 * float(grows)
 			if p["depth"] < min_depth:
 				w += float(atom["nodes"]) - float(atom["deps"])
+			if level_number > 2000:
+				# V5: prefer atoms that buy depth cheaply in board area (nodes per tile) and that the composer can actually
+				# lay out (measured layout failure per atom, D110: the shared-tile atoms SO/SH and PG fail 75-90% of layouts).
+				w *= pow(float(atom["nodes"] + 1) / float(TILE_COST[a] + 1), 1.5) * 2.0 * float(V5_LAYOUT_WEIGHT.get(a, 1.0))
 			options.append(a)
 			weights.append(maxf(w, 0.2))
 		if options.is_empty():
@@ -274,16 +342,16 @@ static func choose_atoms(level_number: int, req: Dictionary, rng: RandomNumberGe
 		atoms.append(options[_weighted(weights, rng)])
 
 	# Optional advanced patterns (only once the band allows their cost).
-	if fusion_core.is_empty() and level_number >= 401 and avail.has("TM") and atoms.has("F") and rng.randf() < (0.5 if level_number >= 1001 else 0.3):
+	if fusion_core.is_empty() and level_number >= 401 and avail.has("TM") and atoms.has("F") and rng.randf() < (0.25 if level_number > 2000 else (0.5 if level_number >= 1001 else 0.3)):
 		var trial: Array[String] = atoms.duplicate()
 		trial.append("TM")
 		trial.append("F2")
-		if _within_caps(predict(trial), max_depth, max_deps):
+		if _within_caps(predict(trial, sel_n), max_depth, max_deps):
 			atoms = trial
-	if fusion_core.is_empty() and level_number >= 401 and avail.has("OH") and rng.randf() < 0.25:
+	if fusion_core.is_empty() and level_number >= 401 and avail.has("OH") and rng.randf() < (0.12 if level_number > 2000 else 0.25):
 		atoms.append("OH")
 
-	var final := predict(atoms)
+	var final := predict(atoms, sel_n)
 	if final["depth"] < min_depth or final["kinds"] < min_kinds or final["deps"] < min_deps:
 		return []
 	if not _within_caps(final, max_depth, max_deps):
@@ -295,7 +363,7 @@ static func choose_atoms(level_number: int, req: Dictionary, rng: RandomNumberGe
 	var has_fu3 := atoms.has("FU3")
 	var keyed: Array = []
 	for i in range(atoms.size()):
-		keyed.append([_order(atoms[i], has_tm, has_fu3) * 100 + i, atoms[i]])
+		keyed.append([_order(atoms[i], has_tm, has_fu3, str(selector_spec.get("fragment", "")) == "SJ") * 100 + i, atoms[i]])
 	keyed.sort_custom(func(x: Array, y: Array) -> bool: return x[0] < y[0])
 	var sorted: Array[String] = []
 	for k in keyed:
@@ -306,11 +374,11 @@ static func choose_atoms(level_number: int, req: Dictionary, rng: RandomNumberGe
 ## The Fusion recipe this level rolls ONCE (or [] = an ordinary V3-style recipe). Deterministic: one draw for
 ## the yes/no and one for the fragment, both from the level's own dedicated rng (never re-rolled per attempt, so a
 ## fragment that is hard to place does not silently lower the band's Fusion frequency).
-static func roll_fusion_recipe(level_number: int, rng: RandomNumberGenerator) -> Array[String]:
+static func roll_fusion_recipe(level_number: int, rng: RandomNumberGenerator, force: bool = false) -> Array[String]:
 	var policy := ProceduralDifficultyContract.fusion_policy(level_number)
 	var fragments: Array = policy["fragments"]
 	var out: Array[String] = []
-	if fragments.is_empty() or rng.randf() >= float(policy["probability"]):
+	if fragments.is_empty() or (not force and rng.randf() >= float(policy["probability"])):
 		return out
 	var frag: String = fragments[rng.randi_range(0, fragments.size() - 1)]
 	if FUSION_RECIPE_VARIANTS.has(frag):
@@ -372,7 +440,7 @@ static func _within_caps(p: Dictionary, max_depth: int, max_deps: int) -> bool:
 ## leads; with a mid-route target the first filter sits right before it (same
 ## line, so its colour is what the target asks for) and the second follows it;
 ## the splitter branch to a second target comes last so it inherits the colour.
-static func _order(atom: String, has_tm: bool, has_fu3: bool = false) -> int:
+static func _order(atom: String, has_tm: bool, has_fu3: bool = false, portal_first: bool = false) -> int:
 	match atom:
 		"PR", "PG":
 			# A Prism after a three-colour Fusion sees the node's WHITE output, so it follows the node.
@@ -385,7 +453,9 @@ static func _order(atom: String, has_tm: bool, has_fu3: bool = false) -> int:
 			return 20
 		"SG", "SH", "SO":
 			return 10
-		"G", "GG", "OW", "OH", "H", "P":
+		"P":
+			return 19 if portal_first else 20 # family SJ needs the Portal BEFORE the Receiver hop
+		"G", "GG", "OW", "OH", "H":
 			return 20
 		"F":
 			return 29 if has_tm else 40
@@ -759,6 +829,9 @@ static func _draw_moves(level_number: int, req: Dictionary, rng: RandomNumberGen
 	if level_number < 1301:
 		return rng.randi_range(lo, hi)
 	var r := rng.randf()
+	if level_number > 2000:
+		# V5: spread the draw over the whole band (density fit and layout failures pull it down where the board cannot hold it).
+		return lo + int(round(float(hi - lo) * pow(r, 1.4)))
 	return lo + int(round(float(hi - lo) * r * r))
 
 
@@ -780,3 +853,216 @@ static func estimate_tiles(atoms: Array, turns: int) -> int:
 	for a in atoms:
 		n += int(TILE_COST[a])
 	return n
+
+
+# --- Splitter Selector fragments (generator V5, D110) ---------------------------------------------------
+## Selector families S-A..S-P. A family is a RECIPE, not a template and not a coordinate: it names the
+## mechanics its Selector must feed (`need`: every inner list is an any-of group of base atoms; the
+## composer adds a missing one), the plan `sites` a Selector takes (a "site" = the turn slot in front of a
+## certain token - see _collect_sites), and whether it needs a Fusion recipe (`fusion`). The Selector is one
+## of its slot's turns: the composer routes it like a mirror, and the real LaserSystem-based
+## ProceduralSelectorCheck then decides whether the finished board really needs it.
+##   SA Selector -> Filter (colour)            SB Selector -> Portal
+##   SC Selector -> Switch -> Gate             SD Selector -> Receiver -> Remote
+##   SE Selector -> Fusion input               SF two Selectors -> two Fusion inputs
+##   SG Prism -> Selector -> colour route      SH Selector -> One-Way
+##   SJ Selector -> Portal -> Receiver -> Remote (chain)   SL Selector in front of a Gate
+##   SM Selector -> target continuation        SN Selector on a Splitter branch
+##   SP Fusion output Selector + input Selector (late chain)
+## Not implemented (documented in PROCEDURAL_GENERATION.md section 20): S-I shared-mirror Selector, S-K target
+## vs prerequisite bait, S-O indirect two-Selector dependency - the composer has no
+## bait/decoy builder yet; the consequence metric and the wrong-ray screen approximate their intent.
+const _GATE_ATOMS := ["G", "SG", "PG", "SH", "SO", "GG"]
+const SELECTOR_FRAGMENTS := {
+	"SA": {"label": "Selector -> Filter", "sites": ["filter"], "need": [["F"]], "fusion": false},
+	"SB": {"label": "Selector -> Portal", "sites": ["portal"], "need": [["P"]], "fusion": false},
+	"SC": {"label": "Selector -> Switch -> Gate", "sites": ["switch"], "need": [_GATE_ATOMS], "fusion": false},
+	"SD": {"label": "Selector -> Receiver -> Remote", "sites": ["hop"], "need": [["H"]], "fusion": false},
+	"SE": {"label": "Selector -> Fusion input", "sites": ["fjoin"], "need": [], "fusion": true},
+	"SF": {"label": "Two Selectors -> Fusion inputs", "sites": ["fusion_in", "fjoin"], "need": [], "fusion": true},
+	"SG": {"label": "Prism -> Selector -> colour route", "sites": ["prism_main"], "need": [["PR", "PG"]], "fusion": false},
+	"SH": {"label": "Selector -> One-Way", "sites": ["ow"], "need": [["OW"]], "fusion": false},
+	"SJ": {"label": "Selector -> Portal -> Receiver -> Remote", "sites": ["hop_after_portal"], "need": [["P"], ["H"]], "fusion": false},
+	"SL": {"label": "Selector in front of a Gate", "sites": ["gate"], "need": [_GATE_ATOMS], "fusion": false},
+	"SM": {"label": "Selector -> target continuation", "sites": ["target"], "need": [["TM"]], "fusion": false},
+	"SN": {"label": "Selector on a Splitter branch", "sites": ["branch_first"], "need": [["SB", "SG"]], "fusion": false},
+	"SP": {"label": "Fusion output + input Selectors", "sites": ["fusion_out", "fjoin"], "need": [], "fusion": true},
+}
+## Slots any EXTRA Selector (count beyond the family's own sites) may take.
+const _EXTRA_SITES := ["filter", "portal", "gate", "switch", "hop", "prism_main", "fjoin", "fusion_in", "ow", "target"]
+const SELECTOR_ROLL_STREAM := 91
+## Clockwise taps a generated Selector needs from its start orientation (weights 55 / 35 / 10 %): 4-state
+## tiles cost their real tap distance, and the start is deliberately varied (straight-through / other turn /
+## dead) instead of always "opposite of the solution".
+const _TAP_WEIGHTS := [0.55, 0.35, 0.10]
+
+
+## The level's ONE Selector roll (dedicated rng stream): {} = no Selector, else {fragment, count, need, sites,
+## fusion}. Whether the level carries one at all is the contract's deterministic low-discrepancy sequence
+## (ProceduralDifficultyContract.selector_policy), never an rng draw. `fusion_rolled`: the level's independent
+## Fusion roll came up - then only the Fusion families are eligible (a Filter after a Fusion node would erase
+## its colour); a Fusion family on a level that did NOT roll one makes the caller force a Fusion recipe.
+static var dev_disable_selector := false
+## Dev only (v5_sample family=XX): every level rolls this Selector family regardless of the frequency sequence.
+static var dev_force_family := ""
+
+
+static func roll_selector(level_number: int, rng: RandomNumberGenerator, fusion_rolled: bool) -> Dictionary:
+	if dev_disable_selector:
+		return {}
+	var pol := ProceduralDifficultyContract.selector_policy(level_number)
+	if dev_force_family != "":
+		pol["has_selector"] = true
+		pol["fragments"] = [dev_force_family]
+	if not pol["has_selector"]:
+		return {}
+	if level_number == ProceduralDifficultyContract.SELECTOR_INTRO_LEVEL and dev_force_family == "":
+		# The introduction level (D110): ONE simple Selector, entry families only, one tap from solved.
+		var intro_pool: Array = ["SE"] if fusion_rolled else ["SA", "SB", "SH"]
+		var intro_id: String = intro_pool[rng.randi_range(0, intro_pool.size() - 1)]
+		var intro_frag: Dictionary = SELECTOR_FRAGMENTS[intro_id]
+		return {"fragment": intro_id, "label": intro_frag["label"], "count": 1, "need": intro_frag["need"], "sites": intro_frag["sites"], "fusion": intro_frag["fusion"], "intro": true}
+	var pool: Array = []
+	for fid in pol["fragments"]:
+		if not fusion_rolled or SELECTOR_FRAGMENTS[fid]["fusion"]:
+			pool.append(fid)
+	if pool.is_empty():
+		return {}
+	# Fusion families are down-weighted: they are the easiest to place (their inputs give a Selector natural consequences), so
+	# unweighted they would make Fusion far more common than the Fusion contract intends (D100: 14-28% per band).
+	var weights_f: Array[float] = []
+	for fid in pool:
+		weights_f.append(0.5 if SELECTOR_FRAGMENTS[fid]["fusion"] else 1.0)
+	var id: String = pool[_weighted(weights_f, rng)]
+	var frag: Dictionary = SELECTOR_FRAGMENTS[id]
+	var weights: Array = pol["count_weights"]
+	var r := rng.randf()
+	var count := 1
+	if r >= float(weights[0]):
+		count = 2 if r < float(weights[0]) + float(weights[1]) else 3
+	count = maxi(count, frag["sites"].size())
+	return {"fragment": id, "label": frag["label"], "count": count, "need": frag["need"], "sites": frag["sites"], "fusion": frag["fusion"]}
+
+
+## The any-of groups of `need` that `atoms` does not satisfy yet.
+static func _needs_missing(atoms: Array, need: Array) -> Array:
+	var missing: Array = []
+	for group in need:
+		var ok := false
+		for a in group:
+			if atoms.has(a):
+				ok = true
+				break
+		if not ok:
+			missing.append(group)
+	return missing
+
+
+## Every turn slot a Selector may take, with what follows it. A slot is eligible when it holds >= 1 plain
+## mirror turn, is not a shared-tile slot, and has no Selector yet. `follower` is the token after the slot
+## ("ow" when a One-Way turn is attached right behind it).
+static func _collect_sites(line: Dictionary, out: Array) -> void:
+	var toks: Array = line["tokens"]
+	var seen_portal := false
+	var nth := 0 # index among this line's eligible slots: a shared-tile slot in front must not hide the family's site
+	for i in range(toks.size()):
+		var t: Dictionary = toks[i]
+		if t["t"] == "turn" and t["kind"] == "mirror" and int(t["min"]) >= 1 and not t.has("share") and not t.get("attach", false) and not t.has("sel_id"):
+			var nxt: Dictionary = toks[i + 1] if i + 1 < toks.size() else {}
+			var follower: String = nxt.get("t", "end")
+			if follower == "turn" and nxt.get("attach", false):
+				follower = "ow"
+			out.append({"tok": t, "follower": follower, "line_kind": line["src"]["kind"], "first": nth <= 1, "after_portal": seen_portal, "line": line})
+			nth += 1
+		match t["t"]:
+			"portal":
+				seen_portal = true
+			"gate":
+				if t.has("feeder"):
+					_collect_sites(t["feeder"], out)
+			"splitter":
+				_collect_sites(t["branch"], out)
+			"prism":
+				_collect_sites(t["main"], out)
+				for f in t["feeders"]:
+					_collect_sites(f, out)
+			"hop":
+				_collect_sites(t["next"], out)
+			"fusion":
+				for f in t["feeders"]:
+					_collect_sites(f, out)
+				_collect_sites(t["out"], out)
+
+
+static func _site_matches(site: Dictionary, kind: String) -> bool:
+	match kind:
+		"filter", "portal", "switch", "hop", "fjoin", "ow", "gate", "target":
+			return site["follower"] == kind
+		"fusion_in":
+			return site["follower"] == "fusion"
+		"hop_after_portal":
+			return site["follower"] == "hop" and site["after_portal"]
+		"prism_main":
+			return site["line_kind"] == "channel" and site["first"]
+		"branch_first":
+			return site["line_kind"] == "branch" and site["first"]
+		"fusion_out":
+			return site["line_kind"] == "fusion_out" and site["first"]
+	return false
+
+
+## Marks the family's own sites (then any extras up to `count`) as Selector slots. Returns {ok, reason,
+## extra_taps, ids, taps, sites}; the tap distances land in plan.params["sel_taps"] for the composer.
+static func _apply_selectors(plan: ProceduralPlanV3, spec: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
+	var sites: Array = []
+	_collect_sites(plan.lines[0], sites)
+	var taps: Dictionary = {}
+	var ids: Array[String] = []
+	var kinds_used: Array[String] = []
+	var extra_taps := 0
+	var chosen_lines: Array = []
+	var wanted: Array = spec["sites"].duplicate()
+	while wanted.size() < int(spec["count"]):
+		wanted.append("*")
+	for want in wanted:
+		var options: Array = []
+		for site in sites:
+			if site["tok"].has("sel_id"):
+				continue
+			var kind_ok := false
+			if want == "*":
+				for k in _EXTRA_SITES:
+					if _site_matches(site, k):
+						kind_ok = true
+						break
+			else:
+				kind_ok = _site_matches(site, want)
+			if kind_ok:
+				options.append(site)
+		if want == "*" and not chosen_lines.is_empty():
+			# An EXTRA Selector prefers the line an earlier one sits on: the two decisions are then in series, so the first
+			# one's wrong states change what reaches the second (independent one-step decisions are rejected).
+			var same: Array = []
+			for o in options:
+				if chosen_lines.has(o["line"]):
+					same.append(o)
+			if not same.is_empty():
+				options = same
+		if options.is_empty():
+			if want == "*":
+				continue # an extra Selector that finds no room is simply not placed (count is a ceiling)
+			return {"ok": false, "reason": "no '%s' site for Selector family %s" % [want, spec["fragment"]]}
+		var pick: Dictionary = options[rng.randi_range(0, options.size() - 1)]
+		chosen_lines.append(pick["line"])
+		var id := "sel%d" % (ids.size() + 1)
+		pick["tok"]["sel_id"] = id
+		plan.add_stage(id, "selector", true)
+		var r := rng.randf()
+		var tap := 1 if (spec.get("intro", false) or r < float(_TAP_WEIGHTS[0])) else (2 if r < float(_TAP_WEIGHTS[0]) + float(_TAP_WEIGHTS[1]) else 3)
+		taps[id] = tap
+		extra_taps += tap - 1
+		ids.append(id)
+		kinds_used.append(str(want))
+	plan.params["sel_taps"] = taps
+	plan.params["selector_fragment"] = spec["fragment"]
+	return {"ok": true, "reason": "", "extra_taps": extra_taps, "ids": ids, "taps": taps, "sites": kinds_used, "fragment": spec["fragment"]}

@@ -1,5 +1,7 @@
 # CLAUDE.md — Permanent Instructions for Future Claude Sessions
 
+> **Current phase (2026-09-25): S3.1 NEXT - V5 J/K difficulty refinement.** S1/S2 complete, S3 implemented but NOT certified, S4 (APK) not started. Tool-independent continuation prompt: `NEXT_AI_PROMPT.md`. Nothing from S1-S3 is committed; do not commit/push/build unless asked.
+
 This file is permanent guidance for any Claude session (or account) that
 works on BeamShift after this one. It does not expire and is not replaced
 by newer milestones — update it, don't discard it.
@@ -462,7 +464,7 @@ combining mechanics, not by inflating grid size.
   `GridTypes`, implement the real, reusable mechanic (consistent with
   rules 1–5 above) or leave that tutorial slot explicitly pending and
   say why — never invent tutorial-only gameplay behavior.
-- Don't create Tutorial levels beyond T28 (T21-T28 = the Fusion pack, see "Fusion Node rules"), and don't add mechanics to
+- Don't create Tutorial levels beyond T34 (T21-T28 = Fusion pack, T29-T34 = Splitter Selector pack), and don't add mechanics to
   an existing tutorial that aren't the one it's meant to teach, without
   being explicitly asked — same standing scope discipline as Campaign
   stages.
@@ -1088,9 +1090,11 @@ section is only the permanent, standing rules.
   QA Next can legitimately leave ahead of real progression. Don't
   "simplify" these back into one implementation — see D88 for the
   end-to-end test that caught this exact regression risk.
-- **Do not create Campaign Levels 141+, T29+, a new Era, or procedural
-  Levels 2001+ without being explicitly asked** — same standing scope
-  discipline as every other milestone in this project.
+- **Do not create Campaign Levels 141+, T35+, a new Era, or procedural
+  Levels 3001+ without being explicitly asked** — same standing scope
+  discipline as every other milestone in this project. (Procedural Levels
+  2001-3000 now exist as generator V5, Selector Phase S3 / D110 - see
+  "V5 generator rules" below.)
 - **Known board-size gap, deliberately not fixed yet**: on some
   resolutions/board shapes, a small procedural or legacy board occupies
   noticeably less than the full available portrait height (found and
@@ -1293,7 +1297,7 @@ Details: `DECISIONS.md` D99 (mechanic) and D100 (procedural integration). The us
 - **The Fusion unlock table is `ProceduralDifficultyContract._FUSION_PROGRESSION` (`fusion_policy()`)** - never add a level-number Fusion branch elsewhere. Levels 1-200 have none. The roll is ONCE per level (dedicated rng stream), never re-rolled per attempt. Do not mechanically force Fusion into every eligible level (the realised share is 14-28% per band; report it after any change).
 - **Every generated Fusion node must be load-bearing on the BUILT board** (`ProceduralFusionCheck`): node removal loses a target; EACH input path required (cut ablation); the fused colour consumed (matching composite target, Switch/Receiver, or Prism for WHITE); no required WHITE target or WHITE remote depending on it; NO feedback into its own inputs (an unstable cycle is rejected at generation, LaserSystem's pass cap is only a backstop); start/solved/one-tap-away boards must SETTLE before the cap (`converged`); wrong-direction output rays hardened (an unrepairable adjacent hit rejects). A Filter after a node would erase the fused colour - never place one there.
 - A generated node always starts exactly ONE clockwise tap from solved (one honest move). Do not pad Fusion levels with extra rotations; difficulty is dependency structure, `MAX_COLUMNS = 8`, square cells, comfortable size.
-- **2000 is the initial CERTIFICATION target, not a permanent ceiling** (`INITIAL_CERTIFIED_LEVEL_TARGET`; `MAX_LEVEL` = what is exposed). The contract/fragments are level-number-open (a level past the last row reads the last row). Do NOT expose Level 2001+, generate a post-2000 progression, or hard-code post-2000 bands without being explicitly asked; the documented direction (D100) is combinations of existing mechanics inside a curated envelope, never smaller tiles/more columns/padding.
+- **The certification target is not a permanent ceiling** (`INITIAL_CERTIFIED_LEVEL_TARGET` = 3000 since Selector Phase S3, D110; `MAX_LEVEL` = what is exposed). The contract/fragments are level-number-open (a level past the last row reads the last row). Do NOT expose Level 3001+ or hard-code bands past 3000 without being explicitly asked; the documented direction (D100) is combinations of existing mechanics inside a curated envelope, never smaller tiles/more columns/padding.
 - **The player-facing Fusion tutorial now exists (Fusion Phase 3, D101): T21-T28 (`levels/tutorial/t21.gd`-`t28.gd`), unlocked by `LevelManager.is_fusion_tutorial_selectable()` (T21 at procedural Level 150 or after T20, then sequential; QA flag opens all; NOT era-gated - `get_era_for_tutorial(21)` reads "Era 3" but Fusion is not an era; never a hard gate). Fusion is a PRODUCTION-SUPPORTED mechanic. Tutorial rules: same `TutorialManager`, one idea per tutorial, every board brute-force verified to have exactly ONE solution (LevelSolver cannot: 4-state node), hint entries `t21`-`t28` are hand-authored in `hint_solutions.json` (the builder skips ids >= `FUSION_TUTORIAL_FIRST`), display names <= 13 chars, tutorials ad-free.**
 - QA flags: `LevelManager.USE_FUSION_PROGRESSION_FOR_QA` (V4 for new play), `SHOW_FUSION_TEST_QA` (FUSION TEST / NEXT FUSION, contained like V3 TEST via `game.gd _is_v3_session()`), `USE_V3_FOR_PROCEDURAL_QA`, `SHOW_PROCEDURAL_QA_NEXT_BUTTON` must all be reviewed before production.
 - Never name a PowerShell helper function `Rd`, `Ri`, `Rm`, `Cp` or `Mv` (they are aliases and DELETE/OVERWRITE files - this deleted ARCHITECTURE.md once, D100).
@@ -1398,7 +1402,7 @@ than guessing big.
 - **A Fusion Node is ablated as a DEAD NODE (a blocker), never by deleting its tile** (`ProceduralComplexity.analyze`, `fusion_verify`): deleting it lets its raw input beams run on through the empty cell into a collinear Switch/Receiver - a state no rotation can reach - and produced false "not load-bearing" rejections (share of placed Fusion rolls 16/20 -> 20/20 at 701-1000). Real bypasses are caught by the exact one-tap-away screens in `ProceduralFusionCheck`, the runtime probe and the dev-time exact search, not by that counterfactual.
 - **Fragment variants are generator-driven (`plan.params["fusion_variant"]`), never handwritten levels.** Recipe-level variants (`FUSION_RECIPE_VARIANTS`) draw AFTER the fragment draw so the roll stream stays stable. Any change to fragments/complexity/check: re-run the V1/V2/V3 fingerprint (must be IDENTICAL), `fusion_progression_sample` `freq=1` + `stress=90` windows (0 problems, 0 fallbacks, realised share per band), `fusion_verify` on small-state levels. Realised shares (14/23/27/20/31/34/22% per band 201-2000) are inside the targets; don't chase exact percentages - variety matters more.
 - **Fusion is available past 2000 by data, not by code**: no fragment/contract code caps at 2000. `INITIAL_CERTIFIED_LEVEL_TARGET = 2000` stays; nothing beyond 2000 is exposed. Chained Fusion (output -> a second Fusion) is a future mechanic and needs an explicit request; composite colours remain OUTPUT ONLY.
-- **T21-T28 tutorial numbering is a Fusion pack, not Era 3.** A future Era 3 tutorial pack starts at T29+ and must revisit `LevelManager.FUSION_TUTORIAL_FIRST/LAST` and `EraTheme.TUTORIALS_PER_ERA` together.
+- **T21-T28 tutorial numbering is a Fusion pack, not Era 3.** A future Era 3 tutorial pack starts at T35+ and must revisit `LevelManager.FUSION_TUTORIAL_FIRST/LAST` and `EraTheme.TUTORIALS_PER_ERA` together.
 - QA flags are still ON in `versionCode=56` (`UNLOCK_ALL_*`, `SHOW_*_QA`, `USE_*_FOR_QA`); production clean-up is a separate, explicitly requested pass.
 
 ## Phase 4 standing rules: stars, Hint, QA/production (D102)
@@ -1417,3 +1421,24 @@ Gameplay HUD plates are positioned by ONE mechanism: `SafeAreaMargin.set_hud_ove
 ## NEW GAME rule (D107)
 
 NEW GAME immediately starts on a fresh/no-progress save. If meaningful main progress exists (`SaveManager.has_meaningful_main_progress()`), it requires explicit confirmation before resetting the main run. All main-run reset goes through `SaveManager.reset_main_progress_for_new_game()` (one save; never scatter resets in UI). It preserves settings, ALL tutorial progress, ad cadence/consent and QA/legacy populations. Do not base "fresh" on the save file existing.
+
+## Splitter Selector rules (Selector Phases S1+S2, D108/D109)
+
+- **Rule lives only in `LaserSystem`**: `TileType.SPLITTER_SELECTOR` (appended, never renumber). One beam in -> exactly ONE beam out through the selected output side, same pass, colour unchanged, stateless; a beam entering through the output side is absorbed. 4-state orientation = output `Direction` in `tile_orientations` (one tap = one clockwise step, same path as Fusion). `SplitterSelectorTile` only draws; `LevelSolver` cannot model it (brute-force via `selector_verify`/`selector_tutorial_verify`).
+- **Selector QA**: `SelectorQaSet` + "SELECTOR TEST" (`LevelManager.SHOW_SELECTOR_TEST_QA` = `BuildConfig.QA_TOOLS`), contained like FUSION TEST. **Tutorials T29-T34** (unlock `SELECTOR_TUTORIAL_UNLOCK_PROCEDURAL_LEVEL` = 1900, hand-authored hint entries, ad-free). **Done in S3 (D110)**: generator V5 / Levels 2001-3000 / contract bands G-K / selector complexity, ablation, equivalent-state and triviality rules (see the V5 section below). Do not expose Level 3001+ or change `MAX_LEVEL` without being asked. A selector on a straight line is bypassed by removal - it must TURN the beam to be load-bearing.
+
+
+## V5 generator rules (Selector Phase S3, D110)
+
+Full architecture, band table, family catalog, measured evidence and known weaknesses: `PROCEDURAL_GENERATION.md` section 20 and `DECISIONS.md` D110. Standing rules:
+
+- **V5 = generator version 5 = Levels 2001-3000** (`ProceduralLevelGenerator.GENERATOR_VERSION_V5`, `SELECTOR_FIRST_LEVEL`; `LevelManager.procedural_generator_version_for_new_play(level)` is the ONE place that maps a level to V5). V1-V4 stay FROZEN: after ANY change to the composer/fragments/complexity/probe/contract, re-run the V1-V4 fingerprint (a temporary driver hashing tiles + solution over ~33 levels x 4 versions) - it must be IDENTICAL. A saved puzzle always regenerates under its saved version. `GENERATOR_VERSION` (default) is still 2; V5 is reached only by level number (>= 2001) or an explicit version.
+- **Difficulty stays logic, never size**: `MAX_COLUMNS = 8`, square cells, comfortable size (8x12 is NOT comfortable: 94 px < `MIN_COMFORTABLE_CELL_SIZE`), a V5 tile budget (`ProceduralFragmentsV3.v5_tile_budget`) instead of clutter, no padding. Move targets that do not physically fit are LOWERED (density fit, then relax after layout failures), never forced; the reasoning floors (depth, dependencies, interactions, kinds, every Selector rule) are the last thing to give.
+- **Every relaxation is visible and counted, never silent**: `moves_below_band`, `band_demoted` (attempt >= `V5_DEMOTE_AFTER`(_SELECTOR) uses the REASONING floors of the band below), `selector_dropped` (the rolled family could not be placed), `fallback_used`/`v3_generation_failed` (`V5_GENERATION_FAILED`, HUD `V5 FAILED>V2`; target 0). Never certify a fallback level; never describe a demoted level as full-band.
+- **The Selector is a first-class complexity kind** (`ProceduralSelectorCheck`, `TileType.SPLITTER_SELECTOR` in `ProceduralComplexity._SPECIAL_KINDS`): a Selector counts as a mechanic kind / dependency / depth ONLY when it is load-bearing (blocker ablation loses a target), NOT mirror-like (a wrong output changes a state or meets a mechanic, or >= 2 wrong rays are live), and none of its three other orientations solves the board. Hardening does NOT blanket-block its wrong rays (they are what makes it a decision); only a wrong state that would SOLVE gets a blocker. Strict bands (>= 2601, not demoted) additionally need one consequential Selector and one genuine multi-way decision; Selector counts >= 2 must be coupled/converging.
+- **A 4-state tile costs its real tap distance**: `ProceduralComplexity.analyze` counts `posmod(solution - start, 4)` for Fusion/Selector (Fusion is always 1, so V4 is unchanged); a generated Selector starts 1-3 taps from solved (55/35/10%), never keep-correct. Never pad four-state tiles for move count.
+- **Selector frequency is a deterministic low-discrepancy sequence** (`ProceduralDifficultyContract.selector_policy`, golden-ratio Weyl over the level number), not an RNG draw; Level 2001 always carries one simple Selector (`SELECTOR_INTRO_LEVEL`). The contract's `frequency` is the ROLL, the realised share is lower by the dropped levels - calibrate the roll, not the target.
+- **The intended solution must be MINIMAL**: found by replaying it through a real GridManager (the intended move count overstated difficulty on ~14% of unscreened Mastery boards, and 9-14-flip alternative solutions existed on ~2% of Entry/Branching boards). V5 therefore runs `ProceduralMinimality` (lazy activation + ddmin over several tile orders + whole-line unions) and ONE wide final shortcut probe (`V5_FINAL_PROBE_SIMS/WIDTH`) on the candidate that survives every other gate. These are SCREENS: a residual of ~1-4% of Interlock-Mastery levels is documented (independent random-order ddmin / 6000-simulation probe); say "UNKNOWN", never "verified", for optimality (`verified_optimal_moves` stays -1 for every V5 level).
+- **After ANY V5 change**: run `scripts/tools/v5_sample.tscn` (anchors, `from= count= stride=` windows, `wide=1|big`, `hist=1`, `family=XX`, `nosel=1`), `v5_verify.tscn` (selector brute force, determinism, exact search where feasible), the V1-V4 fingerprint, and a real-game replay of the intended solution (`GridManager._on_orientable_tile_clicked` until solved: taps == `intended_moves`, stars 3) on anchors. Keep every run under ~60 s (`timeout`; a parse error hangs headless Godot); parallel processes are fine. No 1-1000 (or 2001-3000) full audit.
+- **QA**: "V5 TEST" (`LevelManager.SHOW_V5_TEST_QA` = `BuildConfig.QA_TOOLS`, `ProceduralV5QaSet.LEVELS`, in-game "NEXT V5") is contained like SELECTOR TEST / FUSION TEST (`game.gd _is_v3_session()`): no saves, stars, ads or counters. The HUD tag reads `V5 <band code> [F#] [S?]` and `~DEMOTED`. QA +50 clamps at `MAX_LEVEL` (1951 -> 2001, 2951 -> 3000, 3000 no-op) and never completes/stars a level.
+- **Not built**: Selector families S-I (shared mirror), S-K (target vs prerequisite bait), S-M (target continuation), S-O (indirect two-Selector dependency) - the composer has no bait/decoy builder; chained Fusion; Levels 3001+; Android build / version bump / commit (S4).

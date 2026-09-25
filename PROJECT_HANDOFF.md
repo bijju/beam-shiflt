@@ -8,6 +8,25 @@ fits together" briefing; `ARCHITECTURE.md` has the deeper technical
 detail, `LEVEL_EDITOR.md`/`TUTORIAL_SYSTEM.md` are each subsystem's own
 usage/architecture guide.
 
+## HANDOFF BRIEFING (2026-09-25) - read this first if you have zero chat history
+
+**What is BeamShift?** A mobile-first (portrait) deterministic grid laser-reflection puzzle game: rotate mirrors/splitters/etc. to route coloured beams to targets. Godot 4.7.1 (developed against 4.7.1), GDScript. Continuation prompt for the next agent: `NEXT_AI_PROMPT.md`.
+
+**Branch/state:** `dev_abhilas`, HEAD `20c2947`. S1/S2/S3/S3.1 work is uncommitted. `export_presets.cfg` (`version/code=69`, `4.8.3-OFFICE-BRANCH-QA`) is a pre-existing modification, not from S1-S3/S3.1. Last APK built by earlier work: `versionCode=68` line; nothing was built for S1-S3/S3.1.
+
+**Phases:** S1 COMPLETE (Splitter Selector runtime + SELECTOR TEST). S2 COMPLETE (T29-T34). S3 IMPLEMENTED / NOT CERTIFIED (generator V5). S3.1 IN PROGRESS (J/K refinement pass 1 implemented and measured, follow-up certification still needed). S4 NOT STARTED (Android build).
+
+**Content populations:** 15 dev levels, 140-level campaign, tutorials T01-T34 (T01-T10 Era 1, T11-T20 Era 2, T21-T28 Fusion, T29-T34 Selector), procedural Levels 1-3000. **Generators:** V1, V2, V3, V4 frozen; V5 = Levels 2001-3000 (Selector-capable). `MAX_LEVEL` 3000 is the CURRENT boundary, not a ceiling. **Mechanics:** mirror, splitter, filter, portal, switch/gate, hazard, prism, one-way reflector, beam receiver/remote emitter, Fusion node, Splitter Selector. Systems to keep intact: Hint (+attention pulse), AdMob rewarded Hint and interstitial cadence, `StarScoring`, New Game, save/Continue, audio, unified blue theme, HUD calibration, Level Complete popup.
+
+**Splitter Selector:** `TileType.SPLITTER_SELECTOR`; four states, orientation = selected output Direction; one beam in, exactly one out, colour kept, clockwise per tap (1 tap = 1 move), a beam entering through the selected output side is absorbed; stateless, recomputed in `LaserSystem`; Save/Continue via orientation; Hint generic. Assets `assets/gameplay/splitter_selector/*` and `assets/ui/icons/bs_splitter_selector_icon.png` (icon unused) are UNTRACKED - do not delete.
+
+**Why S3 is not approved:** residual shortcuts/superfluous groups exist; exact optimality is UNKNOWN (`verified_optimal_moves` = -1, stars use `intended_moves`); dense Mastery boards' phone readability and Android generation time are unmeasured. Original S3 J/K demotion was too high (bounded samples: J 26/50, K 31/48). S3.1 pass 1 added S-M (`Selector -> target continuation`) and delayed K demotion; post-change bounded windows improved to J `band_demoted=3/36` and K `0/37`, but full 50-level windows still exceeded the QA budget, so V5 remains not certified. V1-V4 fingerprint remained `271eb766be20a12446676a947b49a3f1`.
+
+**What happens next:** continue S3.1 certification/follow-up - complete larger J/K samples or reduce per-level cost so full windows fit budget, consider remaining families S-I/S-K/S-O and fair decoy/bait routes, and preserve MAX_COLUMNS 8/readability. Then the user plays the V5 TEST levels (2001, 2050, 2201, 2351, 2500, 2651, 2800, 2900, 3000; especially 2500+); then S4. Difficulty must come from dependencies/backward reasoning/shared resources/colour/convergence/delayed consequences/fair misleading routes - never from tiny cells, giant boards, clutter, padding or trial-and-error.
+
+**Already tested (desktop):** V1-V4 fingerprint identical before/after S3.1 pass 1 (132 hashes, `271eb766be20a12446676a947b49a3f1`); J/K `v5_sample` windows with `hist=1`; V5 deterministic evidence from S3; Save/Continue, Hint, stars, QA +50, 2000->2001 via the real game scene from S3; intended-solution replay through a real GridManager (7 anchors); levels 1-15 solver; T01-T34 load; SELECTOR TEST / FUSION TEST; `selector_verify`, `selector_tutorial_verify`; rendered V5 TEST screenshots. **Still to test:** full-budget/full-count J/K certification, manual difficulty/readability on a phone, Android generation time, S3.1 real-game replay/regression list in `NEXT_AI_PROMPT.md` section 9. **Build status:** no APK for S1-S3/S3.1; no version bump.
+
+
 ## Current milestone
 
 **Hint attention pulse** (current, `versionCode=68`, `4.8.2-HINT-ATTENTION-PULSE-QA`): see CURRENT_STATUS.md; visual-only pulse on the HintIcon child + reusable halo, tunables in `UIConstants.HINT_*`, logic in `game.gd` `_hint_attention_*`. Awaiting Android testing.
@@ -2431,3 +2450,13 @@ user's Android feedback on D/E/F; do not start Phase 2B.** Re-run
 `v3_prototype_audit.tscn` (with `timeout`) after any layout change and diff
 A/B/C against a saved baseline. Known open item: greedy beam-follower proxy
 still solves F.
+
+
+## Splitter Selector (Phase S1+S2, uncommitted, 2026-09-25)
+
+TileType.SPLITTER_SELECTOR runtime + SELECTOR TEST pack (D108) and tutorials T29-T34 (D109) exist. (Superseded by the Selector Phase S3 section below and the HANDOFF BRIEFING at the top: generator V5 exists; S3.1 is next; Android build S4 not started.) Nothing committed.
+
+
+## Selector Phase S3 - generator V5 (2026-09-25, uncommitted)
+
+Generator V5 (`GENERATOR_VERSION_V5`, D110) owns procedural Levels 2001-3000: contract bands G-K (`SEL`/`SBR`/`SIL`/`SCQ`/`SMS`), Selector families SA-SP plus S-M target continuation (`ProceduralFragmentsV3.SELECTOR_FRAGMENTS`), `ProceduralSelectorCheck`, `ProceduralMinimality`, density fit + degradation ladder, `V5 TEST` QA entry, `MAX_LEVEL` = 3000. V1-V4 frozen (fingerprint identical). Read `PROCEDURAL_GENERATION.md` section 20 and `CLAUDE.md` "V5 generator rules" before touching `scripts/procedural/**`. NOT done: full S3.1 certification, manual review of V5 difficulty, Android build/version bump (S4), on-device generation time, Selector families S-I/S-K/S-O, Levels 3001+. Nothing committed.

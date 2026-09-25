@@ -254,6 +254,8 @@ static func ascii(level: LevelData) -> String:
 				c = "V"
 			GridTypes.TileType.FUSION:
 				c = "@"
+			GridTypes.TileType.SPLITTER_SELECTOR:
+				c = "&"
 			GridTypes.TileType.BEAM_RECEIVER:
 				c = "R"
 			GridTypes.TileType.BLOCKER:
@@ -531,6 +533,25 @@ class Cursor extends RefCounted:
 	## The beam ends there; nothing is created.
 	func to_fusion_input(cell: Vector2i) -> Cursor:
 		return to_join(cell, "fusion")
+
+	## Splitter Selector used as a TURN (generator V5, D110): the arriving beam leaves through `new_dir`.
+	## The solved orientation is the output Direction; the START is `taps` clockwise taps EARLIER (1-3,
+	## a 4-state tile costs its real tap distance - never padded). Computed in PHYSICAL directions like
+	## to_fusion, so the optional vertical flip cannot invert the tap direction. Not in the keep-correct
+	## pool: a required Selector never starts already solved.
+	func to_selector_turn(cell: Vector2i, new_dir: int, node: String = "", taps: int = 1) -> Cursor:
+		if not _land(cell, "selector"):
+			return self
+		var pp := board.phys(cell)
+		var solved_o := board.pdir(new_dir)
+		var start_o := posmod(solved_o - clampi(taps, 1, 3), 4)
+		board.solution[pp] = solved_o
+		board.start[pp] = start_o
+		board.tiles.append(TilePlacement.make_splitter_selector(pp, start_o, true))
+		board.tile_cells[pp] = "selector"
+		board._register(node, pp)
+		dir = new_dir
+		return self
 
 	## Ends an unused beam: a blocker right ahead (nothing at a board edge).
 	func cap(node: String = "") -> void:

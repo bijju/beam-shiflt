@@ -48,6 +48,16 @@ const _BANDS: Array = [
 	[1301, 1600, "Expert+", 16, 20, 5, UNBOUNDED, 8, UNBOUNDED, 6, 4, 2, false],
 	[1601, 1800, "Master", 18, 22, 5, 6, 9, UNBOUNDED, 7, 5, 2, false],
 	[1801, 2000, "Advanced Master", 20, 26, 6, UNBOUNDED, 10, UNBOUNDED, 8, 5, 2, false],
+	# Generator V5 (Selector Phase S3, D110): Levels 2001-3000, five bands G-K that CONTINUE the late-V4 curve
+	# (Level 2001 must feel like progression after Level 2000, never a difficulty reset). Ceilings (deps_max /
+	# depth_max) are stored for the record but, like every band above 200, bind only as soft targets.
+	# Floors for interactions/kinds are this pass's own (the user specified moves/depth/dependencies/selector
+	# frequency only); Selector counts as a mechanic kind once it passes ProceduralSelectorCheck.
+	[2001, 2200, "Selector Entry", 20, 24, 6, 9, 10, 12, 8, 5, 2, false],
+	[2201, 2400, "Selector Branching", 22, 26, 7, 10, 11, 14, 10, 5, 2, false],
+	[2401, 2600, "Selector Interlock", 24, 28, 8, 11, 12, 15, 10, 6, 2, false],
+	[2601, 2800, "Selector Consequence", 26, 30, 9, 13, 13, 17, 12, 6, 2, false],
+	[2801, 3000, "Selector Mastery", 28, 34, 10, 15, 15, 19, 15, 6, 2, false],
 ]
 
 ## Generator V3 policy per level range (Phase 2B, D96): [min_level, max_level,
@@ -66,6 +76,9 @@ const _V3_POLICY: Array = [
 	[201, 700, 0.7, 0.3, "prefer_reject", 0.15, 0.25],
 	[701, 1300, 0.75, 0.25, "reject", 0.15, 0.3],
 	[1301, 2000, 0.8, 0.2, "reject", 0.15, 0.35],
+	# V5 (D110): same plain-move discipline as the top V3 row; the greedy screen stays "reject" and
+	# ProceduralProgressionV3 additionally REQUIRES greedy failure in the Interlock/Consequence/Mastery bands.
+	[2001, 3000, 0.8, 0.2, "reject", 0.15, 0.35],
 ]
 
 ## First level at which each mechanic family may appear in a V3 puzzle
@@ -98,6 +111,8 @@ const _FUSION_PROGRESSION: Array = [
 	[1301, 1600, ["F2", "F3", "F4", "F5", "F6"], 0.28],
 	[1601, 1800, ["F2", "F3", "F4", "F5", "F6", "F7"], 0.28],
 	[1801, 2000, ["F1", "F2", "F3", "F4", "F5", "F6", "F7"], 0.28],
+	# V5 (D110): Selector + Fusion combinations are a stated V5 goal, so Fusion stays as common as in the last V4 band.
+	[2001, 3000, ["F1", "F2", "F3", "F4", "F5", "F6", "F7"], 0.28],
 ]
 
 
@@ -125,6 +140,7 @@ const _BOARDS: Array = [
 	[401, 700, [Vector2i(6, 10), Vector2i(7, 10), Vector2i(7, 11)]],
 	[701, 1600, [Vector2i(7, 10), Vector2i(7, 11), Vector2i(8, 10)]],
 	[1601, 2000, [Vector2i(7, 11), Vector2i(8, 10), Vector2i(8, 11)]],
+	[2001, 3000, [Vector2i(8, 10), Vector2i(8, 11)]],
 ]
 
 
@@ -182,6 +198,38 @@ static func get_difficulty_requirements(level_number: int) -> Dictionary:
 		"keep_correct_fraction": policy[5],
 		"min_plausible_fraction": policy[6],
 	}
+
+
+## Splitter Selector progression (Selector Phase S3 / generator V5, D110): the ONE table saying how often and how many
+## Selectors a V5 level carries. [min_level, max_level, frequency, count_weights [1, 2, 3], fragments, min_downstream_depth (the floor for the deepest Selector decision: how many mechanics its route feeds)].
+## `frequency` = the share of the range's levels that carry >= 1 Selector; the per-level yes/no is a deterministic
+## low-discrepancy (golden-ratio) sequence over the level number, not an RNG draw, so the realised share of ANY
+## window of levels sits inside the target band instead of merely converging to it. Selector families (S-A..S-P) are
+## defined in ProceduralFragmentsV3.SELECTOR_FRAGMENTS; a range lists the ones that may appear.
+const SELECTOR_POLICY: Array = [
+	[1, 2000, 0.0, [1.0, 0.0, 0.0], [], 0],
+	[2001, 2200, 0.40, [1.0, 0.0, 0.0], ["SA", "SB", "SC", "SD", "SE", "SG", "SH"], 1],
+	[2201, 2400, 0.50, [0.6, 0.4, 0.0], ["SA", "SB", "SC", "SD", "SE", "SF", "SG", "SH", "SJ", "SL"], 1],
+	[2401, 2600, 0.60, [0.5, 0.42, 0.08], ["SA", "SB", "SC", "SD", "SE", "SF", "SG", "SH", "SJ", "SL", "SN"], 2],
+	[2601, 2800, 0.65, [0.2, 0.7, 0.1], ["SB", "SC", "SD", "SE", "SF", "SG", "SJ", "SL", "SM", "SN", "SP"], 2],
+	[2801, 3000, 0.76, [0.1, 0.6, 0.3], ["SC", "SD", "SE", "SF", "SG", "SJ", "SL", "SM", "SN", "SP"], 3],
+]
+const _WEYL := 0.6180339887498949
+## The level that INTRODUCES the Splitter Selector to main progression: always carries exactly one simple, understandable Selector (ProceduralFragmentsV3.roll_selector builds it from the entry families only).
+const SELECTOR_INTRO_LEVEL := 2001
+
+
+## {frequency, count_weights, fragments, min_downstream_depth, has_selector} for a level. `has_selector` is the deterministic yes/no (see
+## SELECTOR_POLICY); levels <= 2000 never carry one.
+static func selector_policy(level_number: int) -> Dictionary:
+	var n := maxi(level_number, 1)
+	var row: Array = SELECTOR_POLICY[SELECTOR_POLICY.size() - 1]
+	for r in SELECTOR_POLICY:
+		if n >= r[0] and n <= r[1]:
+			row = r
+			break
+	var phase := fposmod(float(n) * _WEYL + 0.137, 1.0)
+	return {"frequency": row[2], "count_weights": row[3].duplicate(), "fragments": row[4].duplicate(), "min_downstream_depth": row[5], "has_selector": phase < float(row[2]) or n == SELECTOR_INTRO_LEVEL}
 
 
 static func _policy_row(level_number: int) -> Array:
@@ -246,7 +294,14 @@ const _BAND_CODES := {
 	"Foundation": "FND", "Early Thinking": "ERT", "Developing": "DEV", "Medium": "MED",
 	"Medium-Hard": "MHD", "Hard": "HRD", "Hard+": "HD+", "Expert": "EXP", "Expert+": "EX+",
 	"Master": "MST", "Advanced Master": "ADV",
+	"Selector Entry": "SEL", "Selector Branching": "SBR", "Selector Interlock": "SIL",
+	"Selector Consequence": "SCQ", "Selector Mastery": "SMS",
 }
+
+
+## First level of the band `level_number` belongs to (generator V5's demotion ladder reads the band below).
+static func band_start(level_number: int) -> int:
+	return int(_band_row(level_number)[0])
 
 
 static func band_code(level_number: int) -> String:

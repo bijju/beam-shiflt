@@ -451,6 +451,8 @@ func reset_main_progress_for_new_game() -> bool:
 	}
 	if procedural_current_level >= LevelManager.FUSION_TUTORIAL_UNLOCK_PROCEDURAL_LEVEL and tutorial_highest_unlocked_level < LevelManager.FUSION_TUTORIAL_FIRST:
 		tutorial_highest_unlocked_level = LevelManager.FUSION_TUTORIAL_FIRST
+	if procedural_current_level >= LevelManager.SELECTOR_TUTORIAL_UNLOCK_PROCEDURAL_LEVEL and tutorial_highest_unlocked_level < LevelManager.SELECTOR_TUTORIAL_FIRST:
+		tutorial_highest_unlocked_level = LevelManager.SELECTOR_TUTORIAL_FIRST
 	procedural_current_level = 1
 	procedural_resume_level_number = 0
 	procedural_resume_seed = 0

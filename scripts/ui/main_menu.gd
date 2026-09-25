@@ -69,6 +69,27 @@ func _ready() -> void:
 		fusion_button.pressed.connect(func() -> void: GameManager.start_fusion_test(1))
 		fusion_button.pressed.connect(AudioManager.play_ui_button_press)
 
+	# Splitter Selector Phase S1: DEV-ONLY "SELECTOR TEST" (LevelManager.SHOW_SELECTOR_TEST_QA), same containment.
+	if LevelManager.SHOW_SELECTOR_TEST_QA:
+		var selector_button := Button.new()
+		selector_button.text = "SELECTOR TEST"
+		selector_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		selector_button.custom_minimum_size = Vector2(320, 72)
+		selector_button.add_theme_font_size_override("font_size", 18)
+		_qa_level_select_button.get_parent().add_child(selector_button)
+		selector_button.pressed.connect(func() -> void: GameManager.start_selector_test(1))
+		selector_button.pressed.connect(AudioManager.play_ui_button_press)
+	# Selector Phase S3 (D110): DEV-ONLY "V5 TEST" (LevelManager.SHOW_V5_TEST_QA) - a curated sample of generator-V5 levels.
+	if LevelManager.SHOW_V5_TEST_QA:
+		var v5_button := Button.new()
+		v5_button.text = "V5 TEST"
+		v5_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		v5_button.custom_minimum_size = Vector2(320, 72)
+		v5_button.add_theme_font_size_override("font_size", 18)
+		_qa_level_select_button.get_parent().add_child(v5_button)
+		v5_button.pressed.connect(func() -> void: GameManager.start_v5_test(1))
+		v5_button.pressed.connect(AudioManager.play_ui_button_press)
+
 
 	_maybe_show_fusion_tutorial_nudge()
 

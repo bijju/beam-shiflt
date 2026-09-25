@@ -46,6 +46,11 @@ var shared: Dictionary = {}
 ## is built the moment the LAST input has joined, so every input colour is known when the fused colour
 ## is computed.
 var fusions: Dictionary = {}
+## Selector tap distances (generator V5, D110): plan stage id -> clockwise taps from the START orientation to the solved one.
+var sel_taps: Dictionary = {}
+## Per-plan search budgets (generator V5 uses larger ones for its denser boards; V1-V4 keep the constants).
+var op_budget: int = OP_BUDGET
+var walk_budget: int = WALK_BUDGET
 ## Beam colours already produced by an emitter/remote/prism channel/filter. A filter
 ## always takes an UNUSED colour, so no other beam can satisfy its target colour
 ## (the "colour must be unobtainable except through its filter" rule, D96).
@@ -66,13 +71,17 @@ var _walk_left: int = 0
 static func build(plan: ProceduralPlanV3, rng_in: RandomNumberGenerator, width: int, height: int) -> ProceduralBoardV3:
 	var total_ops := 0
 	var c: ProceduralComposerV3
-	for _restart in range(RESTARTS):
+	var restarts := int(plan.params.get("restarts", RESTARTS))
+	for _restart in range(restarts):
 		c = ProceduralComposerV3.new()
 		c.rng = rng_in
 		c.w = width
 		c.h = height
 		c.board = ProceduralBoardV3.new(width, height, false)
 		c.alpha = compact_alpha if compact_alpha >= 0.0 else float(plan.params.get("alpha", 1.0))
+		c.sel_taps = plan.params.get("sel_taps", {})
+		c.op_budget = int(plan.params.get("op_budget", OP_BUDGET))
+		c.walk_budget = int(plan.params.get("walk_budget", WALK_BUDGET))
 		var built := c._build_line(plan.lines[0], null, GridTypes.BeamColor.WHITE, ROOT_TRIES)
 		total_ops += c.ops
 		if built and c.board.failure == "":
@@ -192,7 +201,7 @@ func _one_way_ok(din: int, dout: int) -> bool:
 
 
 func _exhausted() -> bool:
-	return ops > OP_BUDGET
+	return ops > op_budget
 
 
 # --- Snapshots -------------------------------------------------------------------
@@ -358,6 +367,10 @@ func _group(tokens: Array, i: int, cur: ProceduralBoardV3.Cursor, color_in: int)
 			for _n in range(int(tk["n"])):
 				kinds.append(tk["kind"])
 				nodes.append(tk.get("id", ""))
+			if tk.has("sel_id") and not kinds.is_empty():
+				# generator V5: the slot's LAST turn (next to the mechanic it feeds) is a Splitter Selector
+				kinds[-1] = "selector"
+				nodes[-1] = tk["sel_id"]
 			if tk.has("share"):
 				share_id = tk["share"]
 				share_kind = tk.get("share_kind", "mirror")
@@ -510,7 +523,7 @@ func _pick_cells(cur: ProceduralBoardV3.Cursor, count: int, ends: bool, tail: bo
 ## Randomised DFS over turn cells. Returns the steps [{cell, dir, kind}] or null.
 func _walk(cur: ProceduralBoardV3.Cursor, kinds: Array, need: int, axis_req: int, goal: Dictionary) -> Variant:
 	var steps: Array = []
-	_walk_left = WALK_BUDGET
+	_walk_left = walk_budget
 	if _dfs(cur.pos, cur.dir, 0, kinds, need, axis_req, goal, {}, {}, steps):
 		return steps
 	return null
@@ -519,7 +532,7 @@ func _walk(cur: ProceduralBoardV3.Cursor, kinds: Array, need: int, axis_req: int
 func _dfs(pos: Vector2i, dir: int, i: int, kinds: Array, need: int, axis_req: int, goal: Dictionary, tt: Dictionary, ta: Dictionary, steps: Array) -> bool:
 	ops += 1
 	_walk_left -= 1
-	if _walk_left <= 0 or ops > OP_BUDGET:
+	if _walk_left <= 0 or ops > op_budget:
 		return false
 	if i == kinds.size():
 		return _final_ok(pos, dir, need, axis_req, goal, tt, ta)
@@ -540,6 +553,8 @@ func _dfs(pos: Vector2i, dir: int, i: int, kinds: Array, need: int, axis_req: in
 	if cands.is_empty() and i == 0:
 		_note("dfs0_no_cands")
 	_bias_short(cands)
+	if kinds[i] == "selector":
+		_bias_selector(cands, pos, dir, step)
 	for cd in cands:
 		var kk: int = cd[0]
 		var nd: int = cd[1]
@@ -594,6 +609,8 @@ func _commit(cur: ProceduralBoardV3.Cursor, steps: Array, nodes: Array, share_id
 		var din := cur.dir
 		if s["kind"] == "one_way":
 			cur.to_one_way_turn(s["cell"], s["dir"], nodes[si], is_shared)
+		elif s["kind"] == "selector":
+			cur.to_selector_turn(s["cell"], s["dir"], nodes[si], int(sel_taps.get(nodes[si], 1)))
 		else:
 			cur.to_turn(s["cell"], s["dir"], true, false, nodes[si], is_shared)
 		if board.failure != "":
@@ -897,6 +914,28 @@ func _bias_short(cands: Array) -> void:
 	cands.sort_custom(func(a: Array, b: Array) -> bool: return a[2] < b[2])
 
 
+## Splitter Selector cells (generator V5, D110): a Selector is a real decision only when a wrong output MEETS
+## something, so among the candidate turn cells prefer those whose two wrong rays (straight on, the other
+## side) already run into a placed tile - a mechanic scores 2, a mirror 1. Only tiles placed so far are known;
+## the finished board is still judged by ProceduralSelectorCheck. Keeps the random tie-break of _bias_short.
+func _bias_selector(cands: Array, pos: Vector2i, dir: int, step: Vector2i) -> void:
+	for cd in cands:
+		var c: Vector2i = pos + step * int(cd[0])
+		var score := 0
+		for wd in [dir, _opp(int(cd[1]))]:
+			var v := _vec(wd)
+			var p: Vector2i = c + v
+			while _in(p):
+				if board.tile_cells.has(p):
+					var role: String = board.tile_cells[p]
+					if role != "blocker":
+						score += 1 if (role == "mirror" or role == "shared_mirror") else 2
+					break
+				p += v
+		cd[2] = float(cd[2]) / (1.0 + 0.8 * float(score))
+	cands.sort_custom(func(a: Array, b: Array) -> bool: return a[2] < b[2])
+
+
 ## Same idea for landing indices: favour cells close to the previous element.
 func _bias_indices(idxs: Array) -> void:
 	var keyed: Array = []
@@ -1023,7 +1062,45 @@ static func harden(board: ProceduralBoardV3) -> Dictionary:
 			else:
 				out["unrepaired"] += 1
 				out["fusion_unrepaired"] = int(out.get("fusion_unrepaired", 0)) + 1
+	# Splitter Selectors (generator V5, D110). Unlike a mirror's single wrong ray, a Selector has three wrong
+	# outputs, and a wrong output that MEETS something is what makes the decision a decision (a dead-end
+	# output is obvious). So a hazardous ray is not blindly blocked: it is SCREENED with the real
+	# LaserSystem - only a wrong state that would solve the puzzle (a shortcut / equivalent state) gets a
+	# blocker, and one that still solves afterwards is unrepairable (the candidate is rejected).
+	for t in board.tiles:
+		if t.tile_type != GridTypes.TileType.SPLITTER_SELECTOR:
+			continue
+		var spos: Vector2i = t.position
+		var arrival_sides := {}
+		for a in ProceduralFusionCheck._arrivals(res, spos):
+			arrival_sides[int(String(a).split("|")[0])] = true
+		for d in [_U, _R, _D, _L]:
+			if d == int(board.solution[spos]) or arrival_sides.has(d):
+				continue
+			var sz := _ray_hazard(board, spos, d)
+			if sz["kind"] == "none":
+				continue
+			out["selector_wrong_rays_live"] = int(out.get("selector_wrong_rays_live", 0)) + 1
+			if not _selector_state_solves(board, solved, spos, d):
+				continue
+			out["hazards"] += 1
+			if sz["fix"] != null:
+				var sfx: Vector2i = sz["fix"]
+				board.tiles.append(TilePlacement.make_blocker(sfx))
+				board.tile_cells[sfx] = "blocker"
+				if not _selector_state_solves(board, solved, spos, d):
+					out["repaired"] += 1
+					continue
+			out["unrepaired"] += 1
+			out["selector_unrepaired"] = int(out.get("selector_unrepaired", 0)) + 1
 	return out
+
+
+## True when the SOLVED board with the Selector at `spos` turned to `dir` still solves the puzzle.
+static func _selector_state_solves(board: ProceduralBoardV3, solved: Dictionary, spos: Vector2i, dir: int) -> bool:
+	var trial: Dictionary = solved.duplicate()
+	trial[spos] = dir
+	return LaserSystem.simulate_until_stable(board.to_level_data(board.w, board.h), trial)["solved"]
 
 
 static func _dir_of(v: Vector2i) -> int:

@@ -57,6 +57,7 @@ const HAZARD_SCENE := preload("res://scenes/tiles/hazard.tscn")
 const PRISM_SCENE := preload("res://scenes/tiles/prism.tscn")
 const ONE_WAY_REFLECTOR_SCENE := preload("res://scenes/tiles/one_way_reflector.tscn")
 const FUSION_SCENE := preload("res://scenes/tiles/fusion.tscn")
+const SPLITTER_SELECTOR_SCENE := preload("res://scenes/tiles/splitter_selector.tscn")
 const BEAM_RECEIVER_SCENE := preload("res://scenes/tiles/beam_receiver.tscn")
 const REMOTE_EMITTER_SCENE := preload("res://scenes/tiles/remote_emitter.tscn")
 const MIRROR_IMPACT_FX_SCENE := preload("res://scenes/gameplay/laser_mirror_impact_fx.tscn")
@@ -127,6 +128,7 @@ var _remote_emitter_nodes: Dictionary = {} # Vector2i -> RemoteEmitterTile (Era 
 var _remote_emitter_link_id_by_position: Dictionary = {} # Vector2i -> String (Era 2)
 var _prism_positions: Dictionary = {} # Vector2i -> true (Era 2, VFX only)
 var _fusion_nodes: Dictionary = {} # Vector2i -> FusionTile (Fusion Phase 1)
+var _selector_nodes: Dictionary = {} # Vector2i -> SplitterSelectorTile (Selector Phase S1)
 var _filter_positions: Dictionary = {} # Vector2i -> true (audio only - see _play_beam_interaction_audio())
 
 var cell_size: float = 64.0
@@ -230,6 +232,7 @@ func load_level(data: LevelData) -> void:
 	_remote_emitter_link_id_by_position.clear()
 	_prism_positions.clear()
 	_fusion_nodes.clear()
+	_selector_nodes.clear()
 	_filter_positions.clear()
 	_last_result = {}
 
@@ -353,6 +356,17 @@ func load_level(data: LevelData) -> void:
 				tile_orientations[tile.position] = tile.direction
 				_orientable_nodes[tile.position] = node
 				_fusion_nodes[tile.position] = node
+
+			GridTypes.TileType.SPLITTER_SELECTOR:
+				var node: SplitterSelectorTile = SPLITTER_SELECTOR_SCENE.instantiate()
+				node.grid_position = tile.position
+				node.orientation = tile.direction
+				node.rotatable = tile.rotatable
+				node.tile_clicked.connect(_on_orientable_tile_clicked)
+				_tiles_root.add_child(node)
+				tile_orientations[tile.position] = tile.direction
+				_orientable_nodes[tile.position] = node
+				_selector_nodes[tile.position] = node
 
 			GridTypes.TileType.BEAM_RECEIVER:
 				var node: BeamReceiverTile = BEAM_RECEIVER_SCENE.instantiate()
@@ -529,7 +543,7 @@ func _on_orientable_tile_clicked(grid_position: Vector2i) -> void:
 		GridTypes.MirrorOrientation.BACKSLASH if current == GridTypes.MirrorOrientation.SLASH
 		else GridTypes.MirrorOrientation.SLASH
 	)
-	if _fusion_nodes.has(grid_position):
+	if _fusion_nodes.has(grid_position) or _selector_nodes.has(grid_position):
 		new_orientation = (int(current) + 1) % 4 # Fusion: 4-state, one clockwise step per tap (D99)
 	tile_orientations[grid_position] = new_orientation
 	if _orientable_nodes.has(grid_position):
@@ -707,6 +721,12 @@ func _simulate_and_draw(play_impacts: bool = false) -> void:
 		for side in fusion_sides.get(pos, {}):
 			sides_view[side] = fusion_sides[pos][side].keys()
 		fnode.input_sides = sides_view
+
+	var selector_hits: Dictionary = _last_result["selector_hits"]
+	for pos in _selector_nodes:
+		var snode: SplitterSelectorTile = _selector_nodes[pos]
+		snode.active = selector_hits.has(pos)
+		snode.routed_color = selector_hits[pos].keys()[0] if selector_hits.has(pos) else -1
 
 	_redraw_beams()
 	if play_impacts:

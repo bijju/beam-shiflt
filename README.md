@@ -372,3 +372,8 @@ A Beam Fusion Node combines RED/GREEN/BLUE beams into YELLOW/MAGENTA/CYAN/WHITE.
 ## Fusion Node in procedural levels (QA build)
 
 Fusion Nodes now appear in main procedural levels from Level 201 (generator V4, `versionCode=55`): a node combines RED/GREEN/BLUE beams into YELLOW/MAGENTA/CYAN/WHITE and every generated node is load-bearing. Levels 1-200 have none; Level 2000 is the initial certification target (not a ceiling). QA entry points: PLAY + QA +50, Main Menu "FUSION TEST". A player-facing Fusion tutorial is a release blocker. See `DECISIONS.md` D99/D100.
+
+
+## Procedural Levels 2001-3000 - generator V5 (Selector Phase S3, uncommitted)
+
+Procedural Levels 2001-3000 now exist (generator V5, `MAX_LEVEL` = 3000 - the current boundary, not a ceiling). Level 2001 introduces the Splitter Selector into main progression (its tutorials T29-T34 are unlocked earlier, from Level 1900); from there 35-75% of levels per band carry one to three Selectors combined with Fusion, Prism, Filter, Portal, Switch/Gate, Receiver/Remote, One-Way and Splitter dependencies. Difficulty comes from dependencies and interactions, never from tile size (`MAX_COLUMNS` stays 8). QA entry: Main Menu "V5 TEST" (nine curated levels, no saves/stars/ads). Desktop-verified only and NOT certified: J/K difficulty refinement (S3.1, next), manual difficulty review, the Android build (S4) and on-device generation time are pending. Continuation prompt: `NEXT_AI_PROMPT.md`. See `DECISIONS.md` D110 and `PROCEDURAL_GENERATION.md` section 20.

@@ -49,6 +49,9 @@ const GENERATOR_VERSION_V3 := 3
 ## (not a mutation of V3) because Fusion changes what a level number generates: a saved version-3
 ## puzzle keeps regenerating byte-identically as V3, a saved version-4 puzzle as V4.
 const GENERATOR_VERSION_V4 := 4
+## V5 = the V4 progression + Splitter Selector fragments, the generator of Levels 2001-3000 (Selector Phase S3, D110).
+## A NEW version, never a mutation of V4: a saved version-4 puzzle keeps regenerating byte-identically as V4.
+const GENERATOR_VERSION_V5 := 5
 
 const MAX_ATTEMPTS := 40
 
@@ -56,10 +59,13 @@ const MIN_LEVEL := 1
 ## Initial production CERTIFICATION target (Levels 1-2000). NOT a permanent architectural ceiling: the
 ## difficulty contract, fragment planner and seed derivation are level-number-open (a level beyond the
 ## last band reads the last band) - see PROCEDURAL_GENERATION.md "Post-2000 readiness".
-const INITIAL_CERTIFIED_LEVEL_TARGET := 2000
+const INITIAL_CERTIFIED_LEVEL_TARGET := 3000
 ## The highest level the game currently EXPOSES (PLAY, Continue, QA jump). Equal to the certified
-## target in this pass; raising it is a deliberate later phase, never a side effect.
+## target; raising it is a deliberate later phase, never a side effect. 3000 is the CURRENT boundary
+## (Selector Phase S3, D110: Levels 2001-3000 are generator V5's), not a permanent architectural ceiling.
 const MAX_LEVEL := INITIAL_CERTIFIED_LEVEL_TARGET
+## First level generator V5 owns (Levels 2001..MAX_LEVEL); every level up to 2000 keeps V1-V4.
+const SELECTOR_FIRST_LEVEL := 2001
 
 
 ## Returns:
@@ -76,7 +82,7 @@ const MAX_LEVEL := INITIAL_CERTIFIED_LEVEL_TARGET
 ##   "intended_moves": int,  # == level_data.optimal_moves; Phase 2 star thresholds should use the solver-verified value
 ## }
 static func generate(level_number: int, generator_version: int = GENERATOR_VERSION) -> Dictionary:
-	if generator_version == GENERATOR_VERSION_V3 or generator_version == GENERATOR_VERSION_V4:
+	if generator_version == GENERATOR_VERSION_V3 or generator_version == GENERATOR_VERSION_V4 or generator_version == GENERATOR_VERSION_V5:
 		return ProceduralProgressionV3.generate(level_number, generator_version)
 	var profile := ProceduralDifficultyProfile.for_level(level_number, generator_version)
 	var rejections: Array = []

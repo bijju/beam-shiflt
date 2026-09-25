@@ -181,6 +181,17 @@ static func make_remote_emitter(pos: Vector2i, dir: GridTypes.Direction, emitter
 ## FUSION (Fusion Phase 1, D99): `direction` is the OUTPUT side (initial; the live value is
 ## the 4-state orientation in tile_orientations, one Direction per rotation), `rotatable`
 ## lets the player turn it clockwise one step per tap. No runtime input state lives here.
+## SPLITTER_SELECTOR (Selector Phase S1): `direction` is the SELECTED OUTPUT side (initial; the live
+## value is the 4-state orientation in tile_orientations, one Direction per tap, clockwise).
+static func make_splitter_selector(pos: Vector2i, output_dir: GridTypes.Direction, is_rotatable: bool = true) -> TilePlacement:
+	var t := TilePlacement.new()
+	t.tile_type = GridTypes.TileType.SPLITTER_SELECTOR
+	t.position = pos
+	t.direction = output_dir
+	t.rotatable = is_rotatable
+	return t
+
+
 static func make_fusion(pos: Vector2i, output_dir: GridTypes.Direction, is_rotatable: bool = true) -> TilePlacement:
 	var t := TilePlacement.new()
 	t.tile_type = GridTypes.TileType.FUSION

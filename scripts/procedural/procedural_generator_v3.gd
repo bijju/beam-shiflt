@@ -220,5 +220,5 @@ static func _explain(reason: String, m: Dictionary, req: Dictionary) -> String:
 		ProceduralTriviality.INDEPENDENT_ROTATIONS:
 			return "%d of %d required moves are plain" % [m["plain_route_moves"], m["required_rotatables"]]
 		ProceduralTriviality.PADDING:
-			return "%d padding move(s)" % m["padding_moves"]
+			return "%d padding move(s) at %s" % [m["padding_moves"], m["padding_positions"]]
 	return ""

@@ -128,6 +128,7 @@ static func simulate(level_data: LevelData, tile_orientations: Dictionary, gate_
 	var beam_receivers: Dictionary = {} # pos -> link_id (String) (Era 2)
 	var remote_emitters_by_link: Dictionary = {} # link_id -> Array[TilePlacement] (Era 2)
 	var fusions: Dictionary = {} # pos -> TilePlacement (Fusion Phase 1)
+	var selectors: Dictionary = {} # pos -> TilePlacement (Splitter Selector, Selector Phase S1)
 
 	for t in level_data.tiles:
 		match t.tile_type:
@@ -165,6 +166,8 @@ static func simulate(level_data: LevelData, tile_orientations: Dictionary, gate_
 				remote_emitters_by_link[t.link_id].append(t)
 			GridTypes.TileType.FUSION:
 				fusions[t.position] = t
+			GridTypes.TileType.SPLITTER_SELECTOR:
+				selectors[t.position] = t
 
 	# Only pairs with exactly 2 members are functional. An unpaired/over-
 	# paired portal fails safe: the cell is simply inert (treated as an
@@ -184,6 +187,7 @@ static func simulate(level_data: LevelData, tile_orientations: Dictionary, gate_
 	var looped := false
 	var activated_receiver_positions: Dictionary = {} # Era 2
 	var activated_link_ids: Dictionary = {} # Era 2
+	var selector_hits: Dictionary = {} # pos -> {color -> true}: beams ROUTED this pass (Selector Phase S1)
 	var fusion_inputs: Dictionary = {} # pos -> {incoming side (Direction) -> {color -> true}} (Fusion Phase 1)
 
 	# Shared across every beam branch this pass: if any branch reaches a
@@ -308,6 +312,21 @@ static func simulate(level_data: LevelData, tile_orientations: Dictionary, gate_
 					fusion_inputs[pos][entry_side][color] = true
 				break
 
+			if selectors.has(pos):
+				# SPLITTER SELECTOR (Selector Phase S1): one beam in, exactly ONE beam out, through the
+				# currently selected output side, colour unchanged. A beam entering THROUGH the output
+				# side is absorbed (that side is the exit, not an input). Same-pass and stateless: the
+				# routing is a pure function of tile_orientations - nothing latches between passes.
+				segments[-1].append(pos)
+				var selector_out: int = _selector_output_dir(selectors[pos], tile_orientations)
+				if GridTypes.opposite_direction(dir) == selector_out:
+					break
+				if not selector_hits.has(pos):
+					selector_hits[pos] = {}
+				selector_hits[pos][color] = true
+				dir = selector_out
+				continue
+
 			if portal_partner.has(pos):
 				segments[-1].append(pos) # entry point ends this segment
 				pos = portal_partner[pos]
@@ -418,7 +437,13 @@ static func simulate(level_data: LevelData, tile_orientations: Dictionary, gate_
 		"fusion_input_colors": fusion_input_masks,
 		"fusion_input_sides": fusion_inputs,
 		"fusion_states": fusion_states.duplicate(),
+		"selector_hits": selector_hits,
 	}
+
+
+## The live selected OUTPUT direction of a Splitter Selector (Selector Phase S1).
+static func _selector_output_dir(tile: TilePlacement, tile_orientations: Dictionary) -> int:
+	return int(tile_orientations.get(tile.position, tile.direction))
 
 
 ## The live OUTPUT direction of a Fusion Node: its 4-state orientation from tile_orientations,

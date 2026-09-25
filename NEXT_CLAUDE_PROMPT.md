@@ -2237,3 +2237,11 @@ Visual-only Hint button pulse in `game.gd` (`_hint_attention_*`), tunables `UICo
 ## UPDATE: Level Complete button fix (`versionCode=67`, `4.8.1-LEVEL-COMPLETE-BUTTON-FIX-QA`)
 
 Fixed the stretched NEXT LEVEL/RETRY/LEVEL SELECT buttons on `scenes/ui/level_complete_popup.tscn`'s `ButtonRow`: they were missing `size_flags_horizontal` and had `custom_minimum_size.x = 0`, so Godot's default `FILL` sizing stretched the `StyleBoxTexture` button art to the full ~812px panel width instead of the intended proportion. Fix was `size_flags_horizontal = 4` (SHRINK_CENTER) + `custom_minimum_size = Vector2(600, 140)` on all three buttons, matching the pattern `main_menu.tscn`'s buttons already use. Rendered-verified at 540x960 and 1080x2400 (both produced identical 600x140 button rects, ratio 4.2857). `pause_menu.tscn` and `tutorial_complete_popup.tscn` have the exact same missing-pattern bug (each is its own hand-authored scene, not a shared component) but were deliberately left untouched — out of scope for this pass, fix them the same way if a future pass is asked to. Stars/Moves Used/panel position/HUD/board were not touched. Awaiting the user's Android screenshot approval.
+
+---
+**Latest state (2026-09-25): see the Update below and `NEXT_AI_PROMPT.md`.** (Older text here said S3 had not started; that is stale - S1 and S2 are COMPLETE, S3 = generator V5 is IMPLEMENTED / NOT CERTIFIED.)
+
+
+**PREFERRED CONTINUATION SOURCE: `NEXT_AI_PROMPT.md` (tool-independent, Codex/Claude/any agent). Current phase = S3.1 (V5 J/K difficulty refinement); S4 (APK) is NOT next.** This file is kept for workflow compatibility and points to the same phase.
+
+**Update (Selector Phase S3, 2026-09-25):** generator V5 (Levels 2001-3000, `GENERATOR_VERSION_V5`, `MAX_LEVEL` = 3000) is implemented and desktop-verified but UNCOMMITTED, with manual difficulty review, the Android build (S4), on-device generation time and any version bump still PENDING. Read `PROCEDURAL_GENERATION.md` section 20, `DECISIONS.md` D110 and `CLAUDE.md` "V5 generator rules" first. Do not start S4 or create Levels 3001+ unless asked; after any change under `scripts/procedural/**` re-run the V1-V4 fingerprint and `scripts/tools/v5_sample.tscn` / `v5_verify.tscn` (wrap in `timeout`, keep runs under ~60 s).

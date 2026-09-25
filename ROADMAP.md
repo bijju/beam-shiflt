@@ -601,7 +601,7 @@ completion. Zero `LaserSystem`/`GridTypes`/campaign/tutorial code changes;
 1-2's own still-outstanding review — four consecutive unreviewed passes
 now await real-device feedback together. **Do not create Campaign Levels
 141+, T21+, a new Era, or procedural Levels 2001+ without being
-explicitly asked.**
+explicitly asked.** (Update 2026-09-25: procedural Levels 2001-3000 now exist as generator V5, Selector Phase S3 / D110 - see the section at the end of this file.)
 
 
 ## Difficulty System - Phase 1 done, Phase 2 pending approval
@@ -671,3 +671,8 @@ Phase 3 (D101): the Fusion tutorial pack T21-T28, generator-V4 fragment variants
 - **QA vs production:** ONE constant, `BuildConfig.IS_PRODUCTION_BUILD` (false in this build). It derives every QA-only UI/unlock flag in `LevelManager` and hides the tutorial debug overlay and the generator tag. Tools are hidden, never deleted. Not covered: Google TEST ad ids, and the generator rollout flags `USE_V3_FOR_PROCEDURAL_QA`/`USE_FUSION_PROGRESSION_FOR_QA`.
 - **Fusion tutorial nudge:** one-time non-blocking "NEW TUTORIAL: FUSION" banner on Main Menu (`LevelManager.should_show_fusion_tutorial_nudge()`, persisted `fusion_tutorial_nudge_seen`); never forces the tutorial, never locks progression. `bs_fusion_icon.png` remains unused (no icon support in the tutorial panel).
 - Level 2000 remains the certification target; nothing beyond it is exposed; no new mechanic.
+
+
+## Procedural Levels 2001-3000 (generator V5, Selector Phase S3, 2026-09-25)
+
+Built (uncommitted): generator V5 = the V4 pipeline + Splitter Selector fragments, bands G-K continuing the late-V4 curve (Level 2001 must feel like progression after 2000, never a reset), `MAX_LEVEL` = 3000 (the CURRENT certification boundary, not a permanent ceiling), T29 available before the introduction (unlock at procedural Level 1900). Difficulty grows through dependency/interaction complexity, never tile size (`MAX_COLUMNS` 8), padding or clutter; exact optimality is UNKNOWN on large state spaces. Status: S3 implemented / NOT certified; S3.1 pass 1 added S-M and reduced bounded J/K demotion, but full certification remains. Next: finish S3.1 (full J/K windows or lower generation cost, remaining families S-I/S-K/S-O, fair decoy routes, stronger minimality/shortcut screens), then manual play review of the V5 TEST levels, then S4 (Android build; measure on-device generation time). See `NEXT_AI_PROMPT.md`. Not planned without a request: Levels 3001+, chained Fusion, Selector families S-I/S-K/S-O.

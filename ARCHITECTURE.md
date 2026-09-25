@@ -1733,3 +1733,8 @@ reference:
 ## HUD edge spacing (D103)
 
 `SafeAreaMargin` has an optional HUD overhang (top/bottom px of transparent HUD art) set by `game.gd._update_hud_edge_overhang()`; vertical margins become safe inset + `GAMEPLAY_VERTICAL_MARGIN` - overhang. Menus use overhang 0 (unchanged).
+
+
+## Generator V5 and the Splitter Selector in procedural progression (D110)
+
+`ProceduralLevelGenerator.generate(level, 5)` -> `ProceduralProgressionV3.generate(level, 5)`: rolls (Fusion stream 90, Selector stream 91, both once per level) -> `ProceduralFragmentsV3.compose` (atoms + `SELECTOR_FRAGMENTS` sites -> line tree, density fit against `v5_tile_budget`) -> `ProceduralComposerV3.build` (kind "selector" is a turn via `ProceduralBoardV3.Cursor.to_selector_turn`; `_bias_selector`; per-plan search budgets) -> `harden` (Selector wrong rays screened, not blanket-blocked) -> `ProceduralGeneratorV3._check` (`ProceduralComplexity.analyze` -> `ProceduralSelectorCheck.analyze`; a Selector counts only when load-bearing, not mirror-like, non-solving) -> `ProceduralSelectorCheck.reasons_for` -> pre-probe -> greedy -> `ProceduralMinimality.find_cheaper` -> ONE final wide `ProceduralShortcutProbe`. Ladder on failure: move relax (<= 25%) -> `band_demoted` (reasoning floors of the band below, from attempt 8 for Selector levels / 14) -> V2 fallback (`V5_GENERATION_FAILED`, 0 observed). All of it is runtime-safe (LaserSystem only, never LevelSolver/LevelValidator); dev tools `v5_sample`/`v5_verify` live in `scripts/tools/` (never exported). Version mapping: `LevelManager.procedural_generator_version_for_new_play(level)` (level >= 2001 -> V5); QA: `GameManager.is_v5_test_mode` + `ProceduralV5QaSet` ("V5 TEST", contained like SELECTOR TEST).

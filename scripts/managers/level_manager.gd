@@ -244,6 +244,13 @@ const TUTORIAL_LEVEL_PATHS: Array[String] = [
 	"res://levels/tutorial/t26.gd",
 	"res://levels/tutorial/t27.gd",
 	"res://levels/tutorial/t28.gd",
+	# Splitter Selector pack (Selector Phase S2, D109) - own unlock rule, see SELECTOR_TUTORIAL_FIRST.
+	"res://levels/tutorial/t29.gd",
+	"res://levels/tutorial/t30.gd",
+	"res://levels/tutorial/t31.gd",
+	"res://levels/tutorial/t32.gd",
+	"res://levels/tutorial/t33.gd",
+	"res://levels/tutorial/t34.gd",
 ]
 
 ## Fusion tutorial pack (T21-T28, Fusion Phase 3, D101). Normal procedural progression
@@ -254,10 +261,18 @@ const FUSION_TUTORIAL_FIRST := 21
 const FUSION_TUTORIAL_LAST := 28
 const FUSION_TUTORIAL_UNLOCK_PROCEDURAL_LEVEL := 150
 
+## Splitter Selector tutorial pack (T29-T34, Selector Phase S2, D109). Selector puzzles first appear in main progression at
+## Level 2001 (generator V5, Selector Phase S3, D110), so T29 opens - well BEFORE that - once real procedural progression reaches
+## SELECTOR_TUTORIAL_UNLOCK_PROCEDURAL_LEVEL (well before the certified boundary); T30-T34 unlock sequentially.
+## Never a hard gate: no procedural level is ever locked behind it.
+const SELECTOR_TUTORIAL_FIRST := 29
+const SELECTOR_TUTORIAL_LAST := 34
+const SELECTOR_TUTORIAL_UNLOCK_PROCEDURAL_LEVEL := 1900
+
 ## Phase 3 (Procedural Generator V1, see PROCEDURAL_GENERATION.md):
 ## TEMPORARY QA-only flag for the small "NEXT" skip button on the shared
 ## gameplay HUD (see game.tscn's %QANextButton / game.gd's
-## _on_qa_next_pressed()). Testing up to Level 2000 by actually solving
+## _on_qa_next_pressed()). Testing up to Level 3000 by actually solving
 ## every prior puzzle is impractical - this lets a tester jump straight to
 ## the next procedural level. Reuses the same single-obvious-flag
 ## convention as UNLOCK_ALL_CAMPAIGN_LEVELS_FOR_TESTING/
@@ -294,6 +309,15 @@ const SHOW_V3_PROTOTYPE_QA := BuildConfig.QA_TOOLS
 ## in-game "NEXT FUSION"). Same containment as V3 TEST: never touches saves, progression, stars,
 ## ads or the interstitial counter; hints stay free. IMPORTANT: SET TO FALSE BEFORE PRODUCTION.
 const SHOW_FUSION_TEST_QA := BuildConfig.QA_TOOLS
+
+## Splitter Selector Phase S1: DEV-ONLY entry for the six Selector QA puzzles (Main Menu "SELECTOR TEST",
+## in-game "NEXT SELECTOR"). Same containment as FUSION TEST. IMPORTANT: SET TO FALSE BEFORE PRODUCTION.
+const SHOW_SELECTOR_TEST_QA := BuildConfig.QA_TOOLS
+
+## Selector Phase S3 (D110): DEV-ONLY entry for a curated sample of generator-V5 levels (Main Menu "V5 TEST", in-game
+## "NEXT V5"), for manual difficulty review. Same containment as SELECTOR TEST / FUSION TEST: never touches saves, stars,
+## ads or the interstitial counter. IMPORTANT: SET TO FALSE BEFORE PRODUCTION (it follows BuildConfig.QA_TOOLS).
+const SHOW_V5_TEST_QA := BuildConfig.QA_TOOLS
 
 ## Difficulty System Phase 2B (D96): DEV/QA switch that makes normal procedural
 ## progression (PLAY / CONTINUE / the +50 button) generate NEW puzzles with
@@ -465,6 +489,8 @@ func get_tutorial_level_count() -> int:
 ## rule". Generalizes to future eras: an era N tutorial additionally
 ## requires campaign level (N-1)*100 completed.
 func is_tutorial_level_selectable(tutorial_level_id: int) -> bool:
+	if tutorial_level_id >= SELECTOR_TUTORIAL_FIRST and tutorial_level_id <= SELECTOR_TUTORIAL_LAST:
+		return is_selector_tutorial_selectable(tutorial_level_id)
 	if tutorial_level_id >= FUSION_TUTORIAL_FIRST and tutorial_level_id <= FUSION_TUTORIAL_LAST:
 		return is_fusion_tutorial_selectable(tutorial_level_id)
 	var era := EraTheme.get_era_for_tutorial(tutorial_level_id)
@@ -486,6 +512,17 @@ func is_fusion_tutorial_selectable(tutorial_level_id: int) -> bool:
 		return true
 	if tutorial_level_id == FUSION_TUTORIAL_FIRST:
 		return SaveManager.procedural_current_level >= FUSION_TUTORIAL_UNLOCK_PROCEDURAL_LEVEL \
+			or SaveManager.is_tutorial_level_unlocked(tutorial_level_id)
+	return SaveManager.is_tutorial_level_unlocked(tutorial_level_id)
+
+
+## T29 opens once real procedural progression reaches SELECTOR_TUTORIAL_UNLOCK_PROCEDURAL_LEVEL (or an earlier
+## tutorial_highest_unlocked_level says so); T30-T34 are sequential. The QA flag opens all of them.
+func is_selector_tutorial_selectable(tutorial_level_id: int) -> bool:
+	if UNLOCK_ALL_ERA_2_TUTORIALS_FOR_TESTING:
+		return true
+	if tutorial_level_id == SELECTOR_TUTORIAL_FIRST:
+		return SaveManager.procedural_current_level >= SELECTOR_TUTORIAL_UNLOCK_PROCEDURAL_LEVEL \
 			or SaveManager.is_tutorial_level_unlocked(tutorial_level_id)
 	return SaveManager.is_tutorial_level_unlocked(tutorial_level_id)
 
@@ -517,7 +554,7 @@ func get_tutorial_level(tutorial_level_id: int) -> TutorialLevelData:
 
 
 ## --- Phase 3 (Procedural Generator V1, see PROCEDURAL_GENERATION.md):
-## the main-menu PLAY/CONTINUE progression, Levels 1-2000. A completely
+## the main-menu PLAY/CONTINUE progression, Levels 1-3000 (1-2000 under generators V1-V4, 2001-3000 under V5). A completely
 ## separate population from LEVEL_PATHS/CAMPAIGN_LEVEL_PATHS/
 ## TUTORIAL_LEVEL_PATHS above - generated on demand via
 ## ProceduralLevelGenerator rather than loaded from a fixed path array, so
@@ -550,7 +587,10 @@ func get_procedural_level(level_number: int, generator_version: int = Procedural
 
 ## Generator version for a BRAND-NEW procedural puzzle (never for a resumed one -
 ## game.gd uses the version saved with the resume state for that).
-func procedural_generator_version_for_new_play() -> int:
+func procedural_generator_version_for_new_play(level_number: int = 0) -> int:
+	# Levels 2001+ exist only under generator V5 (Selector Phase S3, D110) - the ONE place that maps a level to V5.
+	if level_number >= ProceduralLevelGenerator.SELECTOR_FIRST_LEVEL:
+		return ProceduralLevelGenerator.GENERATOR_VERSION_V5
 	if USE_V3_FOR_PROCEDURAL_QA and USE_FUSION_PROGRESSION_FOR_QA:
 		return ProceduralLevelGenerator.GENERATOR_VERSION_V4
 	if USE_V3_FOR_PROCEDURAL_QA:

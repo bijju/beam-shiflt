@@ -1,5 +1,13 @@
 # CHANGELOG.md
 
+## Selector Phase S3 - generator V5, Levels 2001-3000 (2026-09-25, uncommitted, no version bump)
+
+New generator version 5 for procedural Levels 2001-3000 (`MAX_LEVEL` 3000): contract bands G-K, Splitter Selector in main progression (Level 2001 introduces it; T29 unlock at 1900 unchanged), `ProceduralSelectorCheck` (load-bearing / mirror-like / equivalent-state / consequence / coupling / downstream depth), 12 Selector families initially, `ProceduralMinimality` + final wide shortcut probe, density fit + degradation ladder, `V5 TEST` QA entry, `v5_sample.tscn`/`v5_verify.tscn`. S3.1 pass 1 adds S-M (`Selector -> target continuation`) and delays K demotion; bounded J/K windows improve to J 3/36 and K 0/37 demoted under a 90s budget, with V1-V4 fingerprint still identical. Also: 4-state tap distance in `ProceduralComplexity.analyze` (Fusion unchanged), `GameManager.is_v5_test_mode`, `LevelManager.SHOW_V5_TEST_QA`, HUD tag shows the Selector family. Exact optimum UNKNOWN on V5. **Status: S3/S3.1 implemented but V5 still NOT certified; full 50-level J/K windows, phone readability, and Android generation time remain open; not S4.** See DECISIONS D110 and PROCEDURAL_GENERATION.md section 20.
+
+## Splitter Selector S1+S2 (2026-09-25, uncommitted, no version bump yet)
+
+New mechanic SPLITTER_SELECTOR (S1: runtime, SelectorQaSet S1-S6 behind "SELECTOR TEST", scripts/tools/selector_verify) and the T29-T34 tutorial pack (S2: levels/tutorial/t29.gd-t34.gd, hand-authored hint_solutions.json entries, LevelManager.SELECTOR_TUTORIAL_* unlock, scripts/tools/selector_tutorial_verify). (Historical: at S1/S2 time generator V5 was not started - it now exists, see the Selector Phase S3 entry above.) V1-V4 fingerprint verified identical. See DECISIONS D108/D109.
+
 ## Hint attention pulse (2026-09-25, QA)
 
 `versionCode=68`, `4.8.2-HINT-ATTENTION-PULSE-QA`. Subtle repeating cyan glow/scale pulse (5 s interval, scale 1.04) on the Hint icon; visual-only, one reusable halo node and one looping Tween in `game.gd`; constants in `UIConstants.HINT_*`. Stops on press/ad/solve/reload.

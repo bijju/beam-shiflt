@@ -420,3 +420,24 @@ Authoring rules that each mattered: every board has exactly ONE solution (brute-
 - **QA vs production:** ONE constant, `BuildConfig.IS_PRODUCTION_BUILD` (false in this build). It derives every QA-only UI/unlock flag in `LevelManager` and hides the tutorial debug overlay and the generator tag. Tools are hidden, never deleted. Not covered: Google TEST ad ids, and the generator rollout flags `USE_V3_FOR_PROCEDURAL_QA`/`USE_FUSION_PROGRESSION_FOR_QA`.
 - **Fusion tutorial nudge:** one-time non-blocking "NEW TUTORIAL: FUSION" banner on Main Menu (`LevelManager.should_show_fusion_tutorial_nudge()`, persisted `fusion_tutorial_nudge_seen`); never forces the tutorial, never locks progression. `bs_fusion_icon.png` remains unused (no icon support in the tutorial panel).
 - Level 2000 remains the certification target; nothing beyond it is exposed; no new mechanic.
+
+
+## 15. Splitter Selector tutorial pack T29-T34 (Selector Phase S2, DECISIONS.md D109)
+
+| ID | Name | Teaches | Forced taps |
+|---|---|---|---|
+| T29 | Select Path | one beam in, ONE chosen output (vs. the ordinary Splitter) | 1 |
+| T30 | Choose Output | only one output active; each tap = next direction clockwise; an output facing the input side is dark | 3 |
+| T31 | Sel + Filter | check the target colour, choose the path whose filter supplies it | 1 |
+| T32 | Sel + Portal | selected path continues through a portal; wrong state lights a decoy | 2 |
+| T33 | Sel + Fusion | Selector controls a Fusion input (load-bearing) | 2 |
+| T34 | Sel Trial | free play (wait_for_solved, Hint from table): Selector, Filter, Portal, Fusion, Switch/Gate, mirrors | 5 (free) |
+
+Rules learned: the selector is an ordinary orientable tile, so REQUIRE_TILE_TAP, interaction_restricted_to and Hint work unchanged; a decoy is a NON-required target (make_target(pos, color, false)); brute-force every board (scripts/tools/selector_tutorial_verify.tscn) - LevelSolver cannot model the 4-state tile. Hint entries t29-t34 are hand-authored (Selector/Fusion value = Direction 0-3, mirror 0/1). Unlock: LevelManager.is_selector_tutorial_selectable() (T29 at procedural Level 1900, then sequential; QA opens all; not era-gated, not a hard gate). Tutorials stay ad-free/star-free.
+
+
+## T29 and generator V5 (Selector Phase S3, D110)
+
+T29 ("Select Path") unlocks at procedural Level 1900 (`LevelManager.SELECTOR_TUTORIAL_UNLOCK_PROCEDURAL_LEVEL`), i.e. well before the first Selector level in main progression (Level 2001, always one simple Selector: family SA/SB/SH/SE). No tutorial code changed in S3; the tutorial pack and its hints are exactly as in D109. Generated V5 levels never use `TutorialManager`, and V5 levels are ad-eligible like any normal procedural level (V5 TEST is not).
+
+Status (2026-09-25): T29-T34 are COMPLETE and unchanged by S3/S3.1; T29 unlocks at procedural Level 1900, T30-T34 sequential, tutorials are ad-free, QA builds unlock all, hint entries are hand-authored.

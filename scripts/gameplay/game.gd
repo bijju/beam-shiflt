@@ -251,7 +251,7 @@ func _load_current_level(force_fresh: bool = false) -> void:
 	_rewarded_this_level = false
 	_tutorial_complete_popup.hide()
 	_qa_next_button.visible = GameManager.is_procedural_mode and (LevelManager.SHOW_PROCEDURAL_QA_NEXT_BUTTON or _is_v3_session())
-	_qa_next_button.text = ("NEXT FUSION" if _is_fusion_session() else "NEXT V3") if _is_v3_session() else "+%d" % LevelManager.PROCEDURAL_QA_JUMP_AMOUNT
+	_qa_next_button.text = ("NEXT V5" if _is_v5_session() else "NEXT SELECTOR" if _is_selector_session() else "NEXT FUSION" if _is_fusion_session() else "NEXT V3") if _is_v3_session() else "+%d" % LevelManager.PROCEDURAL_QA_JUMP_AMOUNT
 
 	if GameManager.is_tutorial_mode:
 		_apply_era_theme(EraTheme.get_era_for_tutorial(GameManager.current_tutorial_id))
@@ -299,23 +299,30 @@ func _load_current_level(force_fresh: bool = false) -> void:
 		# while only one version had ever existed but would have silently
 		# regenerated a resumed V1 puzzle under V2 rules the moment V2
 		# shipped - fixed here, not left as a latent bug.
-		var generator_version := SaveManager.procedural_resume_generator_version if is_resuming else LevelManager.procedural_generator_version_for_new_play()
+		var generator_version := SaveManager.procedural_resume_generator_version if is_resuming else LevelManager.procedural_generator_version_for_new_play(procedural_level_number)
 		_procedural_generator_version = generator_version
 		var gen_result: Dictionary = _qa_generate(procedural_level_number) if v3_session else LevelManager.get_procedural_generation_result(procedural_level_number, generator_version)
 		level_data = gen_result["level_data"]
 		_hint.configure(gen_result.get("solution_orientations", {}))
-		var qa_title := "FUSION QA" if _is_fusion_session() else "V3 PROTO"
+		var qa_title := "V5 TEST" if _is_v5_session() else "SELECTOR QA" if _is_selector_session() else "FUSION QA" if _is_fusion_session() else "V3 PROTO"
 		_level_label.text = ("%s\n%d / %d" % [qa_title, procedural_level_number, _qa_count()]) if v3_session else ("LEVEL %d" % procedural_level_number)
+		if _is_v5_session():
+			# V5 TEST names the REAL level number and generator facts (the index alone says nothing).
+			var qa_real: int = ProceduralV5QaSet.level_for(procedural_level_number)
+			var qa_sel: String = gen_result.get("selector_fragment", "")
+			_level_label.text = "V5 TEST %d/%d\nL%d %s%s%s" % [procedural_level_number, _qa_count(), qa_real, ProceduralDifficultyContract.band_code(qa_real), (" " + qa_sel) if qa_sel != "" else "", " ~DEMOTED" if gen_result.get("band_demoted", false) else ""]
 		# QA-only tag (Phase 2B, D96): which generator/band this puzzle came from, so a tester can
 		# judge difficulty per band and see a V3 generation failure (V2 fallback) on the device.
-		if BuildConfig.QA_TOOLS and not v3_session and LevelManager.USE_V3_FOR_PROCEDURAL_QA and (generator_version == ProceduralLevelGenerator.GENERATOR_VERSION_V3 or generator_version == ProceduralLevelGenerator.GENERATOR_VERSION_V4):
+		if BuildConfig.QA_TOOLS and not v3_session and LevelManager.USE_V3_FOR_PROCEDURAL_QA and generator_version >= ProceduralLevelGenerator.GENERATOR_VERSION_V3:
 			# Fusion Phase 2 (D100): "V4 HRD F2" = generator 4, band, Fusion fragment (F1-F7) when the level has one.
 			var qa_tag := "V%d" % generator_version
 			if gen_result.get("v3_generation_failed", false):
 				_level_label.text += "\n%s FAILED>V2" % qa_tag
 			else:
 				var frag: String = gen_result.get("fusion_fragment", "")
-				_level_label.text += "\n%s %s%s" % [qa_tag, ProceduralDifficultyContract.band_code(procedural_level_number), (" " + frag) if frag != "" else ""]
+				# Selector Phase S3 (D110): a V5 level also names its Selector family (SA-SP), e.g. "V5 SCQ F3 SL".
+				var sel_frag: String = gen_result.get("selector_fragment", "")
+				_level_label.text += "\n%s %s%s%s" % [qa_tag, ProceduralDifficultyContract.band_code(procedural_level_number), (" " + frag) if frag != "" else "", (" " + sel_frag) if sel_frag != "" else ""]
 		_apply_era_theme(EraTheme.get_era_for_level(procedural_level_number))
 		_grid.load_level(level_data)
 
@@ -591,19 +598,27 @@ func _on_qa_next_pressed() -> void:
 func _is_v3_session() -> bool:
 	# "QA sandbox session": the V3 prototype selector OR the Fusion QA selector (D99) - both are
 	# save-free, ad-free, counter-free and keep hints free.
-	return GameManager.is_procedural_mode and ((GameManager.is_v3_prototype_mode and LevelManager.SHOW_V3_PROTOTYPE_QA) or _is_fusion_session())
+	return GameManager.is_procedural_mode and ((GameManager.is_v3_prototype_mode and LevelManager.SHOW_V3_PROTOTYPE_QA) or _is_fusion_session() or _is_selector_session() or _is_v5_session())
 
 
 func _is_fusion_session() -> bool:
 	return GameManager.is_fusion_test_mode and LevelManager.SHOW_FUSION_TEST_QA and GameManager.is_procedural_mode
 
 
+func _is_v5_session() -> bool:
+	return GameManager.is_v5_test_mode and LevelManager.SHOW_V5_TEST_QA and GameManager.is_procedural_mode
+
+
+func _is_selector_session() -> bool:
+	return GameManager.is_selector_test_mode and LevelManager.SHOW_SELECTOR_TEST_QA and GameManager.is_procedural_mode
+
+
 func _qa_count() -> int:
-	return FusionQaSet.COUNT if _is_fusion_session() else ProceduralGeneratorV3.PROTOTYPE_COUNT
+	return ProceduralV5QaSet.COUNT if _is_v5_session() else SelectorQaSet.COUNT if _is_selector_session() else FusionQaSet.COUNT if _is_fusion_session() else ProceduralGeneratorV3.PROTOTYPE_COUNT
 
 
 func _qa_generate(n: int) -> Dictionary:
-	return FusionQaSet.get_puzzle(n) if _is_fusion_session() else ProceduralGeneratorV3.generate(n)
+	return ProceduralV5QaSet.get_puzzle(n) if _is_v5_session() else SelectorQaSet.get_puzzle(n) if _is_selector_session() else FusionQaSet.get_puzzle(n) if _is_fusion_session() else ProceduralGeneratorV3.generate(n)
 
 
 func _on_level_select_pressed() -> void:

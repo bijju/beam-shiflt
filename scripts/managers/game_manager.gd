@@ -45,6 +45,8 @@ var is_procedural_mode: bool = false
 func start_tutorial(tutorial_id: int) -> void:
 	is_v3_prototype_mode = false
 	is_fusion_test_mode = false
+	is_selector_test_mode = false
+	is_v5_test_mode = false
 	current_tutorial_id = tutorial_id
 	is_tutorial_mode = true
 	get_tree().change_scene_to_file(GAME_SCENE)
@@ -99,6 +101,8 @@ func take_editor_level_data() -> LevelData:
 func go_to_main_menu() -> void:
 	is_v3_prototype_mode = false
 	is_fusion_test_mode = false
+	is_selector_test_mode = false
+	is_v5_test_mode = false
 	is_tutorial_mode = false
 	get_tree().change_scene_to_file(MAIN_MENU_SCENE)
 
@@ -106,6 +110,8 @@ func go_to_main_menu() -> void:
 func go_to_level_select() -> void:
 	is_v3_prototype_mode = false
 	is_fusion_test_mode = false
+	is_selector_test_mode = false
+	is_v5_test_mode = false
 	is_tutorial_mode = false
 	get_tree().change_scene_to_file(LEVEL_SELECT_SCENE)
 
@@ -117,6 +123,8 @@ func go_to_settings() -> void:
 func start_level(level_id: int, from_level_select: bool = false) -> void:
 	is_v3_prototype_mode = false
 	is_fusion_test_mode = false
+	is_selector_test_mode = false
+	is_v5_test_mode = false
 	current_level_id = level_id
 	is_tutorial_mode = false
 	is_procedural_mode = false
@@ -136,6 +144,8 @@ var current_procedural_level: int = 1
 func start_procedural_level(level_number: int) -> void:
 	is_v3_prototype_mode = false
 	is_fusion_test_mode = false
+	is_selector_test_mode = false
+	is_v5_test_mode = false
 	current_procedural_level = level_number
 	is_tutorial_mode = false
 	is_procedural_mode = true
@@ -209,6 +219,8 @@ func start_v3_prototype(index: int) -> void:
 	is_procedural_mode = true
 	is_v3_prototype_mode = true
 	is_fusion_test_mode = false
+	is_selector_test_mode = false
+	is_v5_test_mode = false
 	entered_via_level_select = false
 	get_tree().change_scene_to_file(GAME_SCENE)
 
@@ -226,5 +238,44 @@ func start_fusion_test(index: int) -> void:
 	is_procedural_mode = true
 	is_v3_prototype_mode = false
 	is_fusion_test_mode = true
+	is_selector_test_mode = false
+	is_v5_test_mode = false
+	entered_via_level_select = false
+	get_tree().change_scene_to_file(GAME_SCENE)
+
+
+## Splitter Selector Phase S1 - DEV-ONLY Selector QA session (LevelManager.SHOW_SELECTOR_TEST_QA).
+## Same containment as the Fusion QA session: a save-free, ad-free sub-mode of procedural mode that
+## plays levels/selector_qa puzzles 1..SelectorQaSet.COUNT (see game.gd's _is_v3_session()).
+var is_selector_test_mode: bool = false
+
+
+func start_selector_test(index: int) -> void:
+	current_procedural_level = clampi(index, 1, SelectorQaSet.COUNT)
+	is_tutorial_mode = false
+	is_procedural_mode = true
+	is_v3_prototype_mode = false
+	is_fusion_test_mode = false
+	is_selector_test_mode = true
+	is_v5_test_mode = false
+	entered_via_level_select = false
+	get_tree().change_scene_to_file(GAME_SCENE)
+
+
+## Selector Phase S3 (D110) - DEV-ONLY V5 QA session (LevelManager.SHOW_V5_TEST_QA): plays a curated list of generator-V5
+## levels (ProceduralV5QaSet.LEVELS) for manual difficulty review. Same containment as the Fusion/Selector QA sessions: a
+## save-free, ad-free, counter-free sub-mode of procedural mode (game.gd's _is_v3_session()). `current_procedural_level` holds
+## the 1-based INDEX into that list, never a real level number.
+var is_v5_test_mode: bool = false
+
+
+func start_v5_test(index: int) -> void:
+	current_procedural_level = clampi(index, 1, ProceduralV5QaSet.COUNT)
+	is_tutorial_mode = false
+	is_procedural_mode = true
+	is_v3_prototype_mode = false
+	is_fusion_test_mode = false
+	is_selector_test_mode = false
+	is_v5_test_mode = true
 	entered_via_level_select = false
 	get_tree().change_scene_to_file(GAME_SCENE)

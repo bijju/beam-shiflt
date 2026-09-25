@@ -58,7 +58,7 @@ func get_initial_tile_orientations() -> Dictionary:
 	for t in tiles:
 		if t.tile_type in _ORIENTABLE_TILE_TYPES:
 			result[t.position] = t.mirror_orientation
-		elif t.tile_type == GridTypes.TileType.FUSION:
+		elif t.tile_type == GridTypes.TileType.FUSION or t.tile_type == GridTypes.TileType.SPLITTER_SELECTOR:
 			result[t.position] = t.direction # 4-state: the OUTPUT Direction (Fusion Phase 1, D99)
 	return result
 

@@ -13,6 +13,8 @@ enum TileType {
 	PRISM, ONE_WAY_REFLECTOR, BEAM_RECEIVER, REMOTE_EMITTER,
 	## Beam Fusion Node (Fusion Phase 1, D99): appended, existing values keep their identity.
 	FUSION,
+	## Splitter Selector (Selector Phase S1): appended, existing values keep their identity.
+	SPLITTER_SELECTOR,
 }
 
 enum Direction { UP, RIGHT, DOWN, LEFT }
