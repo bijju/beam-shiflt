@@ -15,6 +15,7 @@ const TEXTURE_TOGGLE_OFF := preload("res://assets/ui/settings/bs_ui_toggle_off_r
 @onready var _back_button: Button = %BackButton
 @onready var _store_section: Control = %StoreSection
 @onready var _buy_button: Button = %BuyNoForcedAdsButton
+@onready var _store_status: Label = %StoreStatusLabel
 @onready var _restore_button: Button = %RestorePurchasesButton
 @onready var _cloud_section: Control = %CloudSection
 @onready var _cloud_status: Label = %CloudStatusLabel
@@ -58,6 +59,7 @@ func _ready_store_rows() -> void:
 
 
 func _refresh_store() -> void:
+	_store_status.visible = false
 	if StoreManager.owns_no_forced_ads():
 		_buy_button.text = "NO FORCED ADS - OWNED"
 		_buy_button.disabled = true
@@ -68,8 +70,10 @@ func _refresh_store() -> void:
 		_buy_button.text = "NO FORCED ADS - %s" % StoreManager.price_text()
 		_buy_button.disabled = false
 	else:
-		# Never a dead-looking BUY button: say why it can't be pressed.
-		_buy_button.text = "NO FORCED ADS - STORE UNAVAILABLE"
+		# Never a dead-looking BUY button: say why it can't be pressed, on a plain line under the art.
+		_store_status.text = "Store unavailable right now."
+		_store_status.visible = true
+		_buy_button.text = "NO FORCED ADS"
 		_buy_button.disabled = true
 	_restore_button.disabled = StoreManager.is_busy()
 

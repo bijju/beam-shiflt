@@ -20,7 +20,10 @@ const MODE_INTERNAL_QA := 0
 const MODE_EXTERNAL_TEST := 1
 const MODE_PRODUCTION := 2
 
-const BUILD_MODE := MODE_EXTERNAL_TEST
+## Store/release source default: no QA/developer UI, Google TEST ad ids never used (AdConfig derives
+## from IS_PRODUCTION_BUILD; real ids arrive from CI). Internal QA: `tools/ci/set_build_mode.sh
+## internal_qa`. Never commit anything but MODE_PRODUCTION - tag builds in CI refuse to run otherwise.
+const BUILD_MODE := MODE_PRODUCTION
 
 const IS_INTERNAL_QA_BUILD := BUILD_MODE == MODE_INTERNAL_QA
 const IS_EXTERNAL_TEST_BUILD := BUILD_MODE == MODE_EXTERNAL_TEST

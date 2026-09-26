@@ -175,15 +175,44 @@ added via **"Draft Submission (N)"** (never "Create New Submission"). Before Pla
 
 ## 6. Code-side release checklist (before the first store build)
 
-1. Game ID in both Android presets; privacy policy URL in `StoreConfig`.
-2. `BuildConfig.BUILD_MODE = MODE_PRODUCTION`; review `USE_V3_FOR_PROCEDURAL_QA` / `USE_FUSION_PROGRESSION_FOR_QA` and every
+1. Game ID via CI secret `PLAY_GAMES_GAME_ID` (never committed); privacy policy URL in `StoreConfig`.
+2. (DONE, D114: source is `MODE_PRODUCTION`.) Review `USE_V3_FOR_PROCEDURAL_QA` / `USE_FUSION_PROGRESSION_FOR_QA` and every
    `LevelManager` QA flag (CLAUDE.md release rules) — a gameplay decision, not done in this pass.
-3. AdMob App IDs in `project.godot`; `AdConfig.PRODUCTION_IDS` filled locally/CI + `USE_TEST_IDS=false` only AFTER the public
+3. AdMob ids via CI secrets (`stamp_store_config.sh` writes `config/ad_ids.local.json` + `[admob]` app ids; `USE_TEST_IDS` follows the build mode) only AFTER the public
    listing is linked in AdMob and test devices are registered. `AdConfig.config_problem()` must be "".
 4. Open item — **AD_ID permission**: the build carries `com.google.android.gms.permission.AD_ID` (from the Ads SDK). For a game
    treating every player as a child, Families policy expects the advertising ID not to be transmitted; decide whether to strip the
    permission (manifest `tools:node="remove"` via a small export plugin) and answer Play's Advertising ID declaration to match.
 5. Settings layout on a real iPad (3:4 canvas is wider) and the store/cloud rows on real phones — MANUAL.
+
+## 6b. Production release checklist, CI secrets, readiness (D114, 2026-09-26)
+
+**State**: SOURCE production-ready = YES (`BuildConfig.BUILD_MODE = MODE_PRODUCTION`; QA UI/unlocks off; no Google test ids used). STORE SUBMISSION-READY = NO on both platforms until the boxes below are ticked. Internal QA build: `tools/ci/set_build_mode.sh internal_qa` (never commit it; `stamp_store_config.sh` and tag builds refuse a non-production source).
+
+**Identity / version (source of truth: export_presets.cfg, stamped by `tools/ci/stamp_version.sh`)**: package/bundle `com.foursagez.beamshift` (all 3 presets); Android versionCode 10000 / versionName 1.0.0; iOS CFBundleShortVersionString 1.0.0 / CFBundleVersion 10000; iOS min 17.0, iPhone+iPad, portrait; Android min/target SDK = Godot defaults (built APK: target 36, arm64-v8a + armeabi-v7a).
+
+**ANDROID**
+- [ ] production AdMob ids -> secrets `ADMOB_ANDROID_APP_ID`, `ADMOB_ANDROID_REWARDED_ID`, `ADMOB_ANDROID_INTERSTITIAL_ID` (else ads ship OFF; required on `v*` tags / production track)
+- [ ] Play Games project id -> secret `PLAY_GAMES_GAME_ID` (the Android lane fails without it)
+- [ ] IAP product `beamshift_no_forced_ads` created in Play Console (same id on both stores - `StoreConfig.NO_FORCED_ADS`)
+- [ ] upload keystore -> secrets `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_USER`, `ANDROID_KEYSTORE_PASSWORD`
+- [ ] cloud save: PGS Saved Games enabled, OAuth client with the App Signing SHA-1, testers
+- [ ] signed AAB (`Release CD`), uploaded via `PLAY_SERVICE_ACCOUNT_JSON` or by hand
+- [ ] Play Console: listing, privacy policy URL (`StoreConfig.PRIVACY_POLICY_URL`, empty = BLOCKER), Data safety, IARC, Families/target audience, Advertising-ID declaration + AD_ID permission decision (item 4 above)
+
+**IOS** (final archive/sign/upload needs macOS: the `ios-appstore` job on `macos-26`)
+- [ ] Apple Team ID (`APPLE_TEAM_ID`), bundle id registered with Game Center + iCloud container `iCloud.com.foursagez.beamshift`
+- [ ] distribution certificate + provisioning profile (`IOS_DIST_CERT_B64`, `IOS_DIST_CERT_PASSWORD`, `IOS_PROVISIONING_PROFILE_B64`)
+- [ ] AdMob iOS ids (`ADMOB_IOS_APP_ID`, `ADMOB_IOS_REWARDED_ID`, `ADMOB_IOS_INTERSTITIAL_ID`)
+- [ ] privacy policy URL; UMP/child-directed already configured; ATT NOT used (`privacy/tracking_enabled=false`) - keep it that way
+- [ ] IAP product in App Store Connect; Paid Apps Agreement
+- [ ] Game Center enabled for the app (cloud save = GKSavedGame, iCloud)
+- [ ] icon: only the 1024x1024 RGB (no alpha) `bs_app_icon_ios_1024.png` exists - valid single-size AppIcon; launch screen = Godot default (no custom art; do not generate)
+- [ ] Xcode archive -> App Store Connect key (`ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_API_PRIVATE_KEY`) -> TestFlight test
+
+**All GitHub secrets the workflow reads**: `ANDROID_KEYSTORE_B64/USER/PASSWORD`, `PLAY_SERVICE_ACCOUNT_JSON`, `PLAY_GAMES_GAME_ID`, `ADMOB_ANDROID_{APP,REWARDED,INTERSTITIAL}_ID`, `ADMOB_IOS_{APP,REWARDED,INTERSTITIAL}_ID`, `APPLE_TEAM_ID`, `IOS_DIST_CERT_B64`, `IOS_DIST_CERT_PASSWORD`, `IOS_PROVISIONING_PROFILE_B64`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_API_PRIVATE_KEY`.
+
+**Audit facts (source, not docs)**: consent = UMP every launch + Privacy Options in Settings when required; every request child-directed (TFCD/TFUA, rating G); rewarded hint survives the IAP by design; tutorials/T-packs/V*-TEST never show ads; purchase restore exists (Settings); cloud = Play Games Saved Games (Android) / Game Center saved games in iCloud (iOS), rule "more play time wins", chooser past 1 h gap, fresh install adopts cloud, offline = local file keeps working and the next local save re-queues the push (no dedicated retry timer). None of the cloud/IAP/consent paths has been run on a device. The iOS lane and `release.yml` YAML are UNVERIFIED (never run).
 
 ## 7. Device test checklist (MANUAL — only the owner's devices can confirm)
 - Android (installed **from Play internal testing**, license tester account): price shows in local currency; BUY → Play sheet →

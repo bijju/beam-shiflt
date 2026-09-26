@@ -1,5 +1,8 @@
 # CURRENT_STATUS.md
 
+> **Settings UI proportion fix (2026-09-26, uncommitted, MODE_PRODUCTION kept, 10000/1.0.0 unchanged):** Settings action buttons were full-width 9-slice stretched (5.9:1 / 4:1 vs the 3.13:1 art); now 460x147 centred, "Store unavailable" moved to a status line. **Needs Android device validation** (fresh `builds/android/beamshift-debug.apk`).
+> **Release-prep pass (2026-09-26, uncommitted):** source default is now `BuildConfig.MODE_PRODUCTION` (QA tools off, Google test ad ids never used); production AdMob ids + Play Games id are injected by CI (`tools/ci/stamp_store_config.sh`), missing AdMob ids switch ads off safely (hints free); `tools/ci/set_build_mode.sh internal_qa` restores QA. SOURCE production-ready; NOT store-submission-ready - see `STORE_RELEASE.md` section 6b. Gameplay/generators untouched (D114).
+> **Main Menu logo (2026-09-26, uncommitted):** portrait logo `res://assets/ui/branding/bs_logo_main_menu_portrait.png` (1215x1295) now the Main Menu `Logo` TextureRect (anchors 0.08/0.08/0.92/0.58, KEEP_ASPECT_CENTERED), replacing the old in-VBox logo; buttons/background unchanged. **Android visual validation still required.**
 > **Latest (2026-09-26, uncommitted):** Hint HUD fix - Hint button anchor y 0.5->0.5175 (matches Reset/Pause and the HUD art panel centre) + gold `#FFD84A` attention halo (`UIConstants.HINT_GLOW_COLOR`). External-test APK rebuilt (versionCode 70 / 4.8.4). **Awaiting Android validation.** See CHANGELOG.md.
 
 Fast snapshot. If this disagrees with `CHANGELOG.md`/`ARCHITECTURE.md`,
@@ -2333,3 +2336,7 @@ Stage 3 fix.
 ## Android UI fix: New Game confirmation buttons (versionCode 70 / 4.8.4, unchanged)
 `main_menu.gd` `_show_new_game_confirmation()`: CANCEL / START NEW GAME were full-panel-width (~760x120, ~6.3:1) themed 9-slice buttons, so the button art (region 1705x545, ~3.13:1) stretched horizontally. Now both use `CONFIRM_BUTTON_SIZE` = 480x154 (~3.12:1) with `SIZE_SHRINK_CENTER`; the Control is the touch target (154 px tall). Dialog logic, panel, Hint HUD untouched. Pause/Level Complete/Settings buttons use the same full-width pattern but were not reported and were left unchanged.
 Follow-up: START NEW GAME confirm button font 32 -> 26 so the label fits the art's central area (button size 480x154 unchanged).
+
+## Main Menu particle ambience
+
+Main Menu now has a lightweight dynamic blue/cyan particle ambience: `AmbientParticles` (GPUParticles2D, 28 particles, additive, procedural radial texture, no image asset) in `main_menu.tscn` between the scrim and the logo; `scripts/ui/menu_particles.gd` fits the emission box on `resized`. No reduced-motion setting exists in Settings, so none is honoured. Layout/logo/buttons unchanged. Android validation APK rebuilt; visual approval on device pending.

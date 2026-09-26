@@ -1742,3 +1742,7 @@ reference:
 ## External-test build mode (D113)
 
 `BuildConfig` is the central build-presentation switch. `MODE_INTERNAL_QA` exposes development tools; `MODE_EXTERNAL_TEST` hides them while keeping normal gameplay and test-safe ad configuration; `MODE_PRODUCTION` is reserved for the later public-release pass. `LevelManager` derives QA/unlock flags from `BuildConfig.QA_TOOLS`, `game.gd` gates the tutorial debug overlay and generator labels behind the same flag, and `UIConstants.ALLOW_LARGE_GAMEPLAY_STACK_QA_OFFSET` now follows it too. QA systems are hidden, not deleted.
+
+## Build mode and store config injection (D114)
+
+`BuildConfig.BUILD_MODE` (committed: `MODE_PRODUCTION`) drives `QA_TOOLS` and `AdConfig.USE_TEST_IDS`. Production ad ids: `AdConfig.production_ids()` reads the CI-written, gitignored `res://config/ad_ids.local.json`; `AdConfig.ads_active(platform)` is false when any id is missing (AdManager then loads nothing, hints stay free). `tools/ci/stamp_store_config.sh` (called from `release.yml` in both lanes) also stamps the AdMob export App ID (`project.godot [admob]`) and the Play Games Game ID (Android presets). See `STORE_RELEASE.md` 6b.

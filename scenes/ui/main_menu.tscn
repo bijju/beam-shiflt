@@ -3,7 +3,52 @@
 [ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/ui/safe_area_margin.gd" id="2"]
 [ext_resource type="Texture2D" path="res://assets/ui/backgrounds/bs_bg_main_menu_v2.png" id="3"]
-[ext_resource type="Texture2D" path="res://assets/branding/bs_logo_main.png" id="4"]
+[ext_resource type="Texture2D" path="res://assets/ui/branding/bs_logo_main_menu_portrait.png" id="4"]
+
+[ext_resource type="Script" path="res://scripts/ui/menu_particles.gd" id="5"]
+
+[sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_add"]
+blend_mode = 1
+
+[sub_resource type="Gradient" id="Gradient_mote"]
+offsets = PackedFloat32Array(0, 0.35, 1)
+colors = PackedColorArray(1, 1, 1, 1, 0.6, 0.92, 1, 0.6, 0.2, 0.7, 1, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_mote"]
+gradient = SubResource("Gradient_mote")
+width = 16
+height = 16
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[sub_resource type="Gradient" id="Gradient_life"]
+offsets = PackedFloat32Array(0, 0.25, 0.75, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_life"]
+gradient = SubResource("Gradient_life")
+
+[sub_resource type="Gradient" id="Gradient_hue"]
+offsets = PackedFloat32Array(0, 0.5, 1)
+colors = PackedColorArray(0.208, 0.812, 1, 1, 0.302, 0.91, 1, 1, 0.396, 0.686, 1, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_hue"]
+gradient = SubResource("Gradient_hue")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_mote"]
+lifetime_randomness = 0.4
+emission_shape = 3
+emission_box_extents = Vector3(540, 960, 1)
+direction = Vector3(0, -1, 0)
+spread = 40.0
+gravity = Vector3(0, 0, 0)
+initial_velocity_min = 8.0
+initial_velocity_max = 20.0
+scale_min = 0.4
+scale_max = 1.0
+color_ramp = SubResource("GradientTexture1D_life")
+color_initial_ramp = SubResource("GradientTexture1D_hue")
 
 [sub_resource type="Gradient" id="Gradient_scrim"]
 offsets = PackedFloat32Array(0, 0.42, 0.62, 1)
@@ -48,6 +93,30 @@ texture = SubResource("GradientTexture2D_scrim")
 expand_mode = 1
 stretch_mode = 0
 
+[node name="AmbientParticles" type="GPUParticles2D" parent="."]
+material = SubResource("CanvasItemMaterial_add")
+amount = 42
+texture = SubResource("GradientTexture2D_mote")
+lifetime = 6.0
+preprocess = 6.0
+process_material = SubResource("ParticleProcessMaterial_mote")
+script = ExtResource("5")
+
+[node name="Logo" type="TextureRect" parent="."]
+mouse_filter = 2
+layout_mode = 1
+anchor_left = 0.08
+anchor_top = 1.0
+anchor_right = 0.92
+anchor_bottom = 1.0
+offset_top = -1693.0
+offset_bottom = -733.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("4")
+expand_mode = 1
+stretch_mode = 5
+
 [node name="SafeMargin" type="MarginContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
@@ -59,17 +128,6 @@ script = ExtResource("2")
 
 [node name="Root" type="VBoxContainer" parent="SafeMargin"]
 layout_mode = 2
-
-[node name="LogoWrap" type="CenterContainer" parent="SafeMargin/Root"]
-layout_mode = 2
-size_flags_vertical = 0
-
-[node name="Logo" type="TextureRect" parent="SafeMargin/Root/LogoWrap"]
-custom_minimum_size = Vector2(0, 170)
-layout_mode = 2
-texture = ExtResource("4")
-expand_mode = 1
-stretch_mode = 5
 
 [node name="Spacer" type="Control" parent="SafeMargin/Root"]
 layout_mode = 2

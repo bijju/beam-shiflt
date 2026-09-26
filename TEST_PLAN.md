@@ -6375,3 +6375,9 @@ MANUAL TEST REQUIRED (Android): PLAY + QA +50 -> Level 201+ (first Fusion levels
 - **MANUAL TEST REQUIRED**: play the V5 TEST levels (2001, 2050, 2201, 2351, 2500, 2651, 2800, 2900, 3000) for difficulty feel (does the puzzle require thinking about WHY a route must be chosen?), readability of 38-57-tile boards on a real phone, and on-device generation time. Android build not made (S4).
 
 - **Status note (2026-09-25 handoff)**: S3 is implemented but NOT certified; S3.1 (J/K refinement) is next and must re-run this whole S3 section plus the V1-V4 fingerprint. `NEXT_AI_PROMPT.md` section 9 lists the regression requirements.
+
+## Production readiness pass (D114, 2026-09-26)
+
+- **AUTOMATED - DONE.** Headless driver (`godot --headless --path . <driver scene>`; deleted afterwards) in `MODE_PRODUCTION`: all QA flags false; AdConfig missing-id/complete-id/ios-incomplete cases; main menu buttons = CONTINUE/NEW GAME/TUTORIALS/SETTINGS/QUIT; gameplay HUD `LEVEL n` with no QA next/debug label; real GridManager solution replays with taps == intended on Levels 1, 2, 250, 620, 1100, 1800, 2001, 2500, 3000 (Fusion + Selector eras included); StarScoring 3 stars / hint cap 2; `continue_game()`; T01, T21, T29 load. 0 failures. Same driver under `internal_qa` shows QA Level Select + V3/FUSION/SELECTOR/V5 TEST.
+- **AUTOMATED - DONE.** `stamp_store_config.sh` cases (no env / full env / iOS missing + REQUIRE / non-production refusal) in a scratch tree; real `--export-debug` APK with stamped ids: manifest `APPLICATION_ID` = stamped value, `assets/config/ad_ids.local.json` packed, Play Games `APP_ID` resource present. All stamped files restored afterwards.
+- **NOT DONE**: any device run, real ad/IAP/cloud/sign-in behaviour, the GitHub workflow (never run; YAML not linted), iOS export/Xcode/TestFlight, a new AAB/IPA.

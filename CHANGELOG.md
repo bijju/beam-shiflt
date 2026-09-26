@@ -1,5 +1,13 @@
 # CHANGELOG.md
 
+## Settings UI button proportion fix (2026-09-26, uncommitted, no version change)
+
+Root cause: Settings action buttons (NO FORCED ADS, RESTORE PURCHASES, SIGN IN/SYNC, PRIVACY, BACK) were `Vector2(0, 100/148)` fill-width, so the theme's 9-slice `StyleBoxTexture` (region 1705x545 = 3.13:1) stretched its centre to 593x100 (5.9:1) / 593x148 (4.0:1); the long "NO FORCED ADS - STORE UNAVAILABLE" text also forced the panel to 1016 px wide. Fix in `scenes/ui/settings_menu.tscn` / `scripts/ui/settings_menu.gd` only: buttons 460x147 (3.13:1, shrink-centred), fonts 24-28, "Store unavailable right now." on its own status line (StoreManager logic untouched), panel min width pinned to 1016 (unchanged look), inner margins/separation tightened so the worst-case panel (1719 px) still fits the 1728 px safe area. Other screens audited, unchanged. Settings UI still needs Android device validation.
+
+## Production readiness / PR prep (2026-09-26, uncommitted, no build/upload, versionCode 10000 / 1.0.0 unchanged)
+
+`BuildConfig.BUILD_MODE` default is now `MODE_PRODUCTION`. `AdConfig` derives test-vs-production ids from it; production ids come from the gitignored `config/ad_ids.local.json` (CI-written) and missing ids disable ads instead of requesting empty units. New `tools/ci/set_build_mode.sh` and `tools/ci/stamp_store_config.sh`; `release.yml` stamps AdMob ids / Play Games id in both lanes. `.gitignore` hardened. Verified with a headless driver in production mode (menu, HUD, Level 1/2/250/620/1100/1800/2001/2500/3000 solution replays, Continue, New Game, T01/T21/T29) and INTERNAL_QA shows the QA tools again. See D114 and `STORE_RELEASE.md` 6b.
+
 ## Hint HUD fix - alignment + gold attention pulse (2026-09-26, uncommitted, external-test APK rebuilt, versionCode 70 / 4.8.4 unchanged)
 
 Android device test showed the Hint icon sitting high/left. Root cause: `HintButton` in `game.tscn` anchored at `anchor_top/bottom = 0.5` while Reset/Pause use 0.5175/0.5161 (the bottom HUD art's panel centres sit at ~0.518 of its height); the icon PNG itself is symmetric (bbox 3-252 / 3-249 of 256), so no texture change. Fix: Hint anchor y 0.5 -> 0.5175 (x 0.1212 and 144 px touch box unchanged). The attention halo is now a solid `#FFD84A` silhouette (`UIConstants.HINT_GLOW_COLOR`, tiny additive canvas shader in `game.gd _build_hint_glow`) instead of a tinted copy of the blue icon; timing/interval/scale/alpha/triggers untouched, icon never tinted. Presentation only; HintManager/ads/stars/saves untouched. **Awaiting Android validation.**

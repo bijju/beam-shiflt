@@ -36,3 +36,12 @@ eos_dev.env
 *.certSigningRequest
 play-service-account*.json
 /signing/
+
+# Release-time injected config and generic secret files (production ad ids come from CI secrets)
+/config/ad_ids.local.json
+.env
+.env.*
+*.env
+*service-account*.json
+*credentials*.json
+AuthKey_*.p8

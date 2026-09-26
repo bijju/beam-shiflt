@@ -3,17 +3,16 @@ extends RefCounted
 ## The ONE place every advertising switch, rule constant and ad-unit ID lives
 ## (ADS_MONETIZATION.md). Nothing else in the project may contain an AdMob ID.
 ##
-## THIS QA BUILD USES GOOGLE'S OFFICIAL SAMPLE (TEST) IDs ONLY. Production IDs
-## are intentionally NOT in the repository: fill PRODUCTION_IDS locally (or inject
-## them from CI), set USE_TEST_IDS = false, and change the export App ID (project
-## setting admob/general/android/app_id and the iOS Info.plist key) - see the
-## production checklist in ADS_MONETIZATION.md. A release build that still uses
-## test IDs is reported loudly by config_problem().
+## Non-production builds use GOOGLE'S OFFICIAL SAMPLE (TEST) IDs. A PRODUCTION build
+## (BuildConfig) never does: its IDs come from the gitignored PRODUCTION_IDS_FILE that
+## tools/ci/stamp_store_config.sh writes from CI secrets, together with the export App ID
+## (project setting admob/general/{android,ios}/app_id). If they are missing, ads_active()
+## is false: no SDK, no consent flow, hints free - see ADS_MONETIZATION.md.
 
 ## Master switch. false = no SDK, no consent flow, hints free, no interstitials.
 const ADS_ENABLED := true
-## true = Google sample IDs. MUST be false (and PRODUCTION_IDS filled) for production.
-const USE_TEST_IDS := true
+## true = Google sample IDs; follows the build mode, so a production build can never use them.
+const USE_TEST_IDS := not BuildConfig.IS_PRODUCTION_BUILD
 ## QA: hints skip the rewarded ad (gameplay testing without a network).
 const QA_BYPASS_REWARDED := false
 ## The audience includes children under 13 (store listings: mixed audience), so every ad
@@ -46,11 +45,20 @@ const TEST_IDS := {
 	},
 }
 
-## Deliberately empty in source control (no production IDs committed).
-const PRODUCTION_IDS := {
-	"android": {"app": "", "rewarded": "", "interstitial": ""},
-	"ios": {"app": "", "rewarded": "", "interstitial": ""},
-}
+## Production IDs are never in source control: CI (tools/ci/stamp_store_config.sh) writes this
+## gitignored file from secrets before export. Shape: {"android": {"app","rewarded","interstitial"}, "ios": {...}}.
+const PRODUCTION_IDS_FILE := "res://config/ad_ids.local.json"
+const _ID_KINDS := ["app", "rewarded", "interstitial"]
+
+static var _production_ids_cache: Dictionary = {}
+
+
+static func production_ids() -> Dictionary:
+	if _production_ids_cache.is_empty() and FileAccess.file_exists(PRODUCTION_IDS_FILE):
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(PRODUCTION_IDS_FILE))
+		if typeof(parsed) == TYPE_DICTIONARY:
+			_production_ids_cache = parsed
+	return _production_ids_cache
 
 
 ## "android" / "ios" / "" (desktop/editor: no ad platform).
@@ -63,21 +71,25 @@ static func platform() -> String:
 	return ""
 
 
-static func unit_id(kind: String) -> String:
-	var p := platform()
+static func unit_id(kind: String, p: String = platform()) -> String:
 	if p == "":
 		return ""
-	var table: Dictionary = TEST_IDS if USE_TEST_IDS else PRODUCTION_IDS
-	return str(table[p].get(kind, ""))
+	var table: Dictionary = TEST_IDS if USE_TEST_IDS else production_ids()
+	var row: Variant = table.get(p, {})
+	return str(row.get(kind, "")) if typeof(row) == TYPE_DICTIONARY else ""
 
 
 ## Non-empty = a configuration mistake worth a loud warning at startup.
-static func config_problem() -> String:
-	if USE_TEST_IDS and OS.has_feature("release"):
-		return "TEST ad IDs in a RELEASE build - replace before publishing"
-	if not USE_TEST_IDS:
-		for p in PRODUCTION_IDS:
-			for k in PRODUCTION_IDS[p]:
-				if PRODUCTION_IDS[p][k] == "":
-					return "production ad ID missing: %s/%s" % [p, k]
+static func config_problem(p: String = platform()) -> String:
+	if USE_TEST_IDS:
+		return "TEST ad IDs in a RELEASE build - replace before publishing" if OS.has_feature("release") else ""
+	for k in _ID_KINDS:
+		if p != "" and unit_id(k, p) == "":
+			return "production ad ID missing: %s/%s" % [p, k]
 	return ""
+
+
+## Ads run only with a complete ID set. A production build with missing IDs must not load the
+## SDK at all (and hints then stay free) rather than request ads with empty/sample units.
+static func ads_active(p: String = platform()) -> bool:
+	return ADS_ENABLED and (USE_TEST_IDS or config_problem(p) == "")

@@ -43,20 +43,20 @@ script = ExtResource("2")
 layout_mode = 2
 
 [node name="Panel" type="PanelContainer" parent="SafeMargin/CenterContainer"]
-custom_minimum_size = Vector2(900, 0)
+custom_minimum_size = Vector2(1016, 0)
 layout_mode = 2
 theme_override_styles/panel = SubResource("SettingsPanelStyle")
 
 [node name="Margin" type="MarginContainer" parent="SafeMargin/CenterContainer/Panel"]
 layout_mode = 2
 theme_override_constants/margin_left = 44
-theme_override_constants/margin_top = 40
+theme_override_constants/margin_top = 12
 theme_override_constants/margin_right = 44
-theme_override_constants/margin_bottom = 40
+theme_override_constants/margin_bottom = 12
 
 [node name="VBox" type="VBoxContainer" parent="SafeMargin/CenterContainer/Panel/Margin"]
 layout_mode = 2
-theme_override_constants/separation = 16
+theme_override_constants/separation = 8
 
 [node name="SoundRow" type="HBoxContainer" parent="SafeMargin/CenterContainer/Panel/Margin/VBox"]
 layout_mode = 2
@@ -131,58 +131,72 @@ theme_override_constants/separation = 8
 [node name="BuyNoForcedAdsButton" type="Button" parent="SafeMargin/CenterContainer/Panel/Margin/VBox/StoreSection"]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(0, 100)
+custom_minimum_size = Vector2(460, 147)
+size_flags_horizontal = 4
 theme_override_font_sizes/font_size = 24
 text = "NO FORCED ADS"
+
+[node name="StoreStatusLabel" type="Label" parent="SafeMargin/CenterContainer/Panel/Margin/VBox/StoreSection"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+horizontal_alignment = 1
+autowrap_mode = 3
 
 [node name="RestorePurchasesButton" type="Button" parent="SafeMargin/CenterContainer/Panel/Margin/VBox/StoreSection"]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(0, 100)
-theme_override_font_sizes/font_size = 22
+custom_minimum_size = Vector2(460, 147)
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 24
 text = "RESTORE PURCHASES"
 
 [node name="CloudSection" type="VBoxContainer" parent="SafeMargin/CenterContainer/Panel/Margin/VBox"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
-theme_override_constants/separation = 10
+theme_override_constants/separation = 8
 
 [node name="CloudStatusLabel" type="Label" parent="SafeMargin/CenterContainer/Panel/Margin/VBox/CloudSection"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 22
 horizontal_alignment = 1
 autowrap_mode = 3
 
 [node name="CloudSignInButton" type="Button" parent="SafeMargin/CenterContainer/Panel/Margin/VBox/CloudSection"]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(0, 100)
-theme_override_font_sizes/font_size = 22
+custom_minimum_size = Vector2(460, 147)
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 26
 text = "SIGN IN"
 
 [node name="CloudSyncButton" type="Button" parent="SafeMargin/CenterContainer/Panel/Margin/VBox/CloudSection"]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(0, 100)
-theme_override_font_sizes/font_size = 22
+custom_minimum_size = Vector2(460, 147)
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 26
 text = "SYNC NOW"
 
 [node name="PrivacyOptionsButton" type="Button" parent="SafeMargin/CenterContainer/Panel/Margin/VBox"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
-custom_minimum_size = Vector2(0, 100)
-theme_override_font_sizes/font_size = 22
+custom_minimum_size = Vector2(460, 147)
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 24
 text = "PRIVACY OPTIONS"
 
 [node name="PrivacyPolicyButton" type="Button" parent="SafeMargin/CenterContainer/Panel/Margin/VBox"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
-custom_minimum_size = Vector2(0, 100)
-theme_override_font_sizes/font_size = 22
+custom_minimum_size = Vector2(460, 147)
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 24
 text = "PRIVACY POLICY"
 
 [node name="StoreMessageLabel" type="Label" parent="SafeMargin/CenterContainer/Panel/Margin/VBox"]
@@ -196,6 +210,7 @@ autowrap_mode = 3
 [node name="BackButton" type="Button" parent="SafeMargin/CenterContainer/Panel/Margin/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(0, 148)
-theme_override_font_sizes/font_size = 32
+custom_minimum_size = Vector2(460, 147)
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 28
 text = "BACK"

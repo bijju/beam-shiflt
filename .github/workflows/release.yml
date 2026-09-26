@@ -190,6 +190,18 @@ jobs:
       - name: Stamp version
         run: tools/ci/stamp_version.sh "${{ needs.guard.outputs.version }}"
 
+      # Refuses a non-production BuildConfig. Fails without PLAY_GAMES_GAME_ID (the build
+      # cannot compile without it); AdMob ids missing = ads OFF, or a failure when the
+      # production track is requested.
+      - name: Stamp store config (Play Games id, AdMob ids)
+        env:
+          PLAY_GAMES_GAME_ID: ${{ secrets.PLAY_GAMES_GAME_ID }}
+          ADMOB_ANDROID_APP_ID: ${{ secrets.ADMOB_ANDROID_APP_ID }}
+          ADMOB_ANDROID_REWARDED_ID: ${{ secrets.ADMOB_ANDROID_REWARDED_ID }}
+          ADMOB_ANDROID_INTERSTITIAL_ID: ${{ secrets.ADMOB_ANDROID_INTERSTITIAL_ID }}
+          REQUIRE_ADMOB: ${{ (startsWith(github.ref, 'refs/tags/') || inputs.play_track == 'production') && '1' || '' }}
+        run: tools/ci/stamp_store_config.sh android
+
       - name: Prepare signing (release keystore, or generated debug key)
         id: signing
         # The keystore arrives through env, never interpolated into the
@@ -412,6 +424,14 @@ jobs:
           # the unsigned project is opened.
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID || 'XXXXXXXXXX' }}
         run: tools/ci/stamp_version.sh "${{ needs.guard.outputs.version }}"
+
+      - name: Stamp store config (AdMob ids)
+        env:
+          ADMOB_IOS_APP_ID: ${{ secrets.ADMOB_IOS_APP_ID }}
+          ADMOB_IOS_REWARDED_ID: ${{ secrets.ADMOB_IOS_REWARDED_ID }}
+          ADMOB_IOS_INTERSTITIAL_ID: ${{ secrets.ADMOB_IOS_INTERSTITIAL_ID }}
+          REQUIRE_ADMOB: ${{ startsWith(github.ref, 'refs/tags/') && '1' || '' }}
+        run: tools/ci/stamp_store_config.sh ios
 
       # StoreKit 2 GDExtension (godot-store-kit, pinned). Not vendored: its
       # macOS frameworks use symlinks a Windows checkout cannot hold, and the

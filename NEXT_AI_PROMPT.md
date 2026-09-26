@@ -1,5 +1,7 @@
 # NEXT_AI_PROMPT.md
 
+> **Settings UI proportion fix (2026-09-26, uncommitted, MODE_PRODUCTION kept, 10000/1.0.0 unchanged):** Settings action buttons were full-width 9-slice stretched (5.9:1 / 4:1 vs the 3.13:1 art); now 460x147 centred, "Store unavailable" moved to a status line. **Needs Android device validation** (fresh `builds/android/beamshift-debug.apk`).
+> **Release-prep pass (2026-09-26, uncommitted):** source default is now `BuildConfig.MODE_PRODUCTION` (QA tools off, Google test ad ids never used); production AdMob ids + Play Games id are injected by CI (`tools/ci/stamp_store_config.sh`), missing AdMob ids switch ads off safely (hints free); `tools/ci/set_build_mode.sh internal_qa` restores QA. SOURCE production-ready; NOT store-submission-ready - see `STORE_RELEASE.md` section 6b. Gameplay/generators untouched (D114).
 > **Latest (2026-09-26, uncommitted):** Hint HUD fix - Hint button anchor y 0.5->0.5175 (matches Reset/Pause and the HUD art panel centre) + gold `#FFD84A` attention halo (`UIConstants.HINT_GLOW_COLOR`). External-test APK rebuilt (versionCode 70 / 4.8.4). **Awaiting Android validation.** See CHANGELOG.md.
 
 Tool-independent continuation prompt (Codex, Claude, or any coding agent). It replaces the need for any chat history.

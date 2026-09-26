@@ -47,11 +47,11 @@ var _muted_before := false
 
 
 func _ready() -> void:
-	if not AdConfig.ADS_ENABLED:
-		return
 	var problem := AdConfig.config_problem()
 	if problem != "":
 		push_warning("AdManager: " + problem)
+	if not AdConfig.ads_active():
+		return
 	if AdConfig.platform() == "":
 		return # desktop / editor: no ad platform, hints stay free
 	use_backend(AdBackendAdMob.new())
