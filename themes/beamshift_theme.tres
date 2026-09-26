@@ -1,0 +1,93 @@
+[gd_resource type="Theme" format=3 uid="uid://bunf1dj6824h7"]
+
+[ext_resource type="Texture2D" uid="uid://dmr754w5g5g5u" path="res://assets/ui/buttons/bs_ui_button_primary.png" id="1"]
+[ext_resource type="Texture2D" uid="uid://b2llfy6k2cuk" path="res://assets/ui/buttons/bs_ui_button_secondary.png" id="2"]
+[ext_resource type="Texture2D" uid="uid://dbfferssk7ec4" path="res://assets/ui/buttons/bs_ui_button_danger.png" id="3"]
+
+[sub_resource type="StyleBoxTexture" id="SBTPrimaryDisabled"]
+texture = ExtResource("2")
+texture_margin_left = 70.0
+texture_margin_top = 32.0
+texture_margin_right = 70.0
+texture_margin_bottom = 32.0
+region_rect = Rect2(35, 165, 1705, 545)
+modulate_color = Color(1, 1, 1, 0.5)
+
+[sub_resource type="StyleBoxTexture" id="SBTPrimaryHover"]
+texture = ExtResource("1")
+texture_margin_left = 70.0
+texture_margin_top = 32.0
+texture_margin_right = 70.0
+texture_margin_bottom = 32.0
+region_rect = Rect2(35, 165, 1705, 545)
+modulate_color = Color(1.15, 1.15, 1.15, 1)
+
+[sub_resource type="StyleBoxTexture" id="SBTPrimaryNormal"]
+texture = ExtResource("1")
+texture_margin_left = 70.0
+texture_margin_top = 32.0
+texture_margin_right = 70.0
+texture_margin_bottom = 32.0
+region_rect = Rect2(35, 165, 1705, 545)
+
+[sub_resource type="StyleBoxTexture" id="SBTPrimaryPressed"]
+texture = ExtResource("1")
+texture_margin_left = 70.0
+texture_margin_top = 32.0
+texture_margin_right = 70.0
+texture_margin_bottom = 32.0
+region_rect = Rect2(35, 165, 1705, 545)
+modulate_color = Color(0.8, 0.8, 0.8, 1)
+
+[sub_resource type="StyleBoxTexture" id="SBTDangerHover"]
+texture = ExtResource("3")
+texture_margin_left = 70.0
+texture_margin_top = 32.0
+texture_margin_right = 70.0
+texture_margin_bottom = 32.0
+region_rect = Rect2(35, 165, 1705, 545)
+modulate_color = Color(1.15, 1.15, 1.15, 1)
+
+[sub_resource type="StyleBoxTexture" id="SBTDangerNormal"]
+texture = ExtResource("3")
+texture_margin_left = 70.0
+texture_margin_top = 32.0
+texture_margin_right = 70.0
+texture_margin_bottom = 32.0
+region_rect = Rect2(35, 165, 1705, 545)
+
+[sub_resource type="StyleBoxTexture" id="SBTDangerPressed"]
+texture = ExtResource("3")
+texture_margin_left = 70.0
+texture_margin_top = 32.0
+texture_margin_right = 70.0
+texture_margin_bottom = 32.0
+region_rect = Rect2(35, 165, 1705, 545)
+modulate_color = Color(0.8, 0.8, 0.8, 1)
+
+[resource]
+default_font_size = 28
+Button/colors/font_color = Color(1, 1, 1, 1)
+Button/colors/font_disabled_color = Color(0.85, 0.85, 0.85, 0.6)
+Button/colors/font_focus_color = Color(1, 1, 1, 1)
+Button/colors/font_hover_color = Color(1, 1, 1, 1)
+Button/colors/font_outline_color = Color(0, 0, 0, 1)
+Button/colors/font_pressed_color = Color(0.85, 0.85, 0.85, 1)
+Button/constants/icon_max_width = 64
+Button/constants/outline_size = 4
+Button/font_sizes/font_size = 28
+Button/styles/disabled = SubResource("SBTPrimaryDisabled")
+Button/styles/focus = SubResource("SBTPrimaryHover")
+Button/styles/hover = SubResource("SBTPrimaryHover")
+Button/styles/normal = SubResource("SBTPrimaryNormal")
+Button/styles/pressed = SubResource("SBTPrimaryPressed")
+CheckButton/colors/font_color = Color(0.94, 0.96, 1, 1)
+DangerButton/base_type = &"Button"
+DangerButton/styles/disabled = SubResource("SBTPrimaryDisabled")
+DangerButton/styles/focus = SubResource("SBTDangerHover")
+DangerButton/styles/hover = SubResource("SBTDangerHover")
+DangerButton/styles/normal = SubResource("SBTDangerNormal")
+DangerButton/styles/pressed = SubResource("SBTDangerPressed")
+Label/colors/font_color = Color(0.94, 0.96, 1, 1)
+Label/colors/font_outline_color = Color(0, 0, 0, 0.9)
+Label/constants/outline_size = 6

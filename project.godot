@@ -1,0 +1,59 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="BeamShift"
+config/version="1.0.0"
+run/main_scene="res://scenes/ui/main_menu.tscn"
+config/quit_on_go_back=false
+config/features=PackedStringArray("4.7", "Mobile")
+config/icon="res://assets/branding/bs_app_icon.png"
+
+[audio]
+
+buses/default_bus_layout="res://assets/audio/default_bus_layout.tres"
+
+[autoload]
+
+SaveManager="*res://scripts/managers/save_manager.gd"
+LevelManager="*res://scripts/managers/level_manager.gd"
+GameManager="*res://scripts/managers/game_manager.gd"
+AudioManager="*res://scripts/managers/audio_manager.gd"
+AdManager="*res://scripts/managers/ad_manager.gd"
+StoreManager="*res://scripts/managers/store_manager.gd"
+GodotPlayGameServices="*uid://bsds5unhjravp"
+CloudSave="*res://scripts/managers/cloud_save.gd"
+
+[display]
+
+window/size/viewport_width=1080
+window/size/viewport_height=1920
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=1
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/admob/plugin.cfg", "res://addons/GodotGooglePlayBilling/plugin.cfg", "res://addons/GodotPlayGameServices/plugin.cfg")
+
+[gui]
+
+theme/custom="res://themes/beamshift_theme.tres"
+
+[physics]
+
+3d/physics_engine="Jolt Physics"
+
+[rendering]
+
+rendering_device/driver.windows="d3d12"
+renderer/rendering_method="mobile"
+textures/vram_compression/import_etc2_astc=true
