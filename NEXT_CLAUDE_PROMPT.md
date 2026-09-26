@@ -1,5 +1,7 @@
 # NEXT_CLAUDE_PROMPT.md
 
+> **Latest (2026-09-26, uncommitted):** Hint HUD fix - Hint button anchor y 0.5->0.5175 (matches Reset/Pause and the HUD art panel centre) + gold `#FFD84A` attention halo (`UIConstants.HINT_GLOW_COLOR`). External-test APK rebuilt (versionCode 70 / 4.8.4). **Awaiting Android validation.** See CHANGELOG.md.
+
 Copy-paste this into a new Claude session/account working on BeamShift.
 
 ---

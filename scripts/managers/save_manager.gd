@@ -114,6 +114,19 @@ var ad_completions_since_interstitial: int = 0
 var ad_last_interstitial_unix: int = 0
 var ad_last_counted_level: int = 0
 
+## Store release (STORE_RELEASE.md): owned store products, product_id -> true. The store is
+## the authority - StoreManager re-checks at every launch - and entitlements NEVER travel
+## with a cloud profile (adopt_cloud_data keeps the local ones).
+var entitlements: Dictionary = {}
+## Seconds of real gameplay (a level on screen, not paused). The cloud-save merge rule and
+## its fresh-install guard read this, so menu time must never count.
+var play_time_seconds: float = 0.0
+## ISO-8601 UTC stamp of the last write - the cloud merge tie-breaker.
+var saved_at: String = ""
+
+## Emitted after every successful write (CloudSave queues a throttled push from it).
+signal saved
+
 
 func _ready() -> void:
 	load_game()
@@ -150,6 +163,9 @@ func _default_data() -> Dictionary:
 		"ad_completions_since_interstitial": 0,
 		"ad_last_interstitial_unix": 0,
 		"ad_last_counted_level": 0,
+		"entitlements": {},
+		"play_time_seconds": 0.0,
+		"saved_at": "",
 	}
 
 
@@ -214,10 +230,27 @@ func _apply_data(data: Dictionary) -> void:
 	ad_completions_since_interstitial = int(data.get("ad_completions_since_interstitial", 0))
 	ad_last_interstitial_unix = int(data.get("ad_last_interstitial_unix", 0))
 	ad_last_counted_level = int(data.get("ad_last_counted_level", 0))
+	var owned: Variant = data.get("entitlements", {})
+	entitlements = owned if typeof(owned) == TYPE_DICTIONARY else {}
+	play_time_seconds = float(data.get("play_time_seconds", 0.0))
+	saved_at = str(data.get("saved_at", ""))
 
 
 func save_game() -> bool:
-	var data := {
+	saved_at = Time.get_datetime_string_from_system(true)
+	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if file == null:
+		push_warning("SaveManager: could not write save file.")
+		return false
+	file.store_string(JSON.stringify(to_dict()))
+	file.close()
+	saved.emit()
+	return true
+
+
+## The whole profile as plain data - what save_game() writes and CloudSave pushes.
+func to_dict() -> Dictionary:
+	return {
 		"version": SAVE_VERSION,
 		"highest_unlocked_level": highest_unlocked_level,
 		"completed_levels": completed_levels,
@@ -247,14 +280,43 @@ func save_game() -> bool:
 		"ad_completions_since_interstitial": ad_completions_since_interstitial,
 		"ad_last_interstitial_unix": ad_last_interstitial_unix,
 		"ad_last_counted_level": ad_last_counted_level,
+		"entitlements": entitlements,
+		"play_time_seconds": play_time_seconds,
+		"saved_at": saved_at,
 	}
-	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-	if file == null:
-		push_warning("SaveManager: could not write save file.")
+
+
+func has_entitlement(product_id: String) -> bool:
+	return bool(entitlements.get(product_id, false))
+
+
+## Returns true when the value changed (and was saved).
+func set_entitlement(product_id: String, owned: bool) -> bool:
+	if has_entitlement(product_id) == owned:
 		return false
-	file.store_string(JSON.stringify(data))
-	file.close()
+	if owned:
+		entitlements[product_id] = true
+	else:
+		entitlements.erase(product_id)
+	save_game()
 	return true
+
+
+## Accumulated in memory; persisted by the next save (every accepted move saves).
+func add_play_time(seconds: float) -> void:
+	play_time_seconds += seconds
+
+
+## Replaces the profile with a cloud copy and saves. Kept LOCAL, never taken from the
+## cloud: entitlements (per store account), sound/music (per device), and the
+## interstitial cadence (so switching devices can't dodge or double ads).
+func adopt_cloud_data(cloud: Dictionary) -> void:
+	var data := cloud.duplicate(true)
+	var local := to_dict()
+	for key in ["entitlements", "sound_enabled", "music_enabled", "ad_completions_since_interstitial", "ad_last_interstitial_unix", "ad_last_counted_level"]:
+		data[key] = local[key]
+	_apply_data(data)
+	save_game()
 
 
 func is_level_completed(level_id: int) -> bool:

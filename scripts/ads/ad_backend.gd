@@ -56,3 +56,13 @@ func privacy_options_required() -> bool:
 
 func show_privacy_options(_on_done: Callable) -> void:
 	pass
+
+
+## Drops a loaded interstitial (No Forced Ads was just bought).
+func discard_interstitial() -> void:
+	pass
+
+
+## Empties everything the SDK still holds for us (AdManager._exit_tree). Idempotent.
+func release() -> void:
+	pass

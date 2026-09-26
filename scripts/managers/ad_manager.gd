@@ -58,6 +58,11 @@ func _ready() -> void:
 	initialize_ads()
 
 
+func _exit_tree() -> void:
+	if _backend != null:
+		_backend.release()
+
+
 ## Selects the platform bridge (tests inject a fake).
 func use_backend(backend: AdBackend) -> void:
 	_backend = backend
@@ -85,6 +90,20 @@ func is_supported() -> bool:
 	return AdConfig.ADS_ENABLED and _backend != null
 
 
+## The player owns No Forced Ads: interstitials never load or show. The rewarded hint ad
+## is untouched - it is optional and player-initiated (StoreConfig.NO_FORCED_ADS).
+func forced_ads_removed() -> bool:
+	return SaveManager.has_entitlement(StoreConfig.NO_FORCED_ADS)
+
+
+## StoreManager calls this the moment the entitlement lands, so a preloaded interstitial
+## can never show after the purchase.
+func on_forced_ads_removed() -> void:
+	_interstitial_ready = false
+	if _backend != null:
+		_backend.discard_interstitial()
+
+
 ## True when a hint request must go through a rewarded ad.
 func hint_requires_ad() -> bool:
 	return is_supported() and not AdConfig.QA_BYPASS_REWARDED
@@ -108,6 +127,8 @@ func load_rewarded() -> void:
 
 
 func load_interstitial() -> void:
+	if forced_ads_removed():
+		return
 	if _backend != null and _sdk_ready and not _interstitial_ready:
 		_backend.load_interstitial()
 
@@ -229,6 +250,8 @@ func is_interstitial_due() -> bool:
 func maybe_show_interstitial_after_completion(suppressed: bool, on_done: Callable) -> bool:
 	if state == State.SHOWING_INTERSTITIAL:
 		return true # second tap on Next while the ad is up: swallow it
+	if forced_ads_removed():
+		return false
 	if not is_supported() or state != State.IDLE or suppressed or not is_interstitial_due():
 		return false
 	if not is_interstitial_ready() or not _backend.has_interstitial():

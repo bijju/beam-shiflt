@@ -31,6 +31,7 @@ func _ready() -> void:
 	# NOT derived from unlock/completion progress - see SaveManager.
 	# has_resumable_procedural_game()'s own doc comment for why.
 	_continue_button.disabled = not SaveManager.has_resumable_procedural_game()
+	_setup_cloud_chooser()
 
 	# Godot's quit() call is intended for desktop; on mobile the OS back
 	# gesture/button is the platform-expected way to leave the app.
@@ -140,6 +141,8 @@ func _maybe_show_fusion_tutorial_nudge() -> void:
 ## NEW GAME (D107). Fresh/settings-only save: starts Level 1 immediately, no popup. Meaningful main progress: asks first;
 ## nothing is erased until START NEW GAME is confirmed. _busy blocks double taps / duplicate callbacks.
 var _busy := false
+# Matches the button art's ~3.13:1 region aspect (1705x545); full-width 9-slice stretched it to ~6.3:1.
+const CONFIRM_BUTTON_SIZE := Vector2(480, 154)
 var _confirm_layer: Control = null
 
 
@@ -201,7 +204,8 @@ This cannot be undone."
 	box.add_child(row)
 	var cancel := Button.new()
 	cancel.text = "CANCEL"
-	cancel.custom_minimum_size = Vector2(0, 120)
+	cancel.custom_minimum_size = CONFIRM_BUTTON_SIZE
+	cancel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	cancel.add_theme_font_size_override("font_size", 32)
 	cancel.pressed.connect(AudioManager.play_ui_button_press)
 	cancel.pressed.connect(_close_new_game_confirmation)
@@ -209,8 +213,9 @@ This cannot be undone."
 	var confirm := Button.new()
 	confirm.name = "ConfirmNewGame"
 	confirm.text = "START NEW GAME"
-	confirm.custom_minimum_size = Vector2(0, 120)
-	confirm.add_theme_font_size_override("font_size", 32)
+	confirm.custom_minimum_size = CONFIRM_BUTTON_SIZE
+	confirm.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	confirm.add_theme_font_size_override("font_size", 26)
 	confirm.pressed.connect(AudioManager.play_ui_button_press)
 	confirm.pressed.connect(func() -> void:
 		if _busy:
@@ -228,6 +233,93 @@ func _close_new_game_confirmation() -> void:
 		_confirm_layer.queue_free()
 		_confirm_layer = null
 
+
+## Cloud save chooser (STORE_RELEASE.md): the device and cloud copies differ by more than
+## CloudSave.CHOOSER_THRESHOLD of play time, so neither is picked silently. Built in code
+## like the NEW GAME confirmation. Back/closing leaves the question pending for next time.
+var _cloud_layer: Control = null
+
+
+func _setup_cloud_chooser() -> void:
+	CloudSave.chooser_needed.connect(_show_cloud_chooser)
+	CloudSave.reconcile_held()
+	if CloudSave.has_pending_choice():
+		_show_cloud_chooser()
+
+
+func _show_cloud_chooser() -> void:
+	if _cloud_layer != null or not CloudSave.has_pending_choice():
+		return
+	_close_new_game_confirmation()
+	_cloud_layer = Control.new()
+	_cloud_layer.name = "CloudChooser"
+	_cloud_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_cloud_layer.mouse_filter = Control.MOUSE_FILTER_STOP
+	var dim := ColorRect.new()
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.color = Color(0, 0.02, 0.08, 0.85)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	_cloud_layer.add_child(dim)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cloud_layer.add_child(center)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(880, 0)
+	center.add_child(panel)
+	var margin := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 60)
+	panel.add_child(margin)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 28)
+	margin.add_child(box)
+	var title := Label.new()
+	title.text = "WHICH PROGRESS?"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 44)
+	box.add_child(title)
+	var body := Label.new()
+	body.text = "Your %s save and this device have different progress. The one you don't pick will be replaced." % CloudSave.service_name()
+	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.add_theme_font_size_override("font_size", 30)
+	box.add_child(body)
+	var cloud_button := Button.new()
+	cloud_button.text = "CLOUD: %s" % _progress_text(CloudSave.pending_cloud)
+	var device_button := Button.new()
+	device_button.text = "THIS DEVICE: %s" % _progress_text(CloudSave.pending_local)
+	for button: Button in [cloud_button, device_button]:
+		button.custom_minimum_size = CONFIRM_BUTTON_SIZE
+		button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		button.add_theme_font_size_override("font_size", 24)
+		button.pressed.connect(AudioManager.play_ui_button_press)
+		box.add_child(button)
+	cloud_button.pressed.connect(_on_take_cloud)
+	device_button.pressed.connect(_on_keep_local)
+	add_child(_cloud_layer)
+
+
+func _progress_text(profile: Dictionary) -> String:
+	var minutes := int(CloudSave.play_time_of(profile) / 60.0)
+	return "LEVEL %d, %dh %02dm" % [CloudSave.level_of(profile), minutes / 60, minutes % 60]
+
+
+func _close_cloud_chooser() -> void:
+	if _cloud_layer != null:
+		_cloud_layer.queue_free()
+		_cloud_layer = null
+
+
+func _on_take_cloud() -> void:
+	_close_cloud_chooser()
+	CloudSave.take_cloud() # reloads this menu with the adopted profile
+
+
+func _on_keep_local() -> void:
+	_close_cloud_chooser()
+	CloudSave.keep_local()
+
 ## project.godot sets quit_on_go_back=false project-wide (see game.gd,
 ## which needs to intercept this to open Pause instead of exiting) - so
 ## Main Menu must replicate the previous default behavior itself: the
@@ -235,6 +327,9 @@ func _close_new_game_confirmation() -> void:
 ## before that setting existed.
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		if _cloud_layer != null:
+			_close_cloud_chooser() # the question stays pending for the next menu build
+			return
 		if _confirm_layer != null:
 			_close_new_game_confirmation() # Back on the popup = CANCEL
 			return

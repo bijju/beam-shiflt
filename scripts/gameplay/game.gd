@@ -161,6 +161,16 @@ func _ready() -> void:
 ## ARCHITECTURE.md "Pause menu"/"Android back handling"). Desktop's Esc
 ## key raises the same notification, so this doubles as the desktop
 ## shortcut for free.
+## Real play time for the cloud-save merge rule (SaveManager.play_time_seconds): a board on
+## screen, not paused, not solved, not an editor playtest.
+func _process(delta: float) -> void:
+	if get_tree().paused or GameManager.is_editor_playtest:
+		return
+	if _complete_popup.visible or _tutorial_complete_popup.visible:
+		return
+	SaveManager.add_play_time(delta)
+
+
 func _notification(what: int) -> void:
 	if what != NOTIFICATION_WM_GO_BACK_REQUEST:
 		return
@@ -764,8 +774,15 @@ func _build_hint_glow() -> void:
 	_hint_glow.grow_vertical = Control.GROW_DIRECTION_BOTH
 	var half := Vector2(_hint_icon.offset_right - _hint_icon.offset_left, _hint_icon.offset_bottom - _hint_icon.offset_top) * 0.5
 	_hint_glow.pivot_offset = half
-	var mat := CanvasItemMaterial.new()
-	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	# Solid-colour silhouette (texture alpha only): multiplying the blue icon by gold would come out muddy.
+	var sh := Shader.new()
+	sh.code = "shader_type canvas_item;
+render_mode blend_add;
+uniform vec3 glow_color : source_color;
+void fragment() { COLOR = vec4(glow_color, COLOR.a); }"
+	var mat := ShaderMaterial.new()
+	mat.shader = sh
+	mat.set_shader_parameter("glow_color", Vector3(UIConstants.HINT_GLOW_COLOR.r, UIConstants.HINT_GLOW_COLOR.g, UIConstants.HINT_GLOW_COLOR.b))
 	_hint_glow.material = mat
 	_hint_glow.modulate = Color(UIConstants.HINT_GLOW_COLOR, 0.0)
 	_hint_glow.visible = false

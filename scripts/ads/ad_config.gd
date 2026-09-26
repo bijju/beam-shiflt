@@ -16,6 +16,12 @@ const ADS_ENABLED := true
 const USE_TEST_IDS := true
 ## QA: hints skip the rewarded ad (gameplay testing without a network).
 const QA_BYPASS_REWARDED := false
+## The audience includes children under 13 (store listings: mixed audience), so every ad
+## request is child-directed: TFCD + TFUA + max rating G, non-personalised, no IDFA/ATT.
+## Changing this is a policy decision (Play Families / COPPA / Apple 1.3), not a tweak.
+const CHILD_DIRECTED := true
+## UMP sometimes never calls back; start the SDK anyway after this many seconds.
+const CONSENT_TIMEOUT_SECONDS := 8.0
 
 ## Interstitial rule: every N legitimate completions AND at least this many seconds
 ## since the last interstitial. The counter resets ONLY when an interstitial is

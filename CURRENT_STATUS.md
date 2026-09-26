@@ -1,5 +1,7 @@
 # CURRENT_STATUS.md
 
+> **Latest (2026-09-26, uncommitted):** Hint HUD fix - Hint button anchor y 0.5->0.5175 (matches Reset/Pause and the HUD art panel centre) + gold `#FFD84A` attention halo (`UIConstants.HINT_GLOW_COLOR`). External-test APK rebuilt (versionCode 70 / 4.8.4). **Awaiting Android validation.** See CHANGELOG.md.
+
 Fast snapshot. If this disagrees with `CHANGELOG.md`/`ARCHITECTURE.md`,
 trust the code, then fix whichever doc is stale.
 
@@ -2327,3 +2329,7 @@ requested, none self-directed). If Stage 3's feedback requests changes,
 address only what's reported — don't preemptively touch Stage 1/2/3
 levels that weren't flagged, and don't start Stage 4 as part of a
 Stage 3 fix.
+
+## Android UI fix: New Game confirmation buttons (versionCode 70 / 4.8.4, unchanged)
+`main_menu.gd` `_show_new_game_confirmation()`: CANCEL / START NEW GAME were full-panel-width (~760x120, ~6.3:1) themed 9-slice buttons, so the button art (region 1705x545, ~3.13:1) stretched horizontally. Now both use `CONFIRM_BUTTON_SIZE` = 480x154 (~3.12:1) with `SIZE_SHRINK_CENTER`; the Control is the touch target (154 px tall). Dialog logic, panel, Hint HUD untouched. Pause/Level Complete/Settings buttons use the same full-width pattern but were not reported and were left unchanged.
+Follow-up: START NEW GAME confirm button font 32 -> 26 so the label fits the art's central area (button size 480x154 unchanged).

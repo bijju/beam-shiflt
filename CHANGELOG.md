@@ -1,5 +1,9 @@
 # CHANGELOG.md
 
+## Hint HUD fix - alignment + gold attention pulse (2026-09-26, uncommitted, external-test APK rebuilt, versionCode 70 / 4.8.4 unchanged)
+
+Android device test showed the Hint icon sitting high/left. Root cause: `HintButton` in `game.tscn` anchored at `anchor_top/bottom = 0.5` while Reset/Pause use 0.5175/0.5161 (the bottom HUD art's panel centres sit at ~0.518 of its height); the icon PNG itself is symmetric (bbox 3-252 / 3-249 of 256), so no texture change. Fix: Hint anchor y 0.5 -> 0.5175 (x 0.1212 and 144 px touch box unchanged). The attention halo is now a solid `#FFD84A` silhouette (`UIConstants.HINT_GLOW_COLOR`, tiny additive canvas shader in `game.gd _build_hint_glow`) instead of a tinted copy of the blue icon; timing/interval/scale/alpha/triggers untouched, icon never tinted. Presentation only; HintManager/ads/stars/saves untouched. **Awaiting Android validation.**
+
 ## S4 external-test cleanup pass 1 (2026-09-26, no build/upload)
 
 Introduced explicit build modes in `BuildConfig`: `INTERNAL_QA`, `EXTERNAL_TEST`, and `PRODUCTION`. Current mode is `EXTERNAL_TEST`, so `QA_TOOLS` is false while final production monetization/signing decisions remain separate. This hides QA Level Select, V3/Fusion/Selector/V5 test entries, QA `+50` / NEXT QA buttons, tutorial QA overlay, generator tags and unlock-all shortcuts without deleting any QA systems. Main Menu now reads `TUTORIALS`, hides the QA spacer in external-test mode, and Android metadata is cleaned from `4.8.3-OFFICE-BRANCH-QA` to `versionCode=70`, `versionName="4.8.4"`. No APK/AAB/IPA was created, uploaded, committed or pushed.

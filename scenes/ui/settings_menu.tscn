@@ -122,6 +122,77 @@ texture = ExtResource("4")
 expand_mode = 1
 stretch_mode = 5
 
+[node name="StoreSection" type="VBoxContainer" parent="SafeMargin/CenterContainer/Panel/Margin/VBox"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="BuyNoForcedAdsButton" type="Button" parent="SafeMargin/CenterContainer/Panel/Margin/VBox/StoreSection"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 128)
+theme_override_font_sizes/font_size = 30
+text = "NO FORCED ADS"
+
+[node name="RestorePurchasesButton" type="Button" parent="SafeMargin/CenterContainer/Panel/Margin/VBox/StoreSection"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 112)
+theme_override_font_sizes/font_size = 28
+text = "RESTORE PURCHASES"
+
+[node name="CloudSection" type="VBoxContainer" parent="SafeMargin/CenterContainer/Panel/Margin/VBox"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="CloudStatusLabel" type="Label" parent="SafeMargin/CenterContainer/Panel/Margin/VBox/CloudSection"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="CloudSignInButton" type="Button" parent="SafeMargin/CenterContainer/Panel/Margin/VBox/CloudSection"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 112)
+theme_override_font_sizes/font_size = 28
+text = "SIGN IN"
+
+[node name="CloudSyncButton" type="Button" parent="SafeMargin/CenterContainer/Panel/Margin/VBox/CloudSection"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 112)
+theme_override_font_sizes/font_size = 28
+text = "SYNC NOW"
+
+[node name="PrivacyOptionsButton" type="Button" parent="SafeMargin/CenterContainer/Panel/Margin/VBox"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+custom_minimum_size = Vector2(0, 112)
+theme_override_font_sizes/font_size = 28
+text = "PRIVACY OPTIONS"
+
+[node name="PrivacyPolicyButton" type="Button" parent="SafeMargin/CenterContainer/Panel/Margin/VBox"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+custom_minimum_size = Vector2(0, 112)
+theme_override_font_sizes/font_size = 28
+text = "PRIVACY POLICY"
+
+[node name="StoreMessageLabel" type="Label" parent="SafeMargin/CenterContainer/Panel/Margin/VBox"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+horizontal_alignment = 1
+autowrap_mode = 3
+
 [node name="BackButton" type="Button" parent="SafeMargin/CenterContainer/Panel/Margin/VBox"]
 unique_name_in_owner = true
 layout_mode = 2

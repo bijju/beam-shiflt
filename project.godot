@@ -27,6 +27,9 @@ LevelManager="*res://scripts/managers/level_manager.gd"
 GameManager="*res://scripts/managers/game_manager.gd"
 AudioManager="*res://scripts/managers/audio_manager.gd"
 AdManager="*res://scripts/managers/ad_manager.gd"
+StoreManager="*res://scripts/managers/store_manager.gd"
+GodotPlayGameServices="*res://addons/GodotPlayGameServices/scripts/autoloads/godot_play_game_services.gd"
+CloudSave="*res://scripts/managers/cloud_save.gd"
 
 [display]
 
@@ -38,7 +41,7 @@ window/handheld/orientation=1
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/admob/plugin.cfg")
+enabled=PackedStringArray("res://addons/admob/plugin.cfg", "res://addons/GodotGooglePlayBilling/plugin.cfg", "res://addons/GodotPlayGameServices/plugin.cfg")
 
 [gui]
 

@@ -110,4 +110,4 @@ const HINT_GLOW_OUT_DURATION := 0.45
 const HINT_ATTENTION_SCALE := 1.04
 const HINT_GLOW_ALPHA := 0.55
 const HINT_GLOW_SCALE := 1.22
-const HINT_GLOW_COLOR := Color(0.35, 0.9, 1.0, 1.0)
+const HINT_GLOW_COLOR := Color("ffd84a")
