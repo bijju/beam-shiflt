@@ -441,3 +441,5 @@ Rules learned: the selector is an ordinary orientable tile, so REQUIRE_TILE_TAP,
 T29 ("Select Path") unlocks at procedural Level 1900 (`LevelManager.SELECTOR_TUTORIAL_UNLOCK_PROCEDURAL_LEVEL`), i.e. well before the first Selector level in main progression (Level 2001, always one simple Selector: family SA/SB/SH/SE). No tutorial code changed in S3; the tutorial pack and its hints are exactly as in D109. Generated V5 levels never use `TutorialManager`, and V5 levels are ad-eligible like any normal procedural level (V5 TEST is not).
 
 Status (2026-09-25): T29-T34 are COMPLETE and unchanged by S3/S3.1; T29 unlocks at procedural Level 1900, T30-T34 sequential, tutorials are ad-free, QA builds unlock all, hint entries are hand-authored.
+
+External-test status (2026-09-26): with `BuildConfig.BUILD_MODE = MODE_EXTERNAL_TEST`, QA unlock-all is off. T29 still unlocks from real procedural progression at Level 1900 or normal tutorial sequential progress; T30-T34 remain sequential. No QA tutorial labels or tutorial debug overlay are visible because `BuildConfig.QA_TOOLS` is false.

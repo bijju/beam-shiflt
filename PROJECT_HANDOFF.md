@@ -12,7 +12,9 @@ usage/architecture guide.
 
 **What is BeamShift?** A mobile-first (portrait) deterministic grid laser-reflection puzzle game: rotate mirrors/splitters/etc. to route coloured beams to targets. Godot 4.7.1 (developed against 4.7.1), GDScript. Continuation prompt for the next agent: `NEXT_AI_PROMPT.md`.
 
-**Branch/state:** `dev_abhilas`, HEAD `36fc104`. S1/S2/S3/S3.1 work is uncommitted. `export_presets.cfg` (`version/code=69`, `4.8.3-OFFICE-BRANCH-QA`) is a pre-existing modification, not from S1-S3/S3.1. Last APK built by earlier work: `versionCode=68` line; nothing was built for S1-S3/S3.1.
+**S4 external-test cleanup pass 1 (2026-09-26):** `BuildConfig` now has explicit `MODE_INTERNAL_QA`, `MODE_EXTERNAL_TEST`, and `MODE_PRODUCTION`; current mode is `MODE_EXTERNAL_TEST`. In that mode `QA_TOOLS` is false, so Main Menu QA entries, gameplay QA next (`+50`, NEXT V3/FUSION/SELECTOR/V5), tutorial QA overlay, generator tags and unlock-all shortcuts are hidden. QA code/content remains intact and returns in `MODE_INTERNAL_QA`. Android metadata is now `versionCode=70`, `versionName="4.8.4"`; no Android/iOS artifact has been built or uploaded.
+
+**Branch/state:** `dev_abhilas`, HEAD `acbdd2e` at the start of S4 cleanup. S1/S2/S3/S3.1 work is uncommitted. `export_presets.cfg` now carries the S4 external-test metadata (`version/code=70`, `version/name="4.8.4"`). Last APK built by earlier work: `versionCode=68`; nothing was built for S1-S3/S3.1 or this S4 cleanup pass.
 
 **Phases:** S1 COMPLETE (Splitter Selector runtime + SELECTOR TEST). S2 COMPLETE (T29-T34). S3 IMPLEMENTED / DESKTOP S3.1 VERIFIED / AWAITING MANUAL APPROVAL (generator V5). S4 NOT STARTED (Android build).
 

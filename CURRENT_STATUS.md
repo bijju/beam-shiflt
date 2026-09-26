@@ -13,6 +13,8 @@ part below instead of trusting it.
 
 ## CURRENT DEVELOPMENT PHASE (2026-09-25, S3.1 final verification)
 
+**S4 EXTERNAL TEST CLEANUP PASS 1 IN PROGRESS (2026-09-26).** Branch `dev_abhilas`, HEAD `acbdd2e`. The repository is now configured for a polished external-test presentation via `BuildConfig.BUILD_MODE = MODE_EXTERNAL_TEST`: `QA_TOOLS` is false, hiding QA Level Select, V3/Fusion/Selector/V5 test entries, the gameplay QA next button (`+50` / NEXT QA), tutorial QA overlay, generator debug tags and unlock-all shortcuts. QA systems remain in source and reappear by switching to `MODE_INTERNAL_QA`. Android export metadata was cleaned to `versionCode=70`, `versionName="4.8.4"`; no build/upload/commit/push was performed in this pass. AdMob still uses Google test IDs, which is intentional for review unless explicitly replaced later.
+
 **S3.1 READY FOR MANUAL APPROVAL - V5 J/K DIFFICULTY REFINEMENT (Levels 2601-3000).** Continuation prompt: `NEXT_AI_PROMPT.md` (tool-independent; preferred). Branch `dev_abhilas`, HEAD `36fc104`; **nothing from S1/S2/S3/S3.1 is committed**.
 
 - **S1: COMPLETE** (Splitter Selector runtime + 6 SELECTOR TEST puzzles).

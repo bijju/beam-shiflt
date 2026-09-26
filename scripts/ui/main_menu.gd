@@ -5,6 +5,7 @@ extends Control
 @onready var _tutorial_button: Button = %TutorialButton
 @onready var _settings_button: Button = %SettingsButton
 @onready var _quit_button: Button = %QuitButton
+@onready var _qa_spacer: Control = %QASpacer
 ## QA/dev-only - see DECISIONS.md D85. Not part of the normal player-
 ## facing flow; visibility is gated in _ready() below.
 @onready var _qa_level_select_button: Button = %QALevelSelectButton
@@ -41,6 +42,7 @@ func _ready() -> void:
 	# QA flag. MUST read false (hiding this button) before any production
 	# release, same as that flag's own existing requirement.
 	_qa_level_select_button.visible = LevelManager.UNLOCK_ALL_CAMPAIGN_LEVELS_FOR_TESTING
+	_qa_spacer.visible = BuildConfig.QA_TOOLS
 
 	# Difficulty System Phase 2A (D94): DEV-ONLY "V3 TEST" entry for the six
 	# Generator V3 prototypes, built in code so the shared scene stays

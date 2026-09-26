@@ -95,8 +95,8 @@ const GAMEPLAY_BOTTOM_VISIBLE_GAP := 20.0
 ## safe area + 0 px.
 const GAMEPLAY_STACK_VERTICAL_OFFSET := -30.0
 ## QA TEST ONLY (D107): lifts the safe-edge cap on the stack shift so the -100 offset is really applied. The Top HUD may
-## cross the safe area in this build. NOT production approved; set false to restore the normal clamp.
-const ALLOW_LARGE_GAMEPLAY_STACK_QA_OFFSET := true
+## cross the safe area in an internal QA build. External test/production restore the normal clamp.
+const ALLOW_LARGE_GAMEPLAY_STACK_QA_OFFSET := BuildConfig.QA_TOOLS
 const HUD_TOP_ART_PAD_FRACTION := 0.2054
 const HUD_BOTTOM_ART_PAD_FRACTION := 0.2003
 

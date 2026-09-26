@@ -1,5 +1,12 @@
 # TEST_PLAN.md
 
+## S4 External-Test Cleanup
+
+- **AUTOMATED - DONE (2026-09-26).** `godot --headless --path . --import` completed with no `SCRIPT ERROR` / `Parse Error` lines after the build-mode change. Environment warnings remained: Windows root certificate store and editor settings save warnings.
+- **STATIC CHECK - DONE (2026-09-26).** Confirmed `BuildConfig.BUILD_MODE == MODE_EXTERNAL_TEST`, `QA_TOOLS` derives from `IS_INTERNAL_QA_BUILD`, LevelManager QA flags derive from `BuildConfig.QA_TOOLS`, Main Menu reads `TUTORIALS`, QA spacer visibility is gated by `BuildConfig.QA_TOOLS`, generator/tutorial debug labels are gated, gameplay QA stack cap override follows `BuildConfig.QA_TOOLS`, export metadata is `versionCode=70`, `versionName="4.8.4"`, and `OFFICE`/`BRANCH-QA`/`ANDROID TILE FIX` are absent from `export_presets.cfg`.
+- **AUTOMATED - BLOCKED IN THIS ENVIRONMENT (2026-09-26).** Both `godot --headless --path . --script _qa_tmp/s4_external_test_smoke.gd` and `godot --headless --path . --quit-after 3` hit a Godot 4.7.1 crash handler (`signal 11`) before useful scene assertions. No live Godot process remained afterward. Treat real runtime boot/menu/gameplay visibility as MANUAL/RENDERED still required for S4.
+- **MANUAL TEST REQUIRED (Android/iOS device).** External tester flow: Launch -> Main Menu -> New Game/Continue -> Tutorials -> Gameplay -> Hint -> Reset -> Pause -> Complete -> Next Level -> close/reopen -> Continue. Confirm no QA/dev/test labels are visible and dense V5 boards are readable on phone hardware.
+
 Repeatable tests for BeamShift. Each item is marked with how it was last
 validated: **AUTOMATED** (a command you can re-run), **MANUAL** (needs a
 human in the editor or on a device — not yet performed unless stated

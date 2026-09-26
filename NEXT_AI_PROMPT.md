@@ -9,6 +9,8 @@ Written 2026-09-25 at the Claude -> Codex handoff. Source authority is the REPOS
 
 You are continuing development of **BeamShift** (Godot 4.7.1, GDScript, Android/portrait-first deterministic laser-reflection puzzle) on branch **`dev_abhilas`**.
 
+**Current repo overlay (2026-09-26): S4 external-test cleanup pass 1 has started.** `BuildConfig.BUILD_MODE` is `MODE_EXTERNAL_TEST`, which makes `QA_TOOLS` false and hides internal QA UI while preserving all QA systems for `MODE_INTERNAL_QA`. Android metadata is `versionCode=70`, `versionName="4.8.4"`. No APK/AAB/TestFlight artifact has been built or uploaded.
+
 **Current task: PHASE S3.1 - V5 J/K DIFFICULTY REFINEMENT (Levels 2601-3000), manual approval gate.** Not S4. Do not build an APK unless the user explicitly approves S4 after manual V5 play.
 
 Read first, in order: `CLAUDE.md` (esp. "V5 generator rules"), `CURRENT_STATUS.md`, `PROJECT_HANDOFF.md`, this file, `DECISIONS.md` (D108, D109, D110), `ARCHITECTURE.md`, `PROCEDURAL_GENERATION.md` (section 20), `TEST_PLAN.md` (last section), `CHANGELOG.md`, `TUTORIAL_SYSTEM.md`, `ROADMAP.md`. Then run `git status`, `git log -1`, and read the code listed in section 6.

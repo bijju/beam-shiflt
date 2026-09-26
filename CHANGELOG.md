@@ -1,5 +1,9 @@
 # CHANGELOG.md
 
+## S4 external-test cleanup pass 1 (2026-09-26, no build/upload)
+
+Introduced explicit build modes in `BuildConfig`: `INTERNAL_QA`, `EXTERNAL_TEST`, and `PRODUCTION`. Current mode is `EXTERNAL_TEST`, so `QA_TOOLS` is false while final production monetization/signing decisions remain separate. This hides QA Level Select, V3/Fusion/Selector/V5 test entries, QA `+50` / NEXT QA buttons, tutorial QA overlay, generator tags and unlock-all shortcuts without deleting any QA systems. Main Menu now reads `TUTORIALS`, hides the QA spacer in external-test mode, and Android metadata is cleaned from `4.8.3-OFFICE-BRANCH-QA` to `versionCode=70`, `versionName="4.8.4"`. No APK/AAB/IPA was created, uploaded, committed or pushed.
+
 ## Selector Phase S3 - generator V5, Levels 2001-3000 (2026-09-25, uncommitted, no version bump)
 
 New generator version 5 for procedural Levels 2001-3000 (`MAX_LEVEL` 3000): contract bands G-K, Splitter Selector in main progression (Level 2001 introduces it; T29 unlock at 1900 unchanged), `ProceduralSelectorCheck` (load-bearing / mirror-like / equivalent-state / consequence / coupling / downstream depth), 12 Selector families initially, `ProceduralMinimality` + final wide shortcut probe, density fit + degradation ladder, `V5 TEST` QA entry, `v5_sample.tscn`/`v5_verify.tscn`. S3.1 pass 1 adds S-M (`Selector -> target continuation`) and delays K demotion; bounded J/K windows improve to J 3/36 and K 0/37 demoted under a 90s budget, with V1-V4 fingerprint still identical. Also: 4-state tap distance in `ProceduralComplexity.analyze` (Fusion unchanged), `GameManager.is_v5_test_mode`, `LevelManager.SHOW_V5_TEST_QA`, HUD tag shows the Selector family. Exact optimum UNKNOWN on V5. **Status: S3/S3.1 implemented but V5 still NOT certified; full 50-level J/K windows, phone readability, and Android generation time remain open; not S4.** See DECISIONS D110 and PROCEDURAL_GENERATION.md section 20.

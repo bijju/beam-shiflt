@@ -8,6 +8,8 @@ increasingly hard solutions.
 
 ## Status
 
+**Current source status (2026-09-26):** S4 external-test cleanup pass 1 is in progress. `BuildConfig` now has explicit internal-QA, external-test and production modes; the repo is set to `EXTERNAL_TEST`, which hides QA UI while keeping QA systems in source. Android metadata is `versionCode=70`, `versionName="4.8.4"`. No distribution artifact has been built or uploaded for this pass. See `CURRENT_STATUS.md` for the authoritative snapshot.
+
 **This section is a chronological narrative that has not been kept
 current every pass — see `CURRENT_STATUS.md` for the authoritative,
 up-to-date snapshot (currently Phase 4 - production cleanup: centralized

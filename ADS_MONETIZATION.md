@@ -136,6 +136,8 @@ SKAdNetwork requirements against Google's docs (do not hand-copy a list), verify
 
 ## 10. Production-ID replacement / release checklist
 
+**External-test status (2026-09-26):** S4 pass 1 keeps `AdConfig.USE_TEST_IDS = true` and `QA_BYPASS_REWARDED = false`. This is the safest review/default state until the user explicitly approves live AdMob units. Rewarded Hint and interstitial architecture remain intact; tutorials and hidden QA sessions remain ad-free/free-hint by design. Before any public production release, replace IDs and manifest app IDs as listed below.
+
 1. `AdConfig.USE_TEST_IDS = false`; fill `PRODUCTION_IDS` (locally / CI - never commit); `AdConfig.config_problem()` must return "".
 2. Change the export App IDs: project setting `admob/general/android/app_id` (manifest) and `admob/general/ios/app_id` (Info.plist).
 3. Verify UMP consent (EEA/UK + non-EEA) and the Privacy Options entry (add it to Settings if `is_privacy_options_required()`); decide child-directed / under-age tagging.
