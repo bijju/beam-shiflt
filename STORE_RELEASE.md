@@ -221,3 +221,5 @@ added via **"Draft Submission (N)"** (never "Create New Submission"). Before Pla
 - Cloud: sign in → Settings shows "synced"; delete + reinstall → progress returns without a question; repeat with **> 1 h** of play
   on the cloud side → still no question on the fresh install; two devices far apart → chooser appears on the menu.
 - iOS (TestFlight, sandbox): same purchase/restore flow; Game Center sign-in; save/restore round trip; no ATT prompt; no QUIT button.
+
+**2026-09-26:** Android AdMob production ids configured via the stamp script; next internal-test build = versionCode 10001 (1.0.0). Still pending: real Play Games Game ID, iOS AdMob ids, AdMob app review, test-device registration.

@@ -2340,3 +2340,7 @@ Follow-up: START NEW GAME confirm button font 32 -> 26 so the label fits the art
 ## Main Menu particle ambience
 
 Main Menu now has a lightweight dynamic blue/cyan particle ambience: `AmbientParticles` (GPUParticles2D, 28 particles, additive, procedural radial texture, no image asset) in `main_menu.tscn` between the scrim and the logo; `scripts/ui/menu_particles.gd` fits the emission box on `resized`. No reduced-motion setting exists in Settings, so none is honoured. Layout/logo/buttons unchanged. Android validation APK rebuilt; visual approval on device pending.
+
+## Android AdMob production ids + versionCode 10001 (2026-09-26)
+
+Real Android AdMob ids (app `~7269770832`, rewarded `/9105596685`, interstitial `/1227106666`, publisher 2730553558670494) are injected at build time by `tools/ci/stamp_store_config.sh android` (gitignored `config/ad_ids.local.json` + `[admob]` project setting); nothing new in tracked source. iOS ids untouched. AdMob app status: "Requires review" - limited/no live ads until approved (expected). Next Play internal-test build is versionCode 10001 / 1.0.0 (preset bumped). Optional local test devices: gitignored `config/ad_test_devices.local.json` (JSON array of hashed ids from logcat "setTestDeviceIds"), read by `AdConfig.test_device_ids()`; register your device before interacting with ads. CloudSave/Play Games (real Game ID) is still a separate pending task; the 10001 AAB was built with a placeholder Game ID that was then restored.

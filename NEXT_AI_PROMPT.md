@@ -121,3 +121,5 @@ Stop when the user has manually approved or rejected the V5 TEST difficulty/read
 ## 13. First instruction
 
 Run `git status`, `git log -1`, read the files in the order above, then prepare/run the user's manual V5 TEST approval checklist. Do not redo generator tuning or S4 unless the user explicitly asks.
+
+> 2026-09-26: Android AdMob production ids are stamped at build time (see ADS_MONETIZATION.md); Play internal build is versionCode 10001; AdMob app "Requires review"; test-device registration and real Play Games Game ID still pending.

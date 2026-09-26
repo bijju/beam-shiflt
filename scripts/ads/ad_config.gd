@@ -93,3 +93,19 @@ static func config_problem(p: String = platform()) -> String:
 ## SDK at all (and hints then stay free) rather than request ads with empty/sample units.
 static func ads_active(p: String = platform()) -> bool:
 	return ADS_ENABLED and (USE_TEST_IDS or config_problem(p) == "")
+
+
+## Optional developer test devices (AdMob hashed ids, from logcat "Use RequestConfiguration...
+## setTestDeviceIds"): a gitignored JSON array in this file, never in tracked source. Lets a
+## production-id build show test ads on registered devices only (no invalid traffic).
+const TEST_DEVICES_FILE := "res://config/ad_test_devices.local.json"
+
+
+static func test_device_ids() -> Array[String]:
+	var ids: Array[String] = []
+	if FileAccess.file_exists(TEST_DEVICES_FILE):
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(TEST_DEVICES_FILE))
+		if typeof(parsed) == TYPE_ARRAY:
+			for v in parsed:
+				ids.append(str(v))
+	return ids

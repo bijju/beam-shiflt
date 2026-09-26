@@ -81,6 +81,8 @@ func _init_sdk() -> void:
 		config.tag_for_child_directed_treatment = RequestConfiguration.TagForChildDirectedTreatment.TRUE
 		config.tag_for_under_age_of_consent = RequestConfiguration.TagForUnderAgeOfConsent.TRUE
 		config.max_ad_content_rating = RequestConfiguration.MAX_AD_CONTENT_RATING_G
+	for id in AdConfig.test_device_ids():
+		config.test_device_ids.append(id)
 	MobileAds.set_request_configuration(config)
 	var listener := OnInitializationCompleteListener.new()
 	listener.on_initialization_complete = _on_initialization_complete

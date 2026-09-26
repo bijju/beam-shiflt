@@ -2466,3 +2466,5 @@ TileType.SPLITTER_SELECTOR runtime + SELECTOR TEST pack (D108) and tutorials T29
 ## Selector Phase S3 - generator V5 (2026-09-25, uncommitted)
 
 Generator V5 (`GENERATOR_VERSION_V5`, D110) owns procedural Levels 2001-3000: contract bands G-K (`SEL`/`SBR`/`SIL`/`SCQ`/`SMS`), Selector families SA-SP plus S-M target continuation (`ProceduralFragmentsV3.SELECTOR_FRAGMENTS`), `ProceduralSelectorCheck`, `ProceduralMinimality`, density fit + degradation ladder, `V5 TEST` QA entry, `MAX_LEVEL` = 3000. V1-V4 frozen (fingerprint identical). Read `PROCEDURAL_GENERATION.md` section 20 and `CLAUDE.md` "V5 generator rules" before touching `scripts/procedural/**`. NOT done: full S3.1 certification, manual review of V5 difficulty, Android build/version bump (S4), on-device generation time, Selector families S-I/S-K/S-O, Levels 3001+. Nothing committed.
+
+> 2026-09-26: Android AdMob production ids are stamped at build time (see ADS_MONETIZATION.md); Play internal build is versionCode 10001; AdMob app "Requires review"; test-device registration and real Play Games Game ID still pending.

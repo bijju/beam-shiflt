@@ -3424,3 +3424,6 @@ project boots headlessly with zero runtime errors. UI interaction, visual
 correctness at various screen sizes, save-file persistence across
 launches, and anything requiring a real Android device are marked
 `MANUAL TEST REQUIRED` and have not yet been performed.
+
+## 2026-09-26
+- Android AdMob production ids integration (build-time stamped), optional local ad test devices, versionCode 10001.
