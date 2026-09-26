@@ -97,10 +97,33 @@ There is one monetization implementation for both platforms; only the plugin's n
 
 Implemented through the plugin's supported UMP API in `AdBackendAdMob.initialize()`: every launch
 `consent_information.update()` -> if a form is available and status is REQUIRED, show it -> `MobileAds.initialize()`.
-**No ad request is made while consent is still REQUIRED** (`initialized(false)`). Ad requests use the SDK's consent state; no personalised-ads
-assumption, no `RequestConfiguration` flags set (child-directed / under-age tagging is a **product/legal decision still to make** before
-release). `AdManager.is_privacy_options_required()` / `show_privacy_options()` exist for a future Settings "Privacy Options" entry; **no Settings UI
-was added**. Not verified on a device; EEA testing needs `ConsentDebugSettings` (not enabled).
+**No ad request is made while consent is still REQUIRED** (`initialized(false)`). Not verified on a device; EEA testing needs
+`ConsentDebugSettings` (not enabled).
+
+### 6a. Child-directed configuration (store-release pass, 2026-09-26 - SUPERSEDES the old "decision still to make")
+
+The owner decided the target audience **includes children under 13** and chose **child-safe ads for everyone** (no age screen).
+`AdConfig.CHILD_DIRECTED = true` makes EVERY request: `tag_for_child_directed_treatment = TRUE`, `tag_for_under_age_of_consent = TRUE`,
+`max_ad_content_rating = G` (`RequestConfiguration`, set before `MobileAds.initialize`), and `ConsentRequestParameters.tag_for_under_age_of_consent
+= true`. Consequences: non-personalised ads only (lower eCPM), UMP normally shows no consent form and reports privacy options NOT_REQUIRED (the
+Settings "PRIVACY OPTIONS" button therefore stays hidden - it appears only if UMP ever reports REQUIRED), **no IDFA / no ATT prompt on iOS**
+(no `NSUserTrackingUsageDescription`, iOS preset `privacy/tracking_enabled=false`), no AdMob IDFA explainer message. Store forms must match:
+Play "Target audience" includes under-13 (Families policy applies), Data safety declares no tracking; App Store "App Privacy" declares no tracking
+and the app is NOT in the Kids category. Changing `CHILD_DIRECTED` is a policy decision (Play Families / COPPA / Apple 1.3), never a tuning knob.
+
+### 6b. Hardening (store-release pass)
+
+`AdBackendAdMob` now hands the plugin **named methods only** (inline lambdas stored in the plugin's static slots crash iOS on swipe-away under Godot
+4.7), `release()` empties those slots from `AdManager._exit_tree()`, and a **consent watchdog** (`AdConfig.CONSENT_TIMEOUT_SECONDS = 8`) starts the SDK
+if UMP never calls back. The Settings screen has the PRIVACY OPTIONS entry (visible only when required) and a PRIVACY POLICY link
+(`StoreConfig.PRIVACY_POLICY_URL`, hidden while empty - must be filled before release).
+
+### 6c. No Forced Ads (IAP)
+
+Owning `StoreConfig.NO_FORCED_ADS` (`beamshift_no_forced_ads`, $3.99) stops interstitials only: `AdManager.forced_ads_removed()` gates
+`load_interstitial()` and `maybe_show_interstitial_after_completion()`, and `on_forced_ads_removed()` drops a preloaded one the moment the purchase
+lands. **The rewarded hint ad is unchanged for owners** (owner decision), which is why the product is named "No Forced Ads", never "Remove Ads" -
+store copy must say optional hint videos remain. See `STORE_RELEASE.md`.
 
 ## 7. Failure and lifecycle behaviour
 
@@ -140,7 +163,7 @@ SKAdNetwork requirements against Google's docs (do not hand-copy a list), verify
 
 1. `AdConfig.USE_TEST_IDS = false`; fill `PRODUCTION_IDS` (locally / CI - never commit); `AdConfig.config_problem()` must return "".
 2. Change the export App IDs: project setting `admob/general/android/app_id` (manifest) and `admob/general/ios/app_id` (Info.plist).
-3. Verify UMP consent (EEA/UK + non-EEA) and the Privacy Options entry (add it to Settings if `is_privacy_options_required()`); decide child-directed / under-age tagging.
+3. Verify on a device that ads load with child-directed tagging (6a) and no consent form / no ATT prompt appears; publish the AdMob GDPR + US-states messages anyway (UMP only shows forms that exist). The Privacy Options entry exists in Settings.
 4. Test Android with production units (real ads, then remove any test-device IDs). Test iOS on a Mac/device; verify Info.plist and SKAdNetwork.
 5. Set `LevelManager` QA flags (`UNLOCK_ALL_*`, `SHOW_PROCEDURAL_QA_NEXT_BUTTON`, `SHOW_V3_PROTOTYPE_QA`, `USE_V3_FOR_PROCEDURAL_QA` review) and the HUD QA tag.
 6. `AdConfig.QA_BYPASS_REWARDED = false`; confirm no test-ad configuration remains; use a release keystore (currently debug-signed).

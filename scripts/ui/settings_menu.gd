@@ -24,6 +24,8 @@ const TEXTURE_TOGGLE_OFF := preload("res://assets/ui/settings/bs_ui_toggle_off_r
 @onready var _privacy_policy: Button = %PrivacyPolicyButton
 @onready var _message: Label = %StoreMessageLabel
 
+const MESSAGE_SECONDS := 4.0
+
 var _cloud_failed := false
 
 
@@ -84,6 +86,14 @@ func _on_purchase_finished(_success: bool, message: String) -> void:
 	_message.visible = message != ""
 	_message.text = message
 	_refresh_store()
+	if message != "":
+		# Transient, so the panel only grows while there is something to say.
+		get_tree().create_timer(MESSAGE_SECONDS).timeout.connect(_hide_message.bind(message))
+
+
+func _hide_message(shown: String) -> void:
+	if _message.text == shown:
+		_message.visible = false
 
 
 func _refresh_cloud() -> void:

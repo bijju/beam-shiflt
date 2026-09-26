@@ -1,5 +1,6 @@
 # CLAUDE.md — Permanent Instructions for Future Claude Sessions
 
+> **Store-release pass (2026-09-26):** owner asked to prepare Google Play + App Store: bundle `com.foursagez.beamshift`, child-directed ads, "No Forced Ads" IAP, cloud save, AAB/iOS presets, CI - code done, console work pending (`STORE_RELEASE.md` section 5). The IAP/SDK additions were explicitly requested; the "no IAP/external SDKs" scope line below predates them.
 > **Current phase (2026-09-25): S3.1 NEXT - V5 J/K difficulty refinement.** S1/S2 complete, S3 implemented but NOT certified, S4 (APK) not started. Tool-independent continuation prompt: `NEXT_AI_PROMPT.md`. Nothing from S1-S3 is committed; do not commit/push/build unless asked.
 
 This file is permanent guidance for any Claude session (or account) that
@@ -23,6 +24,7 @@ Read, in this order:
 11. `ERA_2_DESIGN.md` (Era 2 "Refractions" — the Era architecture (`scripts/resources/era_theme.gd`), the four new mechanics (Prism/One-Way Reflector/Beam Receiver/Remote Emitter) and their exact rules, and the T11–T20 tutorial pack's own reference; read it before touching any of those, `assets/**/era2/`, or `levels/tutorial/t11.gd` through `t20.gd`)
 12. `PROCEDURAL_GENERATION.md` (Phase 3+ — the procedural level generator's own architecture/design reference: seed derivation, generator versioning, difficulty bands, template catalog, the runtime-vs-dev-time verification split, save contract, and QA Next button behavior; (section 19: the V3 progression generator - fragments, composer, contract bands, shortcut probe, measured evidence) read it before touching `scripts/procedural/**`, `scripts/tools/procedural_audit.gd`, or the procedural branches in `GameManager`/`SaveManager`/`LevelManager`/`game.gd`/`game.tscn`)
 14. `ADS_MONETIZATION.md` (AdMob Foundation V1+: AdManager, rewarded hint, interstitial rules, consent, test IDs, release checklist; read before touching `scripts/ads/**`, `scripts/managers/ad_manager.gd`, `addons/admob/**` or the Android Gradle build)
+15. `STORE_RELEASE.md` (Store-release pass+: bundle id, child-directed ads, the No Forced Ads IAP, cloud save, export presets, CI, and the owner's console batches; read before touching `scripts/store/**`, `scripts/cloud/**`, `store_manager.gd`, `cloud_save.gd`, `export_presets.cfg`, `.github/workflows/` or `tools/ci/`)
 13. `AUDIO_SYSTEM.md` (Audio/SFX Integration Pass+ — the centralized SFX architecture's own reference: semantic event mapping, bus layout, player pooling, per-SFX gain, anti-spam/suppression, Era 2 reuse, and the manual Android audio QA checklist; read it before touching `scripts/managers/audio_manager.gd`, `assets/sfx/**`, `assets/audio/default_bus_layout.tres`, or any `AudioManager.play_*()` call site)
 
 **Never assume a previous chat/session's context exists.** You have no
@@ -88,9 +90,11 @@ combining mechanics, not by inflating grid size.
    creates a beam cycle (including through a splitter or a portal), it
    will hang the engine.
 6. **Autoloads are earned, not default.** Only `SaveManager`,
-   `LevelManager`, `GameManager`, plus `AudioManager` and `AdManager`
-   (which each earned it - see the Audio/Advertising rules; `project.godot`
-   is authoritative, five in total), are autoloads. Don't add a new
+   `LevelManager`, `GameManager`, plus `AudioManager`, `AdManager`,
+   `StoreManager` and `CloudSave` (which each earned it - see the
+   Audio/Advertising/Store rules), plus the GodotPlayGameServices plugin's
+   own `GodotPlayGameServices` autoload, are autoloads (`project.godot` is
+   authoritative, eight in total). Don't add a new
    autoload unless something genuinely needs global/persistent access
    from more than one unrelated scene. `TutorialManager` (Guided
    Tutorial Mode, see `TUTORIAL_SYSTEM.md`) is a deliberate example of
@@ -1287,6 +1291,24 @@ Details: `ADS_MONETIZATION.md`, `DECISIONS.md` D98.
 - **Ads are optional services**: any failure must never block hints, saves, generation, completion, Next Level or audio.
 - The Android build now needs Gradle + **JDK 17** + the plugin binaries (`addons/admob/`, downloaded by the plugin in a headless editor run);
   `android/` is git-ignored. iOS is prepared but unbuilt/unvalidated. No banners, no app-open ads.
+
+## Store release rules (store-release pass, 2026-09-26)
+
+Details: `STORE_RELEASE.md`, `ADS_MONETIZATION.md` 6a-6c.
+- **Bundle id is `com.foursagez.beamshift` on every preset, forever.** Build codes are `major*10000+minor*100+patch` (1.0.0 = 10000),
+  stamped by `tools/ci/stamp_version.sh`; never hand-edit a lower code in.
+- **Every ad request is child-directed** (`AdConfig.CHILD_DIRECTED`: the audience includes under-13). Never add ATT/IDFA,
+  `NSUserTrackingUsageDescription` or personalised ads without an explicit owner decision - it is a Families/COPPA policy change.
+- **Store/cloud SDKs only behind `StoreManager`/`CloudSave` + per-platform backends loaded by path.** iOS plugins via `ClassDB`, every
+  plugin signal `CONNECT_DEFERRED`. Product ids live only in `StoreConfig`. Entitlements live in `SaveManager.entitlements`; only a
+  completed full query revokes; entitlements never travel with a cloud profile.
+- **"No Forced Ads" removes interstitials only** - the rewarded hint stays (owner decision). Never label it "Remove Ads".
+- **`play_time_seconds` counts real play only** (`game.gd _process`); the cloud fresh-install guard depends on menu time never counting.
+- **Android builds FAIL while `godot_play_game_services/game_id` is empty** (AAPT resource error) - that is expected until the owner
+  creates the PGS project; test exports may use a placeholder but must restore the empty value.
+- iOS StoreKit/Game Center GDExtensions are never vendored (CI downloads pinned releases). Signing material stays outside the repo
+  (`.gitignore` covers `*.keystore *.jks *.p12 *.p8 *.mobileprovision`).
+- AdMob callbacks are named methods only (no lambdas handed to the plugin) + `AdBackendAdMob.release()`: iOS swipe-away crash otherwise.
 
 ## Fusion Node rules (Fusion Phase 1+2)
 

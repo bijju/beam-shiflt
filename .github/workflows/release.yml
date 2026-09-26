@@ -1,0 +1,547 @@
+name: Release CD
+
+# Store delivery pipeline for BeamShift (Android + iOS; the game has no desktop
+# preset). Secrets are listed in references/ci-cd.md. A job whose secrets are
+# missing degrades rather than fails: Android is debug-signed, iOS ships the
+# unsigned Xcode project, and no store upload happens.
+#
+# EVERY MERGE TO MAIN: builds the Android AAB + APK and refreshes the
+# rolling "latest-main" pre-release on GitHub. iOS does not run here.
+#
+# A manual run takes a `lanes` choice -- both, ios or android -- so a fix that
+# only touches one store does not build the other. Tags and merges always run
+# what they always ran.
+#
+# VERSION TAGS (git tag v1.0.6 && git push origin v1.0.6): Android plus the
+# iOS lane, uploads the signed AAB to the Play internal track and the IPA
+# to TestFlight when the credentials exist, attached to a real GitHub
+# Release. MANUAL RUNS (Actions -> Release CD -> Run workflow) do the same
+# from any branch with a typed version, so the lanes can be proven from
+# a work branch before anything reaches main.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to stamp (MAJOR.MINOR.PATCH)"
+        required: true
+      lanes:
+        description: "Which lanes to build"
+        default: both
+        type: choice
+        options: [both, ios, android]
+      play_track:
+        description: "Google Play track"
+        default: internal
+        type: choice
+        options: [internal, beta, production]
+      confirm_production:
+        description: "Type PUBLISH to allow a production-track upload (ignored for internal/beta)"
+        required: false
+        default: ""
+
+env:
+  GODOT_VERSION: 4.7.1-stable
+  PACKAGE_NAME: com.foursagez.beamshift
+  APP_NAME: BeamShift
+  # addons/admob/plugin.cfg; the addon fetches its platform binaries for this
+  # release + the running Godot version the first time it loads headless.
+  ADMOB_PLUGIN_VERSION: v5.1.0
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      has_android: ${{ steps.creds.outputs.has_android }}
+      has_play_upload: ${{ steps.creds.outputs.has_play_upload }}
+      has_ios: ${{ steps.creds.outputs.has_ios }}
+      has_ios_upload: ${{ steps.creds.outputs.has_ios_upload }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Tag must point at a commit on main
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Tag $GITHUB_REF_NAME is not on main - releases ship from main only"
+            exit 1
+          fi
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "${{ startsWith(github.ref, 'refs/tags/') }}" = "true" ]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            # merge to main: reuse the version the presets already carry for
+            # the rolling build (stores are not touched on merges)
+            v=$(grep -m1 -oE '^version/name="[^"]+"' export_presets.cfg | cut -d'"' -f2)
+            echo "version=${v:-1.0.5}" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Detect store credentials
+        id: creds
+        run: |
+          # store jobs only run once their secrets exist; a tag always
+          # produces packages either way
+          echo "has_android=${{ secrets.ANDROID_KEYSTORE_B64 != '' }}" >> "$GITHUB_OUTPUT"
+          echo "has_play_upload=${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}" >> "$GITHUB_OUTPUT"
+          # A certificate plus a provisioning profile is enough to sign an
+          # installable IPA; the App Store Connect key is only needed to
+          # hand that IPA to TestFlight.
+          echo "has_ios=${{ secrets.IOS_DIST_CERT_B64 != '' && secrets.IOS_PROVISIONING_PROFILE_B64 != '' && secrets.APPLE_TEAM_ID != '' }}" >> "$GITHUB_OUTPUT"
+          echo "has_ios_upload=${{ secrets.ASC_API_PRIVATE_KEY != '' && secrets.ASC_KEY_ID != '' && secrets.ASC_ISSUER_ID != '' }}" >> "$GITHUB_OUTPUT"
+
+  # FIRST-CLASS TARGET: builds on EVERY merge. Release-signed when the
+  # keystore secrets exist; otherwise debug-signed with a keystore generated
+  # on the runner (sideload-installable for testing).
+  android-play:
+    needs: guard
+    # Every other trigger runs it; only a manual run can ask for iOS alone.
+    # An iOS-only run has nothing for this job to do -- its upload is gated on
+    # Play secrets either way, so without them it builds a debug-signed bundle
+    # nobody can ship and burns half an hour doing it.
+    if: github.event_name != 'workflow_dispatch' || inputs.lanes != 'ios'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Cache Godot + export templates
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot
+            ~/.local/share/godot/export_templates
+          key: godot-release-${{ env.GODOT_VERSION }}-linux
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ env.GODOT_VERSION }}-${{ hashFiles('android/build/gradle/wrapper/gradle-wrapper.properties', 'android/build/config.gradle') }}
+
+      # The AdMob addon keeps its .aar/.xcframework binaries out of git and
+      # downloads them (~380 MB for both platforms) on first headless load.
+      # Caching the extracted bin folders turns that into a one-off.
+      - name: Cache AdMob platform binaries
+        uses: actions/cache@v4
+        with:
+          path: |
+            addons/admob/android/bin
+            addons/admob/ios/bin
+          key: admob-${{ env.ADMOB_PLUGIN_VERSION }}-${{ env.GODOT_VERSION }}
+
+      - name: Download Godot + export templates
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot ~/.local/share/godot/export_templates
+          curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          unzip -q godot.zip -d ~/godot
+          curl -sSL -o templates.tpz "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_export_templates.tpz"
+          unzip -q templates.tpz -d ~/godot/tpl
+          mv ~/godot/tpl/templates ~/.local/share/godot/export_templates/"${GODOT_VERSION/-/.}"
+
+      # BeamShift does not track android/ at all (.gitignore: the Gradle
+      # template carries >100 MB godot-lib .aar files). Install the whole
+      # stock template from the export templates, exactly what the editor's
+      # "Install Android Build Template" does.
+      - name: Install Android build template
+        run: |
+          mkdir -p android/build
+          unzip -q -o ~/.local/share/godot/export_templates/"${GODOT_VERSION/-/.}"/android_source.zip -d android/build
+          # Godot looks for the version marker at the ROOT of the gradle
+          # build directory (res://android) as well as inside android/build.
+          echo "${GODOT_VERSION/-/.}" > android/.build_version
+          echo "${GODOT_VERSION/-/.}" > android/build/.build_version
+          touch android/build/.gdignore
+          for f in android/build/libs/release/godot-lib.template_release.aar android/build/libs/debug/godot-lib.template_debug.aar android/.build_version android/build/.build_version; do
+            [ -s "$f" ] || { echo "::error::$f missing after template install"; exit 1; }
+          done
+          chmod +x android/build/gradlew
+
+      - name: Point Godot at the runner's Android SDK + JDK
+        run: |
+          mkdir -p ~/.config/godot
+          for f in editor_settings-4.tres editor_settings-4.7.tres; do
+            cat > ~/.config/godot/$f <<EOF
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "${ANDROID_SDK_ROOT}"
+          export/android/java_sdk_path = "${JAVA_HOME}"
+          EOF
+          done
+
+      - name: Stamp version
+        run: tools/ci/stamp_version.sh "${{ needs.guard.outputs.version }}"
+
+      - name: Prepare signing (release keystore, or generated debug key)
+        id: signing
+        # The keystore arrives through env, never interpolated into the
+        # command line, so it cannot surface in traces. umask 077 keeps the
+        # decoded key unreadable to others.
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          ANDROID_KEYSTORE_USER: ${{ secrets.ANDROID_KEYSTORE_USER }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          umask 077
+          if [ -n "$ANDROID_KEYSTORE_B64" ]; then
+            # Strip whitespace and any BOM before decoding; a value pasted
+            # from a PowerShell console can carry both.
+            printf '%s' "$ANDROID_KEYSTORE_B64" \
+              | tr -d '\r\n \t' | sed '1s/^\xEF\xBB\xBF//' \
+              | base64 --decode > "$RUNNER_TEMP/release.keystore"
+            size=$(stat -c%s "$RUNNER_TEMP/release.keystore" 2>/dev/null || echo 0)
+            if [ "$size" -lt 500 ]; then
+              echo "::error::Decoded keystore is ${size} bytes - ANDROID_KEYSTORE_B64 is not valid base64 of a keystore. Regenerate with tools/ci/print_github_secrets.ps1"
+              exit 1
+            fi
+            # Prove the alias and password open it, so a wrong value fails
+            # here with a clear message instead of deep inside Gradle. The
+            # password goes in on stdin, not on the argv.
+            if ! printf '%s\n' "$ANDROID_KEYSTORE_PASSWORD" \
+                 | keytool -list -keystore "$RUNNER_TEMP/release.keystore" \
+                   -alias "$ANDROID_KEYSTORE_USER" >/dev/null 2>&1; then
+              echo "::error::Keystore decoded (${size} bytes) but ANDROID_KEYSTORE_USER / ANDROID_KEYSTORE_PASSWORD did not open it. The alias recorded for beamshift-upload.keystore is beamshift."
+              exit 1
+            fi
+            echo "mode=release" >> "$GITHUB_OUTPUT"
+            echo "Signing: RELEASE keystore from secrets (${size} bytes, alias verified)"
+          else
+            keytool -genkeypair -v -keystore "$RUNNER_TEMP/debug.keystore" \
+              -alias androiddebugkey -storepass android -keypass android \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US" >/dev/null 2>&1
+            echo "mode=debug" >> "$GITHUB_OUTPUT"
+            echo "Signing: DEBUG keystore (add ANDROID_KEYSTORE_B64 for store-ready builds)"
+          fi
+
+      # The first headless load of the project also makes the AdMob addon
+      # download its binaries (admob.gd -> BinaryInstaller) when the cache
+      # above was empty.
+      - name: Import assets
+        run: ~/godot/Godot_v${GODOT_VERSION}_linux.x86_64 --headless --path . --import || true
+
+      - name: Verify the AdMob Android binaries are present
+        run: |
+          for f in addons/admob/android/bin/package.gd addons/admob/android/bin/ads/libs/poing-godot-admob-ads-release.aar; do
+            [ -s "$f" ] || { echo "::error::$f missing - the AdMob addon did not install its Android binaries (see addons/admob/docs/errors/ERR_002.md)"; exit 1; }
+          done
+          cat addons/admob/android/bin/package.gd | tail -1
+
+      - name: Export AAB + APK
+        env:
+          GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ runner.temp }}/release.keystore
+          GODOT_ANDROID_KEYSTORE_RELEASE_USER: ${{ secrets.ANDROID_KEYSTORE_USER }}
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ runner.temp }}/debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+        run: |
+          mkdir -p build/android
+          GODOT=~/godot/Godot_v${GODOT_VERSION}_linux.x86_64
+          if [ "${{ steps.signing.outputs.mode }}" = "release" ]; then
+            EXPORT_FLAG="--export-release"
+          else
+            EXPORT_FLAG="--export-debug"
+          fi
+          # Two tracked presets: "Android" is the bundle with the install-time
+          # asset pack, "Android Debug" the sideloadable APK. The headless
+          # exporter occasionally hangs AFTER writing the file, so a timeout
+          # kill is not by itself a failure: the file is the truth.
+          timeout 45m $GODOT --headless --path . $EXPORT_FLAG "Android" build/android/${APP_NAME}.aab || true
+          timeout 45m $GODOT --headless --path . $EXPORT_FLAG "Android Debug" build/android/${APP_NAME}.apk || true
+          for f in build/android/${APP_NAME}.aab build/android/${APP_NAME}.apk; do
+            size=$(stat -c%s "$f" 2>/dev/null || echo 0)
+            if [ "$size" -lt 5000000 ]; then
+              echo "::error::$f missing or too small (${size} bytes) - export failed"
+              exit 1
+            fi
+            echo "$f OK: ${size} bytes"
+          done
+          # The versionCode 6 crash class: art on the exclude filter that a
+          # screen loads at runtime. Dev-only folders must never ship
+          # (CLAUDE.md rule 9 + D51: scripts/tools, the level editor, pieces/ art).
+          for dev in 'scripts/tools/' 'tools/level_editor/' 'assets/gameplay/pieces/' '_qa_tmp/'; do
+            if unzip -l build/android/${APP_NAME}.aab | grep -q "$dev"; then
+              echo "::error::$dev is inside the bundle - the exclude filter is not being applied"
+              exit 1
+            fi
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-${{ needs.guard.outputs.version }}-android
+          path: |
+            build/android/${{ env.APP_NAME }}.aab
+            build/android/${{ env.APP_NAME }}.apk
+          # Merge builds are throwaway; releases are kept. Two ~400 MB
+          # packages per run would fill the included Actions storage fast.
+          retention-days: ${{ startsWith(github.ref, 'refs/tags/') && 90 || 7 }}
+
+      # The decoded upload key must not survive the job, including on failure.
+      - name: Remove temporary keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.keystore" "$RUNNER_TEMP/debug.keystore" || true
+
+      # A production-track upload publishes to real players, so it needs an
+      # explicit typed confirmation on top of the dispatch choice. Tag pushes
+      # never reach production: they resolve to the internal track below.
+      - name: Refuse an unconfirmed production upload
+        if: inputs.play_track == 'production' && inputs.confirm_production != 'PUBLISH'
+        run: |
+          echo "::error::play_track=production requires confirm_production=PUBLISH. Nothing was uploaded."
+          exit 1
+
+      - name: Upload to Google Play
+        if: >-
+          (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch')
+          && steps.signing.outputs.mode == 'release'
+          && needs.guard.outputs.has_play_upload == 'true'
+          && (inputs.play_track != 'production' || inputs.confirm_production == 'PUBLISH')
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ env.PACKAGE_NAME }}
+          releaseFiles: build/android/${{ env.APP_NAME }}.aab
+          track: ${{ inputs.play_track || 'internal' }}
+          status: completed
+
+  # RELEASE-ONLY TARGET: version tags and manual dispatch, NOT every merge.
+  # GitHub bills macOS runners at a 10x minute multiplier, so a ~10 minute
+  # iOS build costs ~100 included minutes. A per-commit IPA has no consumer.
+  #
+  # With the Apple secrets it produces a SIGNED IPA (+ TestFlight when the
+  # App Store Connect key exists); without them Apple forbids signing, so it
+  # exports the full unsigned Xcode project instead, which is the most any
+  # CI can legally produce.
+  ios-appstore:
+    needs: guard
+    if: >-
+      (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch')
+      && (github.event_name != 'workflow_dispatch' || inputs.lanes != 'android')
+    # Pinned, not macos-latest: App Store Connect uploads need Xcode 26 and
+    # the iOS 26 SDK since 2026-04-28, and an unpinned label moves silently.
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select and report toolchain (no secrets)
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.app/Contents/Developer 2>/dev/null || \
+            echo "Xcode_26.app not found; staying on the image default"
+          sw_vers
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i "iphoneos" || true
+          major=$(xcodebuild -version | head -1 | sed -E 's/Xcode ([0-9]+).*/\1/')
+          if [ "${major:-0}" -lt 26 ]; then
+            echo "::error::Xcode $major is below the Xcode 26 minimum for App Store Connect uploads"
+            exit 1
+          fi
+
+      - name: Cache Godot + export templates
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot
+            ~/Library/Application Support/Godot/export_templates
+          key: godot-release-${{ env.GODOT_VERSION }}-macos
+
+      - name: Cache AdMob platform binaries
+        uses: actions/cache@v4
+        with:
+          path: |
+            addons/admob/android/bin
+            addons/admob/ios/bin
+          key: admob-${{ env.ADMOB_PLUGIN_VERSION }}-${{ env.GODOT_VERSION }}
+
+      - name: Download Godot + export templates
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot ~/Library/Application\ Support/Godot/export_templates
+          curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_macos.universal.zip"
+          unzip -q godot.zip -d ~/godot
+          curl -sSL -o templates.tpz "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_export_templates.tpz"
+          unzip -q templates.tpz -d ~/godot/tpl
+          mv ~/godot/tpl/templates ~/Library/Application\ Support/Godot/export_templates/"${GODOT_VERSION/-/.}"
+
+      - name: Import signing certificate
+        if: needs.guard.outputs.has_ios == 'true'
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.IOS_DIST_CERT_B64 }}
+          p12-password: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+
+      - name: Install provisioning profile
+        if: needs.guard.outputs.has_ios == 'true'
+        env:
+          IOS_PROVISIONING_PROFILE_B64: ${{ secrets.IOS_PROVISIONING_PROFILE_B64 }}
+        run: |
+          umask 077
+          printf '%s' "$IOS_PROVISIONING_PROFILE_B64" | tr -d '\r\n \t' | base64 --decode > "$RUNNER_TEMP/profile.mobileprovision"
+          security cms -D -i "$RUNNER_TEMP/profile.mobileprovision" > "$RUNNER_TEMP/profile.plist"
+          UUID=$(plutil -extract UUID raw "$RUNNER_TEMP/profile.plist")
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$RUNNER_TEMP/profile.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
+          echo "IOS_PROFILE_UUID=$UUID" >> "$GITHUB_ENV"
+          echo "Installed provisioning profile $UUID"
+
+      - name: Stamp version + signing identifiers
+        env:
+          # Godot 4.7 refuses to export the iOS preset at all with an empty
+          # team id, even when it only writes the Xcode project. Without the
+          # secret a placeholder goes in; Xcode asks for the real team when
+          # the unsigned project is opened.
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID || 'XXXXXXXXXX' }}
+        run: tools/ci/stamp_version.sh "${{ needs.guard.outputs.version }}"
+
+      # StoreKit 2 GDExtension (godot-store-kit, pinned). Not vendored: its
+      # macOS frameworks use symlinks a Windows checkout cannot hold, and the
+      # Windows editor / Android export must never meet an iOS-only
+      # extension. Only this job puts it where Godot will register it.
+      - name: Install the StoreKit extension
+        env:
+          STOREKIT_TAG: v1.5.0
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/sk.zip "https://github.com/atlasapplications/godot-store-kit/releases/download/$STOREKIT_TAG/godot-store-kit-v1.5.zip"
+          rm -rf /tmp/sk addons/godot_store_kit
+          unzip -q -o /tmp/sk.zip -d /tmp/sk -x '__MACOSX/*'
+          cp -R /tmp/sk/addons/godot_store_kit addons/godot_store_kit
+          rm -rf addons/godot_store_kit/bindings  # C# helpers; this project is GDScript
+          ls -la addons/godot_store_kit addons/godot_store_kit/bin/ios
+
+      # Game Center, for cloud save (GKSavedGame). Unlike the StoreKit one this
+      # is not vendored: its xcframeworks are large and only this job ever needs
+      # them, so the pinned release is fetched here instead. GameCenter needs
+      # the shared SwiftGodot runtime beside it.
+      - name: Install the Game Center extension
+        env:
+          GAP_BUILD: bfade13ff8b6027ede438bac637b5bf93057d404
+        run: |
+          set -euo pipefail
+          url="https://github.com/migueldeicaza/GodotApplePlugins/releases/download"
+          curl -fsSL -o /tmp/gap.zip             "$url/build-$GAP_BUILD/GodotApplePlugins-addons-$GAP_BUILD.zip"
+          unzip -q -o /tmp/gap.zip -d /tmp/gap
+          for a in GodotApplePluginsGameCenter GodotApplePluginsRuntime; do
+            src=$(find /tmp/gap -type d -name "$a" -maxdepth 3 | head -1)
+            [ -n "$src" ] || { echo "::error::$a missing from the release zip"; exit 1; }
+            rm -rf "addons/$a"
+            cp -R "$src" "addons/$a"
+          done
+          ls -la addons/GodotApplePluginsGameCenter
+
+      - name: Import assets
+        run: ~/godot/Godot.app/Contents/MacOS/Godot --headless --path . --import || true
+
+      - name: Verify the StoreKit extension registered
+        run: grep -q 'godot_store_kit.gdextension' .godot/extension_list.cfg && cat .godot/extension_list.cfg
+
+      - name: Verify the Game Center extension registered
+        run: grep -q 'godot_apple_plugins_game_center.gdextension' .godot/extension_list.cfg
+
+      - name: Export iOS build
+        run: |
+          mkdir -p build/ios out
+          GODOT=~/godot/Godot.app/Contents/MacOS/Godot
+          if [ "${{ needs.guard.outputs.has_ios }}" = "true" ]; then
+            # Godot writes the Xcode project, archives it and exports the
+            # .ipa itself using the team id + profile UUID stamped above.
+            $GODOT --headless --path . --export-release "iOS" build/ios/${APP_NAME}.ipa
+            size=$(stat -f%z build/ios/${APP_NAME}.ipa 2>/dev/null || echo 0)
+            if [ "$size" -lt 10000000 ]; then
+              echo "::error::IPA missing or too small (${size} bytes) - export failed"
+              exit 1
+            fi
+            echo "Signed IPA OK: ${size} bytes"
+            cp build/ios/${APP_NAME}.ipa out/
+          else
+            echo "No Apple secrets yet - exporting the UNSIGNED Xcode project"
+            sed -i '' 's|^application/export_project_only=false$|application/export_project_only=true|' export_presets.cfg
+            grep -q '^application/export_project_only=true$' export_presets.cfg
+            $GODOT --headless --path . --export-release "iOS" build/ios/${APP_NAME}.ipa || true
+            if [ -z "$(ls -A build/ios 2>/dev/null)" ]; then
+              echo "::error::iOS project export produced nothing"
+              exit 1
+            fi
+            (cd build/ios && zip -q -r ../../out/${APP_NAME}-${{ needs.guard.outputs.version }}-ios-xcode.zip .)
+            echo "Unsigned Xcode project packaged"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-${{ needs.guard.outputs.version }}-ios
+          path: out/*
+          retention-days: ${{ startsWith(github.ref, 'refs/tags/') && 90 || 7 }}
+
+      - name: Upload to App Store Connect (TestFlight)
+        # Uploading needs the ASC key specifically. A signed IPA is still
+        # produced and kept as an artifact when only the signing credentials
+        # exist; it just isn't handed to TestFlight.
+        if: needs.guard.outputs.has_ios == 'true' && needs.guard.outputs.has_ios_upload == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_API_PRIVATE_KEY: ${{ secrets.ASC_API_PRIVATE_KEY }}
+        run: |
+          umask 077
+          mkdir -p ~/.appstoreconnect/private_keys
+          printf '%s' "$ASC_API_PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+          xcrun altool --upload-app -t ios -f build/ios/${APP_NAME}.ipa \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+
+      # Signing material must not outlive the job, including when it fails.
+      - name: Remove temporary signing material
+        if: always()
+        run: |
+          rm -f ~/.appstoreconnect/private_keys/*.p8 || true
+          rm -f "$RUNNER_TEMP/profile.mobileprovision" "$RUNNER_TEMP/profile.plist" || true
+          if [ -n "${IOS_PROFILE_UUID:-}" ]; then
+            rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/${IOS_PROFILE_UUID}.mobileprovision" || true
+          fi
+          security delete-keychain signing_temp.keychain 2>/dev/null || true
+
+  # Publishes the packages: a real GitHub Release for version tags, a
+  # rolling "latest-main" pre-release refreshed on every merge to main.
+  github-release:
+    if: always() && github.event_name == 'push' && needs.android-play.result == 'success'
+    needs: [guard, android-play, ios-appstore]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - name: List packages
+        run: ls -la
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest-main' }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && format('BeamShift v{0}', needs.guard.outputs.version) || format('Latest main build (v{0} base)', needs.guard.outputs.version) }}
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          files: |
+            BeamShift.aab
+            BeamShift.apk
+            BeamShift.ipa
+            BeamShift-*-ios-xcode.zip
+          fail_on_unmatched_files: false
+          generate_release_notes: ${{ startsWith(github.ref, 'refs/tags/') }}

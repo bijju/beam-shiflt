@@ -11,6 +11,7 @@ config_version=5
 [application]
 
 config/name="BeamShift"
+config/version="1.0.0"
 run/main_scene="res://scenes/ui/main_menu.tscn"
 config/quit_on_go_back=false
 config/features=PackedStringArray("4.7", "Mobile")
@@ -28,7 +29,7 @@ GameManager="*res://scripts/managers/game_manager.gd"
 AudioManager="*res://scripts/managers/audio_manager.gd"
 AdManager="*res://scripts/managers/ad_manager.gd"
 StoreManager="*res://scripts/managers/store_manager.gd"
-GodotPlayGameServices="*res://addons/GodotPlayGameServices/scripts/autoloads/godot_play_game_services.gd"
+GodotPlayGameServices="*uid://bsds5unhjravp"
 CloudSave="*res://scripts/managers/cloud_save.gd"
 
 [display]

@@ -63,6 +63,10 @@ func has_interstitial() -> bool:
 	return _it
 
 
+func discard_interstitial() -> void:
+	_it = false
+
+
 func show_interstitial() -> bool:
 	if not _it:
 		return false
