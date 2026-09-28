@@ -6752,3 +6752,41 @@ direct grep of `project.godot` before proceeding to export).
 - Sensitive logging: SAFE - the driver never touched passwords/tokens; it only toggled
   `visible`/`text` on real UI nodes and forced `_set_create_mode()` (an existing scene
   method). Both temporary driver files were deleted after the pass.
+
+## Internal Testing AAB versionCode 10001 - build/signing/packaging verification (2026-09-28)
+
+**AUTOMATED, real-artifact verification** (not RENDERED, not MANUAL): built
+`builds/android/beamshift.aab` via `godot --headless --export-release "Android"` and
+verified the actual output file, not just "export succeeded":
+- Keystore cert (`keytool -list -v` on the keystore file, password never printed) and the
+  AAB's own signing cert (extracted from `META-INF/*.RSA` inside the built .aab via
+  `unzip` + `keytool -printcert`) both independently gave SHA-1
+  `A4:82:77:62:47:1D:00:AE:09:CA:AA:FB:34:20:5B:24:1B:1E:60:5A` / SHA-256
+  `1A:BC:7D:9A:BA:75:FC:3C:89:FB:5E:EC:95:8B:46:DC:0E:CB:F9:8E:D5:85:DB:6E:97:31:D7:A5:D1:0C:5D:33` -
+  match confirmed, not assumed. `jarsigner -verify -verbose -certs` on the .aab: "jar
+  verified."
+- `base/manifest/AndroidManifest.xml` extracted from the .aab and grepped directly (protobuf
+  XML, not standard binary AXML - `aapt2 dump xmltree` doesn't apply to a bare .aab manifest;
+  `bundletool` was present but missing a runtime dependency (guava) in this environment, so
+  plain `unzip` + `grep -a -o` on the extracted file was used instead) for package/version/
+  plugin strings: `com.foursagez.beamshift`, `1.0.0`, `godotengine.plugin.v2.GodotGoogleSignIn`
+  confirmed present - a REAL, reproducible technique worth reusing (bundletool needs its
+  dependencies on the classpath, or its "all"/shaded jar, to run standalone).
+- Classes.dex contents (`base/dex/classes*.dex` extracted, `grep -a -c -o` for
+  `androidx/credentials`) confirmed Credential Manager code is actually compiled in, not
+  just referenced in a manifest.
+- Full zip listing (`unzip -l`) checked against every known dev/QA harness filename and
+  `_qa_tmp/**`/`scripts/tools/**` - clean, matching `export_presets.cfg`'s `exclude_filter`.
+- **A real regression was caught by this technique, not assumed away**: the first build
+  attempt (before the `GodotGoogleSignIn` release-`.aar` fix) produced a successful-looking
+  export with zero errors in the Godot log, and only the manifest-string check revealed the
+  plugin-v2 entry was completely absent - "export succeeded" was not sufficient evidence the
+  AAB was correct. See `STORE_RELEASE.md` section 16.
+- **A stale project claim was re-tested and found inaccurate**: `godot_play_game_services/
+  game_id=""` was long documented as build-blocking (AAPT `string/game_services_project_id
+  not found`). Two real exports in this pass, with the game id empty both times, completed
+  successfully with only a non-fatal printed warning. Do not repeat the old claim without
+  re-verifying against the current Godot/AGP/plugin versions.
+- Not verified (needs Play Console / a real device): the Play-App-Signing-re-signed variant
+  of this AAB, Play Games Saved Games / native fallback at runtime with an empty Game ID,
+  AdMob (deliberately off in this build, no local production ad-id file).

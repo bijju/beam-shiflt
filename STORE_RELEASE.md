@@ -1118,3 +1118,121 @@ existing-account-linking test end-to-end with a real matching Google account, an
 real Android-device IME QA (keyboard open/close on each field, in both Sign In and
 Create Account modes, at real device resolutions) - neither can be completed without a
 human/real device per CLAUDE.md 12a/12d.
+
+## 16. Internal Testing AAB versionCode 10001 (2026-09-28) - BUILT, SIGNED, VERIFIED
+
+**Owner-supplied state going in**: Play Console Internal Testing already has versionCode
+10000/1.0.0 live. The upload keystore was recovered to
+`D:/4Sagez/GodotGames/Keys/BeamShift/beamshift-signing/beamshift-upload.keystore`
+(alias `beamshift`) and already configured in `.godot/export_credentials.cfg` (gitignored,
+local-only - never in source control). Play App Signing SHA-1 already registered in
+Firebase alongside the debug SHA-1 (owner-confirmed; not independently re-checked in the
+Firebase console by this pass - no browser access). Google Sign-In already real-device
+verified end-to-end via the debug APK (section 14 above).
+
+**Keystore verification**: `keytool -list -v` on the keystore file itself, in this session,
+without ever printing the password, gave alias `beamshift`, SHA-1
+`A4:82:77:62:47:1D:00:AE:09:CA:AA:FB:34:20:5B:24:1B:1E:60:5A` - **exact match** to the
+owner-supplied Play Console upload-key SHA-1.
+
+**A real bug found and fixed before building**: `addons/GodotGoogleSignIn/export_plugin.gd`'s
+`_get_android_libraries()` returned an **empty array for a non-debug (release) export** -
+only `bin/debug/GodotGoogleSignIn-debug.aar` existed (see section 13's own doc comment,
+written when the plugin was first added: "release variant is a follow-up step before any
+store-facing build uses this plugin" - that follow-up had never happened). Confirmed by
+building an AAB with the unmodified plugin and inspecting its `base/manifest/AndroidManifest.xml`
+directly (extracted from the .aab and grepped): no `org.godotengine.plugin.v2.GodotGoogleSignIn`
+entry anywhere, alongside AdMob/GodotGooglePlayBilling/GodotPlayGameServices's own entries
+which WERE present. **This means every release/Internal-Testing build up to this pass would
+have shipped with the Google Sign-In button non-functional** (`Engine.has_singleton(...)`
+false), even though the debug APK worked. Fixed by building the real release `.aar` from the
+existing plugin source (`tools/android_plugin_src/google_signin/`, unchanged) via
+`gradlew.bat :google_signin:assembleRelease` (using the section 14 JDK 17 workflow: a
+temporary `include ':google_signin'` line added to the gitignored
+`android/build/settings.gradle`, reverted immediately after the build), copying the result to
+`addons/GodotGoogleSignIn/bin/release/GodotGoogleSignIn-release.aar`, and updating
+`_get_android_libraries()`'s release branch to reference it - mirroring
+`GodotPlayGameServices/export_plugin.gd`'s existing if/else pattern exactly. No Kotlin
+source, `plugin.cfg`, or Gradle dependency list was changed. Re-exported the AAB and
+re-inspected its manifest: `org.godotengine.plugin.v2.GodotGoogleSignIn ->
+com.foursagez.beamshift.googlesignin.GoogleSignInPlugin` now present; `androidx/credentials`
+classes confirmed present in `classes.dex`/`classes2.dex` (grepped directly from the
+extracted dex bytes, since `dexdump` was not available in this environment).
+
+**Play Games `game_services_project_id` - re-verified against the CURRENT project, not
+assumed from old docs**: `godot_play_game_services/game_id` is still `""` on both Android
+presets. `GodotPlayGameServices/export_plugin.gd`'s `_export_begin()` prints
+`"[GodotPlayGameServices] Export [Game id] is empty."` to the export log when this happens
+but does **not** abort the export - it just skips writing `strings.xml`'s
+`game_services_project_id` value. **A real export was run twice in this pass with the game
+id empty and both succeeded** (AAB produced, correctly signed, correct package/version).
+This means CLAUDE.md's/this file's own earlier claim that an empty Game ID blocks Android
+export (AAPT `string/game_services_project_id not found`) **does not reproduce with this
+project's current Godot 4.7.1 / AGP 8.6.1 / plugin versions** - either the underlying AAPT2
+behavior changed, or the original observation was against a different condition. This is
+now corrected here rather than repeated on trust; CLAUDE.md's `godot_play_game_services`
+guidance should be treated as no longer accurate for a build-blocking claim (a genuine,
+separate runtime risk remains: the "CONTINUE WITH PLAY GAMES" native fallback button and
+PGS Saved Games almost certainly won't work correctly at runtime without a real Game ID -
+untested this pass, unrelated to whether the AAB builds).
+
+**AdMob in this exact AAB**: no `config/ad_ids.local.json` exists locally, so
+`AdConfig.production_ids()` returns empty, `config_problem()` reports a missing id, and
+`ads_active()` is **false** - by design (CLAUDE.md D114/STORE_RELEASE.md section 6): ads
+ship OFF and the rewarded hint stays free rather than requesting ads with sample/empty unit
+ids. This is expected, safe behavior for this build, not a defect - production ad ids still
+need to come from the CI stamp script (or a locally-placed `config/ad_ids.local.json`)
+before a real store-facing build.
+
+**Verified facts about the final AAB** (`builds/android/beamshift.aab`, 123,750,289 bytes /
+~118 MiB):
+- `com.foursagez.beamshift`, versionCode 10001, versionName "1.0.0" (read directly from the
+  extracted `base/manifest/AndroidManifest.xml`).
+- Signing cert extracted directly from the AAB's own `META-INF/*.RSA` (not just the keystore
+  file): SHA-1 `A4:82:77:62:47:1D:00:AE:09:CA:AA:FB:34:20:5B:24:1B:1E:60:5A`, SHA-256
+  `1A:BC:7D:9A:BA:75:FC:3C:89:FB:5E:EC:95:8B:46:DC:0E:CB:F9:8E:D5:85:DB:6E:97:31:D7:A5:D1:0C:5D:33`
+  - identical to the keystore's own certificate. `jarsigner -verify` on the .aab: "jar
+  verified."
+- `godotengine.plugin.v2.GodotGoogleSignIn` + `GoogleSignInPlugin` class + `androidx/credentials`
+  classes all present (see above).
+- `firebase_auth.gdc`, `firebase_firestore_rest.gdc`, `firebase_cloud_backend.gdc`,
+  `firebase_config.gdc`, `cloud_save.gdc`, `account_screen.gdc`/`.scn`, `internet_manager.gdc`,
+  `studio_splash.gdc`/`.scn`, `ad_manager.gdc`/`ad_config.gdc` all present in the packaged
+  assets.
+- `config/firebase_config.local.json` (web API key only, client-visible by design) IS bundled;
+  `config/ad_ids.local.json` is NOT (doesn't exist locally - ads off, see above).
+- Zip listing checked for `_qa_tmp/**`, `scripts/tools/**`, and every known dev-harness
+  filename (`firebase_auth_test`, `firebase_firestore_test`, `cloud_save_test`, `v3_prototype_audit`,
+  `v5_sample`, `selector_verify`, `difficulty_inspect`) - **none present**, matching
+  `export_presets.cfg`'s `exclude_filter`.
+- Source `BuildConfig.BUILD_MODE` confirmed `MODE_PRODUCTION` (QA tools off).
+
+**Files changed this pass**: `addons/GodotGoogleSignIn/export_plugin.gd` (release .aar wiring,
+doc comment updated) and a new, untracked `addons/GodotGoogleSignIn/bin/release/
+GodotGoogleSignIn-release.aar`. `export_presets.cfg`'s `version/code=10001` on the release
+Android preset was **already present before this pass started** (pre-existing uncommitted
+change from an earlier session, not made by this one). `android/build/settings.gradle`'s
+temporary module include was reverted in the working tree (that file is gitignored either
+way). Gradle build intermediates under `tools/android_plugin_src/google_signin/build/**`
+were left on disk (untracked; **not currently covered by `.gitignore`** - worth adding a
+`build/` ignore rule under `tools/android_plugin_src/` in a future pass so `git status`
+doesn't show Gradle cache noise).
+
+**No commit, push, merge, or branch switch was performed.** The AAB was **not** uploaded
+to Google Play. `addons/GodotGoogleSignIn/bin/release/GodotGoogleSignIn-release.aar` is
+currently untracked - it needs to be committed alongside the debug `.aar` (which IS already
+tracked) for a future session's export to reproduce this build without rebuilding the
+plugin from source again.
+
+**Not verified by this pass** (same honest gaps as every prior section): the AAB has not
+been installed on a real device (it's a release/signed build tied to the upload key, so it
+can only be meaningfully tested after upload to Play Internal Testing, per Android's own
+signing model); Play Games Saved Games / the native fallback button at runtime with an
+empty Game ID; real Play App Signing SHA-1 re-confirmation in the Firebase console (owner-
+reported only); AdMob production ads (deliberately off in this build).
+
+**Next step**: owner uploads `builds/android/beamshift.aab` to Play Console Internal
+Testing by hand, confirms the Play App Signing re-signed APK still carries a Google-Sign-In-
+working build, and runs the device checklist in section 11/15 above against the newly
+installed Internal Testing build (not a sideloaded debug APK, so Play-Store-only paths like
+Play Billing/Play App Signing behavior can finally be exercised for real).

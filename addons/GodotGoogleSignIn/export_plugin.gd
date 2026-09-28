@@ -6,10 +6,11 @@ extends EditorPlugin
 ## Engine.get_singleton("GodotGoogleSignIn") (see scripts/ui/account_screen.gd), which
 ## needs no persistent wrapper node of its own.
 ##
-## Only a DEBUG .aar exists as of this plugin's introduction (Phase 4A resume pass,
-## 2026-09-28) - _get_android_libraries() returns nothing for a release export rather
-## than referencing a release .aar that doesn't exist yet. Building the release variant
-## is a follow-up step before any store-facing build uses this plugin.
+## The release .aar (addons/GodotGoogleSignIn/bin/release/GodotGoogleSignIn-release.aar)
+## was built from tools/android_plugin_src/google_signin/ (versionCode 10001 pass,
+## 2026-09-28) via `gradlew.bat :google_signin:assembleRelease`, after the initial
+## debug-only version of this file shipped a release AAB with no GodotGoogleSignIn
+## plugin-v2 registration at all (confirmed by inspecting the AAB's own manifest).
 
 var _export_plugin: AndroidExportPlugin
 
@@ -35,8 +36,7 @@ class AndroidExportPlugin extends EditorExportPlugin:
 	func _get_android_libraries(platform, debug):
 		if debug:
 			return PackedStringArray([_plugin_name + "/bin/debug/" + _plugin_name + "-debug.aar"])
-		# No release .aar has been built yet - see this file's own doc comment.
-		return PackedStringArray()
+		return PackedStringArray([_plugin_name + "/bin/release/" + _plugin_name + "-release.aar"])
 
 	func _get_android_dependencies(platform: EditorExportPlatform, debug: bool) -> PackedStringArray:
 		if not _supports_platform(platform):
