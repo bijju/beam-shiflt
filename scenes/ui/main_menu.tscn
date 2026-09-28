@@ -6,6 +6,8 @@
 [ext_resource type="Texture2D" path="res://assets/ui/branding/bs_logo_main_menu_portrait.png" id="4"]
 
 [ext_resource type="Script" path="res://scripts/ui/menu_particles.gd" id="5"]
+[ext_resource type="PackedScene" path="res://scenes/ui/menu_gameplay_preview.tscn" id="6"]
+[ext_resource type="Texture2D" path="res://assets/ui/icons/bs_ui_icon_settings.png" id="7"]
 
 [sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_add"]
 blend_mode = 1
@@ -49,6 +51,10 @@ scale_min = 0.4
 scale_max = 1.0
 color_ramp = SubResource("GradientTexture1D_life")
 color_initial_ramp = SubResource("GradientTexture1D_hue")
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_logo_crop"]
+atlas = ExtResource("4")
+region = Rect2(0, 205, 1215, 810)
 
 [sub_resource type="Gradient" id="Gradient_scrim"]
 offsets = PackedFloat32Array(0, 0.42, 0.62, 1)
@@ -102,21 +108,6 @@ preprocess = 6.0
 process_material = SubResource("ParticleProcessMaterial_mote")
 script = ExtResource("5")
 
-[node name="Logo" type="TextureRect" parent="."]
-mouse_filter = 2
-layout_mode = 1
-anchor_left = 0.08
-anchor_top = 1.0
-anchor_right = 0.92
-anchor_bottom = 1.0
-offset_top = -1693.0
-offset_bottom = -733.0
-grow_horizontal = 2
-grow_vertical = 2
-texture = ExtResource("4")
-expand_mode = 1
-stretch_mode = 5
-
 [node name="SafeMargin" type="MarginContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
@@ -128,15 +119,29 @@ script = ExtResource("2")
 
 [node name="Root" type="VBoxContainer" parent="SafeMargin"]
 layout_mode = 2
+theme_override_constants/separation = 20
 
-[node name="Spacer" type="Control" parent="SafeMargin/Root"]
+[node name="Logo" type="TextureRect" parent="SafeMargin/Root"]
+unique_name_in_owner = true
 layout_mode = 2
-size_flags_vertical = 3
+size_flags_horizontal = 4
+mouse_filter = 2
+custom_minimum_size = Vector2(300, 200)
+texture = SubResource("AtlasTexture_logo_crop")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="PreviewFrame" parent="SafeMargin/Root" instance=ExtResource("6")]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+custom_minimum_size = Vector2(300, 360)
 
 [node name="ButtonGroup" type="VBoxContainer" parent="SafeMargin/Root"]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 0
-theme_override_constants/separation = 22
+theme_override_constants/separation = 18
 alignment = 1
 
 [node name="ContinueButton" type="Button" parent="SafeMargin/Root/ButtonGroup"]
@@ -163,14 +168,6 @@ custom_minimum_size = Vector2(560, 132)
 theme_override_font_sizes/font_size = 26
 text = "TUTORIALS"
 
-[node name="SettingsButton" type="Button" parent="SafeMargin/Root/ButtonGroup"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 4
-custom_minimum_size = Vector2(560, 132)
-theme_override_font_sizes/font_size = 26
-text = "SETTINGS"
-
 [node name="QuitSpacer" type="Control" parent="SafeMargin/Root/ButtonGroup"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 12)
@@ -196,3 +193,24 @@ size_flags_horizontal = 4
 custom_minimum_size = Vector2(320, 72)
 theme_override_font_sizes/font_size = 18
 text = "Level Select (QA)"
+
+[node name="CornerLayer" type="Control" parent="SafeMargin"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="SettingsButton" type="TextureButton" parent="SafeMargin/CornerLayer"]
+unique_name_in_owner = true
+layout_mode = 1
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 0.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -140.0
+offset_right = 128.0
+offset_bottom = -28.0
+grow_horizontal = 1
+grow_vertical = 0
+texture_normal = ExtResource("7")
+ignore_texture_size = true
+stretch_mode = 5

@@ -1,0 +1,53 @@
+// GodotGoogleSignIn plugin module.
+//
+// Versions matched against this project's own Godot Android build config
+// (android/build/config.gradle, read directly during the Phase 4A resume pass,
+// 2026-09-28): androidGradlePlugin 8.6.1, compileSdk/targetSdk 36, minSdk 24 (project
+// minSdk - a library may declare lower, but matching it avoids a merge warning),
+// kotlinVersion 2.1.21, Java 17. Plugin versions are declared explicitly here so this
+// module builds correctly whether included inside android/build/'s multi-project
+// Gradle build (see README.md "To finish this") or built standalone.
+//
+// androidx.credentials 1.5.0 is the latest STABLE release (1.7.0-alpha03 exists but is
+// pre-release - deliberately not used); googleid 1.0.1 is the latest confirmed-listed
+// release - both re-checked against live Maven listings this pass.
+
+plugins {
+    id 'com.android.library'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'com.foursagez.beamshift.googlesignin'
+    compileSdk 36
+
+    defaultConfig {
+        minSdk 24
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+dependencies {
+    // This project's own Godot engine AAR - the plugin compiles against the exact
+    // engine build BeamShift already exports with, matching how every other addon in
+    // this repo (GodotPlayGameServices, GodotGooglePlayBilling) resolves the Godot API.
+    compileOnly files("../../../android/build/libs/debug/godot-lib.template_debug.aar")
+
+    implementation 'androidx.credentials:credentials:1.5.0'
+    implementation 'androidx.credentials:credentials-play-services-auth:1.5.0'
+    implementation 'com.google.android.libraries.identity.googleid:googleid:1.0.1'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0'
+}

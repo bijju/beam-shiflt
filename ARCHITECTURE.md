@@ -36,6 +36,9 @@ scripts/managers/level_manager.gd   Autoload: level list + star formula
 scripts/managers/game_manager.gd    Autoload: scene navigation + selected level
 scripts/managers/audio_manager.gd   Autoload: centralized semantic SFX (AUDIO_SYSTEM.md)
 scripts/managers/ad_manager.gd      Autoload: AdMob rewarded Hint + interstitial over scripts/ads/ (ADS_MONETIZATION.md)
+scripts/managers/firebase_auth.gd   Autoload: Firebase Identity Toolkit REST auth (Firebase REST Auth Phase 1)
+scripts/firebase/firebase_config.gd Firebase project id + gitignored Web API key loader (RefCounted, class_name FirebaseConfig)
+scenes/ui/account_screen.tscn       Player-facing BeamShift Account screen (Firebase Account UI Phase 3), scripts/ui/account_screen.gd
 
 scripts/gameplay/grid_types.gd      Enums + reflect()/color helpers (RefCounted, class_name GridTypes)
 scripts/gameplay/laser_system.gd    Deterministic multi-beam simulation (RefCounted, class_name LaserSystem)
@@ -1746,3 +1749,293 @@ reference:
 ## Build mode and store config injection (D114)
 
 `BuildConfig.BUILD_MODE` (committed: `MODE_PRODUCTION`) drives `QA_TOOLS` and `AdConfig.USE_TEST_IDS`. Production ad ids: `AdConfig.production_ids()` reads the CI-written, gitignored `res://config/ad_ids.local.json`; `AdConfig.ads_active(platform)` is false when any id is missing (AdManager then loads nothing, hints stay free). `tools/ci/stamp_store_config.sh` (called from `release.yml` in both lanes) also stamps the AdMob export App ID (`project.godot [admob]`) and the Play Games Game ID (Android presets). See `STORE_RELEASE.md` 6b.
+
+## Firebase REST Auth (Phase 1)
+
+`FirebaseAuth` (`scripts/managers/firebase_auth.gd`) is the 10th autoload - authenticated
+session state must survive every scene change and will be consumed by the future Account
+screen, Settings, `CloudSave`, and the Firestore backend (Phase 2). It talks directly to
+Google's Firebase Identity Toolkit / Secure Token REST endpoints via plain `HTTPRequest`
+child nodes - no `google-services.json`, no native Firebase Android/iOS SDK, no
+`com.google.gms.google-services` Gradle plugin. `FirebaseConfig`
+(`scripts/firebase/firebase_config.gd`, `class_name FirebaseConfig`, `RefCounted`) is the
+one place the Firebase project id (`beamshift-game`) and Web API key live - the key is
+read from the gitignored `res://config/firebase_config.local.json` (`{"web_api_key": "..."}`
+), same convention as `AdConfig.production_ids()`/`config/ad_ids.local.json`; it is never
+hardcoded in source.
+
+Public surface: `create_account`/`sign_in`/`send_password_reset`/`refresh_token`/
+`sign_out`/`is_signed_in`/`has_refresh_token`/`get_uid`/`get_email`/`get_id_token`/
+`ensure_valid_token` (async - refreshes only if the cached token is within
+`TOKEN_REFRESH_MARGIN_SECONDS` of expiry, otherwise returns the cached token's validity
+immediately). Every network call first checks `InternetManager.is_online` and fails fast
+with an `"OFFLINE"` error code instead of waiting out its own timeout - no second,
+independent connectivity monitor was added (rule 13). Firebase's raw error `message` is
+normalized to its stable all-caps code (`EMAIL_EXISTS`, `INVALID_LOGIN_CREDENTIALS`, ...)
+and the raw JSON never reaches callers.
+
+Session persistence: `user://firebase_session.json` stores only `uid`/`email`/
+`refresh_token` - never the password, never the `id_token` (short-lived, kept in memory
+only). **Known limitation, documented not hidden**: Godot's `user://` storage here is
+plain app-sandboxed storage, not the Android Keystore or iOS Keychain; a stolen device
+image could read the refresh token. On startup, a stored session is treated as
+*optimistically* signed in (`auth_state_changed(true)` fires immediately from disk state)
+while a real token refresh happens in the background once `InternetManager.is_online`
+(or its `internet_restored` signal) says the network is up - this never blocks the studio
+splash or the internet gate. Only an explicit Firebase-confirmed dead-token response
+(`TOKEN_EXPIRED`/`USER_NOT_FOUND`/`USER_DISABLED`/`INVALID_REFRESH_TOKEN`) clears the
+session; a network/timeout failure leaves the refresh token untouched and retries on the
+next `internet_restored`. `sign_out()` is local-only (never a network call) and bumps a
+monotonic `_session_generation` counter so a slow in-flight request from before sign-out
+can never resurrect state afterward; `_create_in_progress`/`_sign_in_in_progress`/
+`_refresh_in_progress` (+`_refresh_waiters`) collapse duplicate/overlapping requests into
+one in-flight call each.
+
+Dev-only manual test harness: `scripts/tools/firebase_auth_test.gd`/`.tscn` (excluded from
+every export preset like the rest of `scripts/tools/**`) - run directly
+(`godot --headless --path . res://scripts/tools/firebase_auth_test.tscn -- action=... email=... password=...`)
+without touching `run/main_scene`, since passing a scene path to `godot --headless --path .`
+still loads the full project including autoloads. Never logs password/id_token/
+refresh_token contents.
+
+**Phase 1 explicitly does NOT touch**: Firestore (no documents/collections/rules), the
+Account UI, the existing Settings SIGN IN button, or `CloudSave`'s backend selection
+(`play_games_cloud_backend.gd`/`game_center_cloud_backend.gd` unchanged) - see
+`STORE_RELEASE.md` for the phased plan and current status.
+
+## Firebase REST Cloud Save (Phase 2A - isolated Firestore transport, LIVE VERIFIED)
+
+`FirebaseFirestoreREST` (`scripts/firebase/firebase_firestore_rest.gd`, `class_name
+FirebaseFirestoreREST`, plain `RefCounted` - not an autoload) is Cloud Firestore's REST
+transport, built the same way as `FirebaseAuth`: no native SDK, no `google-services.json`.
+It is constructed by whatever `Node` needs it (`FirebaseFirestoreREST.new(owner)`) and
+attaches its per-request `HTTPRequest` children to that owner, since a `RefCounted` cannot
+itself join the `SceneTree`. Today its only caller is the Phase 2A dev test harness; a
+future `CloudSave` Firestore backend is its next intended owner.
+
+Public surface: `get_document(path, on_done)` / `set_document(path, data, on_done)` (PATCH,
+full overwrite - fields absent from `data` are removed) / `update_document(path, data,
+on_done)` (PATCH + `updateMask.fieldPaths` - a true merge, every other existing field is
+left untouched) / `delete_document(path, on_done)` / `document_exists(path, on_done)` /
+`current_user_document_path(sub_path)` (builds `"users/<uid>/<sub_path>"`, UID always read
+from `FirebaseAuth.get_uid()`, never hardcoded). Every `on_done` callback receives
+`(ok: bool, data: Dictionary, error_code: String, http_code: int)` - `data` is a fully
+decoded plain Dictionary; Firestore's typed Value JSON wrapper
+(`{"stringValue":...}`/`{"mapValue":{"fields":...}}`/etc.) is produced/consumed only inside
+this file's private `_encode_value`/`_decode_value` and never leaks past it.
+
+Token/auth: every request calls `await FirebaseAuth.ensure_valid_token()` first (no
+duplicated refresh logic) and attaches `Authorization: Bearer <id_token>`; a signed-out
+caller fails fast locally with `NO_AUTH` before any network call. Offline calls fail fast
+with `OFFLINE` (checked before touching `FirebaseAuth` at all) - live-verified at ~0ms with
+the session left completely untouched. **Staleness protection**: `FirebaseAuth.
+get_session_generation()` (a new minimal public getter over Phase 1's already-existing
+private `_session_generation` counter - no new session-invalidation logic, just a read) is
+captured right after a valid token is obtained; if `FirebaseAuth.sign_out()` fires before
+the Firestore HTTP response returns, the generation mismatch is detected and the response
+is discarded as `STALE_SESSION` rather than ever reaching the caller's `on_done` - this
+mirrors the exact pattern `FirebaseAuth._do_refresh`'s own waiters already use for the same
+class of race.
+
+**A real, pre-existing Phase 1 bug was found and fixed while building this**:
+`FirebaseAuth.ensure_valid_token()`'s wait loop (`var done := false; ...; while not done:
+await get_tree().process_frame`) never actually terminated once a real network round-trip
+was required, because GDScript lambdas capture outer local variables **by value** - the
+`done = true` inside the refresh callback mutated a copy, never the loop's own variable.
+This was unexercised in Phase 1 because nothing had called `ensure_valid_token()` itself
+(the Phase 1 harness calls `refresh_token()` directly via its signal instead). Confirmed
+with a standalone two-line capture-semantics test before touching the real file, then fixed
+by moving both fields into the one shared `Dictionary` the function already used for its
+result (`{"ok": ..., "done": ...}` - Dictionaries are reference types, so a key mutation
+inside a lambda DOES propagate to every reference of that same Dictionary). See CLAUDE.md's
+Firebase REST Cloud Save rules for the "don't mutate a captured scalar inside a lambda"
+lesson going forward.
+
+**Live-verified against the real `beamshift-game` Firestore database** (rules:
+`users/{userId}/**` require `request.auth.uid == userId`, `(default)` database, `nam5`):
+write, read, round-trip match, merge-update (unrelated fields preserved, confirmed
+PATCH+`updateMask` not full overwrite), own-UID access allowed, a different UID's path
+denied `403 PERMISSION_DENIED`, a raw request with zero `Authorization` header also denied
+`403` (proves the server-side rule, independent of this wrapper's own client-side `NO_AUTH`
+guard), a locally signed-out attempt denied client-side with `NO_AUTH` (no network call),
+Firestore succeeding immediately after a forced token refresh with no manual re-check by
+the caller, a genuinely fresh process reading via the persisted refresh token alone
+(restart/session-restore), offline fail-fast with the session left intact, and a
+mid-flight sign-out correctly discarded via `STALE_SESSION`. The disposable test document
+(`users/<uid>/save/current`) was deleted afterward and its removal confirmed (`404
+NOT_FOUND` on a follow-up read).
+
+Dev-only manual test harness: `scripts/tools/firebase_firestore_test.gd`/`.tscn` (same
+export-exclusion convention as `scripts/tools/**`) - actions `status`/`write`/`read`/
+`update`/`read_other_uid`/`raw_unauth_read`/`token_refresh_read`/`offline_read`/
+`stale_test`/`delete`. Requires a `FirebaseAuth` session already signed in (via
+`firebase_auth_test.tscn action=sign_in` first); the persisted refresh token then restores
+automatically on every later run.
+
+**Phase 2A explicitly does NOT touch**: `SaveManager` (no `to_dict()`/`adopt_cloud_data()`
+calls), `CloudSave`'s backend table (`play_games_cloud_backend.gd`/
+`game_center_cloud_backend.gd` unchanged, Firestore not added as a backend option yet), the
+Account UI, or the Settings SIGN IN button. No real player save data has ever been sent to
+Firestore under this architecture - only the tiny disposable test payload above. Building
+the real `CloudSave` Firestore backend (Phase 2B) is a separate, explicit future request.
+
+## Firebase Cloud Save integration (Phase 2B - real CloudSave backend, LIVE VERIFIED)
+
+`scripts/cloud/firebase_cloud_backend.gd` is the real Firestore-backed `CloudSave` backend,
+built on top of Phase 2A's `FirebaseFirestoreREST` transport. It implements the identical
+contract `play_games_cloud_backend.gd`/`game_center_cloud_backend.gd` already established
+(see "Cloud save" in `STORE_RELEASE.md`): signals `sign_in_changed`/`profile_loaded`/
+`conflict_found`/`push_finished`, methods `is_available`/`service_name`/`sign_in`/`pull`/
+`push`/`resolve_conflict`, a `last_error` string - `CloudSave` cannot tell which backend it
+holds. Unlike the two native backends, `is_available()` is simply `FirebaseAuth.
+is_signed_in()` - deliberately never gated on `OS.get_name()`, since a BeamShift account is
+available on every platform a player can reach the (future) Account UI from.
+
+`pull()`/`push()`/`resolve_conflict()` delegate entirely to `FirebaseFirestoreREST.
+get_document()`/`set_document()` at `users/{uid}/save/current` - no token/refresh/HTTP/
+serialization logic is duplicated here. `push()` always does a full overwrite (`set_document`,
+not a merge) because `SaveManager.to_dict()` already hands over the complete canonical
+profile on every call. A `NOT_FOUND` pull result (no cloud document yet) is treated as "no
+cloud profile" - `profile_loaded` is never emitted, so `CloudSave`'s existing reconciliation
+simply leaves local data alone, exactly like a first-ever push case on a native backend.
+Firestore's single-authoritative-document model has no analog to Play Games/Game Center's
+own conflict detection - `conflict_found`/`resolve_conflict()` exist purely for contract
+symmetry (so `CloudSave`'s uniform `_backend.call(...)` surface never needs a backend-
+specific branch) and are structurally never triggered by this backend.
+
+**`CloudSave` itself (`scripts/managers/cloud_save.gd`) gained backend selection/switching**,
+the one real architectural change this phase made:
+- Two backend families are now loaded at `_ready()` - `_load_native_backend()` (unchanged
+  logic, just renamed/extracted from the old inline `_ready()` body) and
+  `_load_firebase_backend()` (new, unconditional - not gated on `OS.get_name()`). Both
+  backend `Node`s are created once and kept alive for the entire session; a switch never
+  destroys/recreates one (that would re-trigger a native backend's own sign-in/snapshot-
+  load side effects, or would be wasteful for Firebase).
+- `_select_backend()` is the one place backend priority is decided: **a Firebase account
+  that is currently signed in always wins over the platform-native backend; native wins
+  over nothing.** It is idempotent and safe to call repeatedly with no state change (guards
+  every reconnect with `is_connected()` checks) - called from both
+  `_on_native_sign_in_changed()` (the native backend's own `sign_in_changed`, listened to
+  unconditionally for its whole lifetime so a background native auth completing while
+  Firebase is active is never missed) and directly from `FirebaseAuth.auth_state_changed`
+  (no intermediary - simpler and more direct than routing through the Firebase backend's
+  own mirrored `sign_in_changed` signal, which `CloudSave` does not need to listen to for
+  this purpose).
+- Only the three ACTIVE-only signals (`profile_loaded`/`conflict_found`/`push_finished`) are
+  (dis)connected on a switch; `is_signed_in`/`signed_in_changed` are recomputed from
+  whichever backend is now active (`true` unconditionally for Firebase - it is only ever
+  selected while signed in; the tracked `_native_authenticated` bool for native, so a not-
+  yet-authenticated native backend correctly still reports `is_signed_in == false` even
+  though `CloudSave.is_available()` is already `true`, exactly matching the pre-Phase-2B
+  behavior for players who never touch Firebase).
+- `_reconcile()`/`_cloud_wins()`/`_adopt()`/`_held_cloud`/`_in_level()`/`PUSH_COOLDOWN`/
+  `CHOOSER_THRESHOLD`/the `NOTIFICATION_APPLICATION_PAUSED` background flush are **all
+  completely unchanged** - they only ever read the plain Dictionary payload a backend handed
+  over, never which backend produced it, so Firebase reuses every one of them for free.
+
+**Live-verified (2026-09-28) against the real `beamshift-game` Firestore database, using the
+REAL local `SaveManager` profile** (140 completed campaign levels - not a disposable test
+blob, per this phase's own instruction that Phase 2A's throwaway document is no longer the
+right fixture): Firebase backend correctly selected the moment a Firebase session exists
+(fresh process, restart/session-restore path); the real profile pushed successfully and
+round-tripped byte-identically (representative fields: `version`, `campaign_highest_
+unlocked_level`, `campaign_completed_levels`, `campaign_best_stars_per_level`,
+`procedural_current_level`, `procedural_best_stars`, `play_time_seconds`, `saved_at` all
+confirmed; `entitlements` correctly absent, stripped by the pre-existing `_flush_push()`
+logic); measured payload ≈3.4 KB (comfortably under Firestore's 1 MiB document limit); an
+empty Firestore cloud (no document yet) left local data completely untouched; **a genuine
+fresh-install simulation** (the real local save backed up, then deleted, matching a brand-
+new device) correctly pulled the Firebase cloud copy and adopted it via the unchanged
+`_reconcile()`/`_cloud_wins()` rule, restoring all 140 completed levels; a locally offline
+attempt failed fast (`OFFLINE`, no hang) while the local file save itself still succeeded
+and the session stayed intact; Firebase sign-out correctly deselected the Firebase backend
+(falling back to "no backend" on this desktop test machine, which has no native platform
+backend to fall back to - the native-fallback path itself is code-reviewed, not live-
+exercised, and needs Android/iOS device confirmation) without touching local or cloud data;
+20 consecutive in-process calls to `_select_backend()` with no actual state change never
+grew a signal connection past 1, confirming no duplicate-connection/duplicate-write risk
+across repeated selection. One test-data quirk worth recording: the real local save
+predates `play_time_seconds` tracking (it was `0.0`/`saved_at` `""`), which made an early
+fresh-install attempt correctly NOT adopt the cloud copy (both sides tied at the sentinel
+default under the existing, unchanged rule) - not a bug, just a reminder that the tie-break
+needs a real signal (play time or a timestamp) to have something to compare, exactly as
+designed. Dev harness: `scripts/tools/cloud_save_test.gd`/`.tscn`.
+
+**Phase 2B explicitly does NOT touch**: the Account UI, the existing Settings SIGN IN button
+(still targets the native backend only - `firebase_cloud_backend.gd.sign_in()` is a
+deliberate no-op, since Firebase sign-in has no UI entry point yet), or Firestore's rules
+(the same Phase 2A UID-scoped rules apply unchanged - every access this phase made was
+still scoped to `users/{authenticated_uid}/save/current`, never a cross-user path). Building
+the Account UI and wiring Settings SIGN IN to Firebase is Phase 3, a separate future
+request.
+
+## Firebase Account UI (Phase 3 - player-facing screen, LIVE VERIFIED)
+
+`scenes/ui/account_screen.gd`/`.tscn` closes the gap Phase 2B left open: a real player-
+facing screen for the BeamShift account, and Settings' `CloudSignInButton` now opens it
+(`GameManager.go_to_account()`) instead of calling `CloudSave.sign_in()` directly.
+`_cloud_sign_in.text` reads "ACCOUNT"/"SIGN IN" from `FirebaseAuth.is_signed_in()`.
+
+The screen is one scene with two mutually-exclusive VBox views (`%SignedOutView`/
+`%SignedInView`) toggled by `_refresh_view()`, itself driven by `FirebaseAuth.
+auth_state_changed`. Signed-out: email/password `LineEdit`s (`virtual_keyboard_type` set to
+`EMAIL_ADDRESS`/`PASSWORD` for correct mobile keyboards), a Confirm Password field shown
+only in create-account mode (`_set_create_mode()` toggles it plus the primary button's
+label/the mode-toggle link text - one panel, no second scene/popup), FORGOT PASSWORD, and
+a conditional "CONTINUE WITH <service>" button (visible only when `CloudSave.
+has_native_backend()` is true and Firebase isn't signed in - new minimal `CloudSave`
+getters, `has_native_backend()`/`native_service_name()`, added so the UI never reaches into
+`CloudSave`'s private `_native_backend`). Signed-in: email, a Cloud Save status line built
+from `CloudSave`'s own existing signals/getters (`is_signed_in`/`last_error()`/
+`last_synced_at`/`InternetManager.is_online` - no second cloud-state system), and SIGN OUT
+behind a Cancel/confirm dialog built in code, matching `main_menu.gd`'s existing New-Game/
+cloud-chooser popup pattern exactly (dim `ColorRect` + `CenterContainer` + `PanelContainer`).
+
+**Talks only to `FirebaseAuth`/`CloudSave`'s existing public surface** - no new HTTP call,
+no new token logic. The one deliberate exception: `CloudSave.sync_now()` is called once,
+immediately after `account_create_finished` succeeds (never after a plain `sign_in_
+finished`), so a brand-new account's guaranteed-empty cloud gets the existing local profile
+promptly instead of waiting for the next incidental `SaveManager.saved` signal - `_reconcile()`
+still makes every actual keep-or-adopt decision, completely unchanged.
+
+**Error translation**: `_friendly_error()` is the one place a FirebaseAuth error code (e.g.
+`INVALID_LOGIN_CREDENTIALS`, `EMAIL_EXISTS`, `WEAK_PASSWORD`, `OFFLINE`,
+`TOO_MANY_ATTEMPTS_TRY_LATER`) becomes player-facing text - never a raw code, JSON body,
+token, or the words Firebase/Firestore/UID/REST anywhere in this screen. Password fields are
+`secret = true` and are cleared after every attempt (success or failure) - never retained,
+never logged.
+
+**The existing cloud-chooser (`main_menu.gd`) needed no changes at all** - it was already
+backend-agnostic. Because it only runs at Main Menu build time and the Account screen is
+reached via Settings (not Main Menu), a `chooser_needed` that fires while the player is on
+the Account screen isn't lost: `CloudSave.pending_cloud`/`pending_local` stay set, and
+`has_pending_choice()` is re-checked the next time Main Menu rebuilds (Back from Account ->
+Settings -> Main Menu), exactly the same path a native-backend chooser already relied on
+before Firebase existed.
+
+**A real per-screen art mistake was caught here, not before shipping**: the first draft
+reused `bs_panel_settings_portrait.png` for the Account panel's frame. A RENDERED (real GPU
+frame, not headless) screenshot showed the texture bakes the word "SETTINGS" and a gear icon
+directly into the art - it is not a generic frame, it is the Settings screen's own title
+art. Fixed by giving `account_screen.tscn`'s panel a plain `StyleBoxFlat` in the same
+blue/cyan palette instead of any existing per-screen texture; no new image was generated,
+consistent with the project's standing "never generate art" rule.
+
+**LIVE VERIFIED (2026-09-28)** by driving the real scene's real `Button.pressed` signals
+against the actual `beamshift-game` project (not synthetic OS input - headless input
+dispatch is unreliable per rule 12a, and this test targets the auth/UI wiring, not tap
+dispatch): sign-out confirmation -> real `FirebaseAuth.sign_out()` -> UI correctly switches
+to the signed-out view; a deliberately wrong password -> `INVALID_LOGIN_CREDENTIALS` ->
+"Email or password is incorrect." shown, password field cleared; FORGOT PASSWORD -> a real
+password-reset email sent; a mismatched Confirm Password in create-account mode was rejected
+locally with the correct message and **zero** network calls made. RENDERED at
+720x1280/1080x1920/1080x2400 in both sign-in and create-account modes: no clipping, no
+overlap, matches the shared UI language. **NOT yet verified**: an actual Android device
+(keyboard behavior, restart/session-persistence, the 1-hour conflict chooser, mid-level-hold
+interaction, the native-fallback button against a real Play Games session) - see
+`STORE_RELEASE.md` section 11 for the manual checklist.
+
+**Phase 3 explicitly does NOT touch**: Firestore rules/collections (still only
+`users/{uid}/save/current`), the native backends' own sign-in implementations, or
+`_reconcile()`/`_cloud_wins()`'s conflict policy. No AAB was built and no production
+signing/rollout flag was touched.

@@ -122,12 +122,16 @@ func is_showing() -> bool:
 
 
 func load_rewarded() -> void:
+	if not InternetManager.is_online:
+		return
 	if _backend != null and _sdk_ready and not _rewarded_ready:
 		_backend.load_rewarded()
 
 
 func load_interstitial() -> void:
 	if forced_ads_removed():
+		return
+	if not InternetManager.is_online:
 		return
 	if _backend != null and _sdk_ready and not _interstitial_ready:
 		_backend.load_interstitial()

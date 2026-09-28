@@ -1,9 +1,60 @@
 extends Control
 
+## Main Menu Mobile Layout Correction (2026-09-28, real-device follow-up to the
+## Main Menu Redesign pass): the logo/preview/button stack is sized here, in
+## code, instead of fixed .tscn pixel values, so it adapts to the real safe
+## area on any portrait aspect ratio instead of the single phone this pass
+## was tuned against. See _layout_hero_elements() below.
+##
+## bs_logo_main_menu_portrait.png is 1215x1295 but the painted wordmark only
+## occupies roughly x:6-1201 / y:211-1007 of that canvas (measured via an
+## alpha-channel bounding-box scan) - the rest is baked-in transparent
+## padding. Scaling the FULL texture to fit a box (the pre-existing
+## behavior) scales that padding too, which is why the logo rendered as a
+## small glyph inside a much bigger empty frame on a real device. LOGO_CROP
+## (SafeMargin/Root/Logo's AtlasTexture region in main_menu.tscn) crops to
+## that painted region - reusing the same source asset, never a new logo -
+## so the aspect ratio this script sizes against matches what's actually
+## visible.
+const LOGO_CROP_SIZE := Vector2(1215.0, 810.0)
+const LOGO_ASPECT := LOGO_CROP_SIZE.x / LOGO_CROP_SIZE.y
+
+## Level 3 ("Signal Path", the preview's fixed level - see
+## menu_gameplay_preview.gd) is a 5-wide/6-tall board. PreviewViewport's own
+## `size` (menu_gameplay_preview.tscn) is set to the same 5:6 ratio so
+## GridManager's layout fills nearly the whole viewport instead of
+## letterboxing a non-square board inside a square one - this constant is
+## the outer frame's matching target ratio. Keep both in sync if
+## PREVIEW_LEVEL_PATH ever changes.
+const PREVIEW_BOARD_ASPECT := 5.0 / 6.0
+
+## Soft target fractions of the safe-area width (see CLAUDE.md's Responsive
+## rules / UIConstants.BASELINE_MARGIN) - the logo is a hard 70%, the
+## preview is a soft 84% that yields to whatever vertical budget remains
+## after the logo and button stack, since Level 3's tall board means a
+## preview sized purely by width would frequently blow the screen height.
+const LOGO_WIDTH_FRACTION := 0.70
+const PREVIEW_WIDTH_FRACTION_TARGET := 0.84
+const PREVIEW_WIDTH_FRACTION_MIN := 0.55
+
+## Matches Root's own theme_override_constants/separation in main_menu.tscn
+## (the gap the removed flex Spacer used to paper over) and a small reserve
+## for the breathing room below ButtonGroup, above the corner Settings icon.
+const HERO_GAP := 20.0
+const BOTTOM_BREATHING := 28.0
+
+@onready var _logo: TextureRect = %Logo
+@onready var _preview_frame: Control = %PreviewFrame
+@onready var _button_group: VBoxContainer = %ButtonGroup
 @onready var _play_button: Button = %PlayButton
 @onready var _continue_button: Button = %ContinueButton
 @onready var _tutorial_button: Button = %TutorialButton
-@onready var _settings_button: Button = %SettingsButton
+## Main Menu Redesign pass (2026-09-28): a compact icon button
+## (bs_ui_icon_settings.png), not a full-width text Button - see
+## scenes/ui/main_menu.tscn's CornerLayer/SettingsButton. Typed as
+## BaseButton (the common ancestor of Button/TextureButton) so this
+## reference works regardless of which control type the scene uses.
+@onready var _settings_button: BaseButton = %SettingsButton
 @onready var _quit_button: Button = %QuitButton
 @onready var _qa_spacer: Control = %QASpacer
 ## QA/dev-only - see DECISIONS.md D85. Not part of the normal player-
@@ -95,6 +146,39 @@ func _ready() -> void:
 
 
 	_maybe_show_fusion_tutorial_nudge()
+
+	_layout_hero_elements()
+	get_viewport().size_changed.connect(_layout_hero_elements)
+
+
+## Sizes Logo and PreviewFrame (see the constants above) to fill the real
+## available vertical space between the safe-area edges and ButtonGroup's
+## own (visibility-dependent - QA buttons above may or may not exist)
+## measured height, instead of the fixed pixel sizes + expanding Spacer this
+## replaced. Logo gets a hard width target; PreviewFrame's width target
+## yields to whatever height remains so the tall Level 3 board never forces
+## the button group off-screen or reopens the old giant empty gap.
+func _layout_hero_elements() -> void:
+	var viewport_size := get_viewport().get_visible_rect().size
+	var safe_w := maxf(viewport_size.x - UIConstants.BASELINE_MARGIN * 2.0, 1.0)
+	var safe_h := maxf(viewport_size.y - UIConstants.BASELINE_MARGIN * 2.0, 1.0)
+
+	var logo_w := safe_w * LOGO_WIDTH_FRACTION
+	var logo_h := logo_w / LOGO_ASPECT
+	_logo.custom_minimum_size = Vector2(logo_w, logo_h)
+
+	var button_h := _button_group.get_combined_minimum_size().y
+	var available_for_preview_h := maxf(
+		safe_h - logo_h - button_h - HERO_GAP * 2.0 - BOTTOM_BREATHING,
+		safe_h * 0.20
+	)
+
+	var preview_w := safe_w * PREVIEW_WIDTH_FRACTION_TARGET
+	preview_w = minf(preview_w, available_for_preview_h * PREVIEW_BOARD_ASPECT)
+	preview_w = maxf(preview_w, safe_w * PREVIEW_WIDTH_FRACTION_MIN)
+	preview_w = minf(preview_w, safe_w)
+	var preview_h := preview_w / PREVIEW_BOARD_ASPECT
+	_preview_frame.custom_minimum_size = Vector2(preview_w, preview_h)
 
 
 ## Phase 4 (D102): a one-time, non-blocking "NEW TUTORIAL: FUSION" note the first time the Fusion tutorial pack is

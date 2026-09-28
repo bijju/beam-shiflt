@@ -12,7 +12,7 @@ config_version=5
 
 config/name="BeamShift"
 config/version="1.0.0"
-run/main_scene="res://scenes/ui/main_menu.tscn"
+run/main_scene="res://scenes/ui/studio_splash.tscn"
 config/quit_on_go_back=false
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://assets/branding/bs_app_icon.png"
@@ -31,6 +31,8 @@ AdManager="*res://scripts/managers/ad_manager.gd"
 StoreManager="*res://scripts/managers/store_manager.gd"
 GodotPlayGameServices="*uid://bsds5unhjravp"
 CloudSave="*res://scripts/managers/cloud_save.gd"
+InternetManager="*res://scripts/managers/internet_manager.gd"
+FirebaseAuth="*res://scripts/managers/firebase_auth.gd"
 
 [display]
 
@@ -42,7 +44,7 @@ window/handheld/orientation=1
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/admob/plugin.cfg", "res://addons/GodotGooglePlayBilling/plugin.cfg", "res://addons/GodotPlayGameServices/plugin.cfg")
+enabled=PackedStringArray("res://addons/admob/plugin.cfg", "res://addons/GodotGooglePlayBilling/plugin.cfg", "res://addons/GodotPlayGameServices/plugin.cfg", "res://addons/GodotGoogleSignIn/plugin.cfg")
 
 [gui]
 

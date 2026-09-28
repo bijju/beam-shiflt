@@ -1,0 +1,244 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/account_screen.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/ui/safe_area_margin.gd" id="2"]
+
+[sub_resource type="StyleBoxFlat" id="AccountPanelStyle"]
+; No dedicated Account-screen panel art exists (Pause/Settings/Level-Complete panel
+; textures each bake in their OWN title text, e.g. bs_panel_settings_portrait.png
+; literally paints the word "SETTINGS" - confirmed by a RENDERED screenshot during
+; this pass, see CLAUDE.md rule 10's "never bake in..." precedent for why reusing one
+; here would be wrong, not just a style choice). A plain StyleBoxFlat in the shared
+; blue/cyan sci-fi palette is used instead until dedicated Account panel art exists.
+bg_color = Color(0.058, 0.098, 0.157, 0.94)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.28, 0.72, 0.95, 0.85)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+shadow_color = Color(0.1, 0.55, 0.9, 0.35)
+shadow_size = 10
+
+[node name="AccountScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06, 0.07, 0.09, 1)
+
+[node name="SafeMargin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("2")
+
+[node name="KeyboardVBox" type="VBoxContainer" parent="SafeMargin"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="ScrollContainer" type="ScrollContainer" parent="SafeMargin/KeyboardVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="CenterContainer" type="CenterContainer" parent="SafeMargin/KeyboardVBox/ScrollContainer"]
+layout_mode = 2
+
+[node name="Panel" type="PanelContainer" parent="SafeMargin/KeyboardVBox/ScrollContainer/CenterContainer"]
+custom_minimum_size = Vector2(1016, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("AccountPanelStyle")
+
+[node name="OuterMargin" type="MarginContainer" parent="SafeMargin/KeyboardVBox/ScrollContainer/CenterContainer/Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 44
+theme_override_constants/margin_top = 40
+theme_override_constants/margin_right = 44
+theme_override_constants/margin_bottom = 40
+
+[node name="VBox" type="VBoxContainer" parent="SafeMargin/KeyboardVBox/ScrollContainer/CenterContainer/Panel/OuterMargin"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 14
+
+[node name="Title" type="Label" parent="SafeMargin/KeyboardVBox/ScrollContainer/CenterContainer/Panel/OuterMargin/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 40
+horizontal_alignment = 1
+text = "BEAMSHIFT ACCOUNT"
+
+[node name="SignedOutView" type="VBoxContainer" parent="SafeMargin/KeyboardVBox/ScrollContainer/CenterContainer/Panel/OuterMargin/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="ExplanationLabel" type="Label" parent="SafeMargin/KeyboardVBox/ScrollContainer/CenterContainer/Panel/OuterMargin/VBox/SignedOutView"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+horizontal_alignment = 1
+autowrap_mode = 3
+text = "Sign in to sync your progress across supported devices."
+
+[node name="GoogleContinueButton" type="Button" parent="SafeMargin/KeyboardVBox/ScrollContainer/CenterContainer/Panel/OuterMargin/VBox/SignedOutView"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+custom_minimum_size = Vector2(460, 147)
+theme_override_font_sizes/font_size = 17
+text = "CONTINUE WITH GOOGLE"
+
+[node name="OrLabel" type="Label" parent="SafeMargin/KeyboardVBox/ScrollContainer/CenterContainer/Panel/OuterMargin/VBox/SignedOutView"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+horizontal_alignment = 1
+modulate = Color(0.6, 0.68, 0.8, 1)
+text = "OR"
+
+[node name="EmailField" type="LineEdit" parent="SafeMargin/KeyboardVBox/ScrollContainer/CenterContainer/Panel/OuterMargin/VBox/SignedOutView"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 84)
+theme_override_font_sizes/font_size = 24
+placeholder_text = "Email"
+virtual_keyboard_type = 5
+max_length = 254
+
+[node name="PasswordField" type="LineEdit" parent="SafeMargin/KeyboardVBox/ScrollContainer/CenterContainer/Panel/OuterMargin/VBox/SignedOutView"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 84)
+theme_override_font_sizes/font_size = 24
+placeholder_text = "Password"
+secret = true
+virtual_keyboard_type = 6
+max_length = 128
+
+[node name="ConfirmPasswordField" type="LineEdit" parent="SafeMargin/KeyboardVBox/ScrollContainer/CenterContainer/Panel/OuterMargin/VBox/SignedOutView"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+custom_minimum_size = Vector2(0, 84)
+theme_override_font_sizes/font_size = 24
+placeholder_text = "Confirm Password"
+secret = true
+virtual_keyboard_type = 6
+max_length = 128
+
+[node name="MessageLabel" type="Label" parent="SafeMargin/KeyboardVBox/ScrollContainer/CenterContainer/Panel/OuterMargin/VBox/SignedOutView"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="PrimaryButton" type="Button" parent="SafeMargin/KeyboardVBox/ScrollContainer/CenterContainer/Panel/OuterMargin/VBox/SignedOutView"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+custom_minimum_size = Vector2(460, 147)
+theme_override_font_sizes/font_size = 24
+text = "SIGN IN"
+
+[node name="ModeToggleButton" type="Button" parent="SafeMargin/KeyboardVBox/ScrollContainer/CenterContainer/Panel/OuterMargin/VBox/SignedOutView"]
+unique_name_in_owner = true
+layout_mode = 2
+flat = true
+theme_override_font_sizes/font_size = 22
+text = "New here? Create Account"
+
+[node name="ForgotPasswordButton" type="Button" parent="SafeMargin/KeyboardVBox/ScrollContainer/CenterContainer/Panel/OuterMargin/VBox/SignedOutView"]
+unique_name_in_owner = true
+layout_mode = 2
+flat = true
+theme_override_font_sizes/font_size = 22
+text = "FORGOT PASSWORD"
+
+[node name="NativeContinueButton" type="Button" parent="SafeMargin/KeyboardVBox/ScrollContainer/CenterContainer/Panel/OuterMargin/VBox/SignedOutView"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_horizontal = 4
+custom_minimum_size = Vector2(460, 147)
+theme_override_font_sizes/font_size = 15
+text = "CONTINUE WITH PLAY GAMES"
+
+[node name="SignedInView" type="VBoxContainer" parent="SafeMargin/KeyboardVBox/ScrollContainer/CenterContainer/Panel/OuterMargin/VBox"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="SignedInAsLabel" type="Label" parent="SafeMargin/KeyboardVBox/ScrollContainer/CenterContainer/Panel/OuterMargin/VBox/SignedInView"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+horizontal_alignment = 1
+text = "Signed in as"
+
+[node name="EmailValueLabel" type="Label" parent="SafeMargin/KeyboardVBox/ScrollContainer/CenterContainer/Panel/OuterMargin/VBox/SignedInView"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+horizontal_alignment = 1
+autowrap_mode = 3
+text = "player@example.com"
+
+[node name="CloudStatusValueLabel" type="Label" parent="SafeMargin/KeyboardVBox/ScrollContainer/CenterContainer/Panel/OuterMargin/VBox/SignedInView"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+autowrap_mode = 3
+text = "Cloud Save: Synced"
+
+[node name="SyncedNoteLabel" type="Label" parent="SafeMargin/KeyboardVBox/ScrollContainer/CenterContainer/Panel/OuterMargin/VBox/SignedInView"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+horizontal_alignment = 1
+autowrap_mode = 3
+modulate = Color(0.75, 0.8, 0.9, 1)
+text = "Progress is synced with your BeamShift account."
+
+[node name="SignOutButton" type="Button" parent="SafeMargin/KeyboardVBox/ScrollContainer/CenterContainer/Panel/OuterMargin/VBox/SignedInView"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+custom_minimum_size = Vector2(460, 147)
+theme_type_variation = &"DangerButton"
+theme_override_font_sizes/font_size = 24
+text = "SIGN OUT"
+
+[node name="BackButton" type="Button" parent="SafeMargin/KeyboardVBox/ScrollContainer/CenterContainer/Panel/OuterMargin/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+custom_minimum_size = Vector2(460, 147)
+theme_override_font_sizes/font_size = 24
+text = "BACK"
+
+[node name="KeyboardSpacer" type="Control" parent="SafeMargin/KeyboardVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 0)
+mouse_filter = 2

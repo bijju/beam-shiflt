@@ -1,5 +1,123 @@
 # TEST_PLAN.md
 
+## Phase 4B - existing-account linking QA + Android keyboard/IME fix (2026-09-28)
+
+Supersedes nothing below - additive to the Google Sign-In plugin fix above (now
+real-device verified end-to-end: chooser, Firebase auth, signed-in email, Cloud Save
+Synced, sign-out/back-in, session-survives-restart - all confirmed by the user on a
+real device the same day). This pass's own MANUAL TEST REQUIRED items are separate
+from, and narrower than, that already-completed device test.
+
+- **AUTOMATED / RENDERED, verified this pass**:
+  - Read `FirebaseAuth.sign_in_with_google_id_token()`/`link_pending_google_
+    credential()` and `account_screen.gd`'s NEEDS_LINK handling in full - structurally
+    correct (existing UID preserved via `accounts:update` with the CURRENT session's
+    `idToken`, pending credential cleared on both success/failure, never replayed
+    against a different account). No code changes made.
+  - Restructured `scenes/ui/account_screen.tscn` so `ScrollContainer` is the OUTER,
+    size-owning layout element (`SafeMargin > KeyboardVBox > [ScrollContainer >
+    CenterContainer > Panel > ..., KeyboardSpacer]`) - not nested inside
+    `CenterContainer` (the pattern that previously collapsed the panel to a hairline).
+  - Added two independent mechanisms to `account_screen.gd`: viewport `size_changed` +
+    `ScrollContainer.ensure_control_visible()` (adjustResize devices), and a `_process()`
+    poll of `DisplayServer.virtual_keyboard_get_height()` growing `KeyboardSpacer`'s
+    minimum height (overlay-keyboard devices, the more common real-Android case).
+  - RENDERED (real GPU, `Godot_v4.7.1-stable_win64.exe --path .`, temporary
+    `run/main_scene` swap reverted immediately after) at 720x1280/1080x1920/1080x2400:
+    no-keyboard layout unchanged (screenshot-compared); with `KeyboardSpacer.custom_
+    minimum_size.y` driven to a representative 820px simulated keyboard height (exactly
+    what `_process()` sets once a real device reports one) and `ensure_control_
+    visible()` called exactly as the real code path does, confirmed via `Rect2.
+    encloses()` (not eyeballing alone) that Email/Password/Confirm Password/BACK were
+    ALL fully inside `ScrollContainer`'s shrunk visible rect at every resolution
+    including the smallest tested (720x1280) - screenshots captured and personally
+    inspected.
+  - **Explicitly NOT a valid proxy, tried and rejected**: shrinking `get_window().size`
+    directly to simulate "the keyboard covered part of the screen." This project's
+    `canvas_items`/`expand` stretch mode (`DECISIONS.md` D86) does not shrink the
+    logical UI canvas the way it shrinks real window pixels once height becomes the
+    binding constraint below the 1080x1920 reference floor - confirmed directly
+    (`ScrollContainer`'s logical rect stayed ~1728px tall regardless of window-height
+    shrinks). Driving the real spacer/`ensure_control_visible()` mechanism directly
+    instead is the correct, honest technique for this exact stretch mode; **reuse this
+    technique, not window-resize simulation, for any future IME-adjacent test in this
+    project.**
+- **MANUAL TEST REQUIRED (not yet done - none of these can be substituted by a headless
+  or desktop-rendered test, per CLAUDE.md rule 12a/12d)**:
+  1. Real existing-account linking: a real Google account whose email matches an
+     existing Firebase Email/Password account, walked through the full 24-step
+     procedure in the Phase 4B brief (Firebase UID identical before/after linking,
+     cloud profile intact, second Google sign-in skips the link prompt).
+  2. Real Android device IME behavior: keyboard open/close on Email/Password/Confirm
+     Password in both Sign In and Create Account modes, at real device resolutions -
+     confirm the focused field stays reachable, no permanent offset after the keyboard
+     closes, no overlap, no panel collapse.
+  3. Full auth regression on a real device per the Phase 4B brief's 15-item list
+     (email/password sign-in, Create Account validation, Forgot Password, Sign Out,
+     Google sign-in, Google cancellation/failure, session restore, token refresh,
+     backend selection, Cloud Save sync, offline fail-fast, Play Games fallback,
+     Settings behavior, Back navigation).
+- **APK**: none built this pass - blocked by a sandbox tooling outage during JDK
+  extraction (see `STORE_RELEASE.md` section 15 for the exact failure and the already-
+  downloaded JDK's state). The three manual tests above are blocked on that build.
+
+## Google Sign-In Android plugin registration fix (2026-09-28)
+
+Supersedes the "NOT BUILT"/"NOT TESTED" state in the section below - the plugin WAS
+since compiled and device-tested (in a session not reflected in that section), which is
+how the actual bug this section fixes was found.
+
+- **AUTOMATED, verified this pass**:
+  - Unzipped the old `GodotGoogleSignIn-debug.aar` vs. the working
+    `GodotPlayGameServices-debug.aar`: confirmed the old one's `AndroidManifest.xml` had
+    no `<application>`/`org.godotengine.plugin.v2.*` `<meta-data>` entry - this is the
+    root cause of `Engine.has_singleton("GodotGoogleSignIn")` returning false on-device.
+  - Added the missing meta-data to `tools/android_plugin_src/google_signin/src/main/
+    AndroidManifest.xml`, rebuilt the AAR via Gradle, re-unzipped it and confirmed the
+    entry is now present and `classes.jar` still contains `GoogleSignInPlugin.class`.
+  - Exported a fresh debug APK (`beamshift-google-signin-plugin-fix-test.apk`) and used
+    `aapt2 dump xmltree <apk> --file AndroidManifest.xml` (the manifest is binary AXML;
+    plain `grep`/`strings` cannot read it) to confirm the REAL exported APK's merged
+    manifest carries `org.godotengine.plugin.v2.GodotGoogleSignIn ->
+    com.foursagez.beamshift.googlesignin.GoogleSignInPlugin`, alongside the other
+    working plugins' own entries (AdMob, GodotGooglePlayBilling, GodotPlayGameServices).
+  - Confirmed `GoogleSignInPlugin`/`androidx/credentials/CredentialManager` symbols
+    present in the APK's `classes.dex`/`classes4.dex`.
+  - `apksigner verify --print-certs`: SHA-1 `F6:B7:C8:8B:89:16:E7:E8:26:78:86:42:70:DD:
+    B3:BE:74:83:D7:A7` - unchanged, matches the Firebase-registered debug cert.
+  - Full regression not re-run this pass (no gameplay/simulation/save code touched -
+    only an Android plugin manifest and a rebuilt AAR).
+- **MANUAL TEST REQUIRED (this is the actual next step, not yet done)**: install
+  `builds/android/beamshift-google-signin-plugin-fix-test.apk` on the real device used
+  for the original bug report and confirm (a) the Account screen no longer shows
+  "Google Sign-In is only available in the Android app.", and (b) tapping CONTINUE WITH
+  GOOGLE opens the Android Credential Manager / Google account chooser and completes a
+  real sign-in, reaching `FirebaseAuth.sign_in_with_google_id_token()` and a real
+  Firebase session. Per CLAUDE.md rule 12a/12d, no headless or desktop-rendered test can
+  substitute for this - Credential Manager needs a real Activity and a real Google
+  account on the device.
+
+## Google Sign-In + Firebase Auth Phase 4A (2026-09-28)
+
+- **NOT TESTED - environment could not execute commands.** `FirebaseAuth.
+  sign_in_with_google_id_token()`/`link_pending_google_credential()` and
+  `account_screen.gd`'s Google button/linking flow are code-reviewed only (structural
+  mirrors of the already-verified email/password REST plumbing) - zero live HTTP calls,
+  zero device runs, zero headless runs this pass. See `STORE_RELEASE.md` section 13 for
+  why (a session-wide sandbox fault blocked all `Bash`/`PowerShell`/`WebFetch`/
+  `WebSearch` calls).
+- **NOT BUILT.** No `.aar` for the native `GodotGoogleSignIn` plugin
+  (`tools/android_plugin_src/google_signin/` is uncompiled source only), no
+  `addons/GodotGoogleSignIn/*` wiring, no APK.
+- **MANUAL TEST REQUIRED once the plugin is compiled and an APK exists**: CONTINUE WITH
+  GOOGLE on a device with a real Google account -> ID token obtained -> Firebase session
+  created; a Google email that collides with an existing password account -> NEEDS_LINK
+  message shown, email prefilled, sign-in mode forced -> signing in with the password
+  succeeds normally -> Google credential silently linked in the background (re-open
+  Account screen later and confirm re-signing-in with Google now reaches the SAME
+  account/cloud save, not a new one); email/password sign-in, CONTINUE WITH PLAY GAMES,
+  and sign-out must all still work unchanged.
+
 ## S4 External-Test Cleanup
 
 - **AUTOMATED - DONE (2026-09-26).** `godot --headless --path . --import` completed with no `SCRIPT ERROR` / `Parse Error` lines after the build-mode change. Environment warnings remained: Windows root certificate store and editor settings save warnings.
@@ -6381,3 +6499,256 @@ MANUAL TEST REQUIRED (Android): PLAY + QA +50 -> Level 201+ (first Fusion levels
 - **AUTOMATED - DONE.** Headless driver (`godot --headless --path . <driver scene>`; deleted afterwards) in `MODE_PRODUCTION`: all QA flags false; AdConfig missing-id/complete-id/ios-incomplete cases; main menu buttons = CONTINUE/NEW GAME/TUTORIALS/SETTINGS/QUIT; gameplay HUD `LEVEL n` with no QA next/debug label; real GridManager solution replays with taps == intended on Levels 1, 2, 250, 620, 1100, 1800, 2001, 2500, 3000 (Fusion + Selector eras included); StarScoring 3 stars / hint cap 2; `continue_game()`; T01, T21, T29 load. 0 failures. Same driver under `internal_qa` shows QA Level Select + V3/FUSION/SELECTOR/V5 TEST.
 - **AUTOMATED - DONE.** `stamp_store_config.sh` cases (no env / full env / iOS missing + REQUIRE / non-production refusal) in a scratch tree; real `--export-debug` APK with stamped ids: manifest `APPLICATION_ID` = stamped value, `assets/config/ad_ids.local.json` packed, Play Games `APP_ID` resource present. All stamped files restored afterwards.
 - **NOT DONE**: any device run, real ad/IAP/cloud/sign-in behaviour, the GitHub workflow (never run; YAML not linted), iOS export/Xcode/TestFlight, a new AAB/IPA.
+
+## Firebase REST Auth Phase 1 (2026-09-28) - AUTOMATED only; real-Firebase test BLOCKED
+
+- **AUTOMATED - DONE.** `godot --headless --path .` (full project, real autoloads) booted cleanly with `FirebaseAuth`/`FirebaseConfig` added - no parse errors, no autoload errors (only the engine's own unrelated shutdown-cleanup noise from killing the process, matching prior passes' experience with this technique).
+- **AUTOMATED - DONE.** `scripts/tools/firebase_auth_test.gd`/`.tscn` run directly (`godot --headless --path . res://scripts/tools/firebase_auth_test.tscn -- action=<...>`) with no `run/main_scene` edit needed - passing a scene path to `godot --headless --path .` loads the full project including autoloads, same as any other scene:
+  - `action=status` with no session file present: `signed_in=false`, `has_id_token=false`, `has_refresh_token=false` - clean signed-out baseline.
+  - `action=sign_in email=test@example.com password=fake` with `config/firebase_config.local.json` absent: returns `CONFIG_MISSING` immediately, **zero HTTP requests made** (confirms the "STOP before inventing a fake key" guard actually short-circuits before touching the network, rather than sending a request with an empty key).
+- **NOT DONE / BLOCKED - the real-Firebase test matrix from the original request** (create account against `beamshift-game`, verify the UID/email in Firebase Console → Authentication → Users, sign out, sign back in with the same credentials and confirm identical UID, force a token refresh, restart and verify session restoration, request a password reset) **requires the real Firebase Web API key**, which is not present in this checkout (`config/firebase_config.local.json` does not exist). This must be run once the owner supplies the key - see `STORE_RELEASE.md` section 8 for the exact commands and where the key comes from. **MANUAL TEST REQUIRED** for the Firebase Console verification step specifically (only a human checking the console can confirm a user actually appears there).
+- Logging verified by inspection: `FirebaseAuth`'s only `print()`/`push_warning()` calls are the fixed strings in CLAUDE.md section 15 plus `[FirebaseAuth] Request failed: <error_code>` (a stable Firebase error CODE like `INVALID_LOGIN_CREDENTIALS`, never the raw JSON, never a header) - no code path prints a password, id_token, refresh_token, or Authorization header.
+- **Update (2026-09-28): the real-Firebase auth matrix above is no longer blocked** - the owner supplied the key and Phase 1 (create/sign-in/refresh/reset/sign-out/restore) was LIVE VERIFIED against `beamshift-game` the same day (see `STORE_RELEASE.md` section 8). The one remaining manual item (Firebase Console user listing / reset-email receipt) is still owner-side.
+
+## Firebase REST Cloud Save Phase 2A (2026-09-28) - LIVE VERIFIED against real Firestore
+
+Full pass detail: `STORE_RELEASE.md` section 9, `ARCHITECTURE.md` "Firebase REST Cloud Save
+(Phase 2A)", `CLAUDE.md` "Firebase REST Cloud Save rules (Phase 2A)". Test harness:
+`scripts/tools/firebase_firestore_test.gd`/`.tscn` (run the same way as
+`firebase_auth_test.tscn`, `-- action=<...>`; requires a prior `firebase_auth_test.tscn
+action=sign_in` to establish the persisted session).
+
+- **LIVE - DONE.** `action=write`/`read`: full-overwrite PATCH + GET round-trip against
+  `users/<uid>/save/current` - PASS, payload identical both directions.
+- **LIVE - DONE.** `action=update`: PATCH + `updateMask.fieldPaths=counter` - PASS,
+  `counter` 1->2, all three other fields (`schema_version`/`test_value`/`enabled`)
+  unchanged on a follow-up read (proves merge semantics, not full overwrite).
+- **LIVE - DONE.** `action=read_other_uid` (`users/not-the-current-user/save/current`):
+  `403 PERMISSION_DENIED` - PASS, rules isolation confirmed.
+- **LIVE - DONE.** `action=raw_unauth_read`: a raw `HTTPRequest` with no `Authorization`
+  header at all -> `403` - PASS, server-side rule enforcement confirmed independent of the
+  wrapper's own client-side guard.
+- **LIVE - DONE.** Signed-out via `firebase_auth_test.tscn action=sign_out` then
+  `firebase_firestore_test.tscn action=read`: `NO_AUTH`, zero network calls - PASS
+  (client-side fail-fast). Session restored afterward via `action=sign_in` with the real
+  test credentials (confirmed same UID as before).
+- **LIVE - DONE.** `action=token_refresh_read`: forced `FirebaseAuth.refresh_token()`, then
+  a Firestore read - PASS, succeeded with no manual re-check by the caller.
+- **LIVE - DONE.** `action=read` run as a genuinely fresh process (no `sign_in` in that
+  invocation) - PASS, restart/session-restore -> Firestore chain confirmed working purely
+  off the persisted refresh token.
+- **LIVE - DONE.** `action=offline_read` (dev harness forces `InternetManager.is_online =
+  false` for the call, restores it after): `OFFLINE` in ~0ms, session (`is_signed_in`/
+  `has_refresh_token`) confirmed still intact immediately after - PASS.
+- **LIVE - DONE.** `action=stale_test` (primes a fresh token first, then starts a real read
+  and signs out ~20ms later): `STALE_SESSION` - PASS, the wrapper's session-generation
+  guard discarded the in-flight response rather than applying it post-sign-out.
+- **LIVE - DONE.** `action=delete` then a follow-up `read`: delete PASS, follow-up read
+  `404 NOT_FOUND` - PASS, cleanup confirmed (no leftover test data in the real database).
+- **A real pre-existing Phase 1 bug was found and fixed during this pass**:
+  `FirebaseAuth.ensure_valid_token()` hung indefinitely whenever it needed to actually
+  await a network round-trip, because its wait loop's `done` flag was a local `bool`
+  mutated inside a lambda - GDScript lambdas capture outer locals by value, confirmed with
+  a standalone throwaway test script before touching the real file. Fixed by moving the
+  flag into the function's existing result `Dictionary` (reference type, mutation
+  propagates correctly - re-confirmed with the same throwaway-test technique). All the
+  above Firestore tests were run AFTER this fix; re-run them if this function is ever
+  touched again.
+- **MANUAL CONSOLE CHECK REQUIRED**: Firebase Console -> Firestore -> Data ->
+  `users/<test uid>/save/current` existing during the test window (now deleted) was not
+  independently confirmed - no browser automation available in this pass.
+- `SaveManager`/`CloudSave` confirmed untouched: `git status --short` on
+  `scripts/managers/cloud_save.gd`, `scripts/cloud/`, `scripts/managers/save_manager.gd`
+  showed zero diff throughout this pass.
+- Sensitive logging: SAFE - every print statement across `firebase_firestore_test.gd`/
+  `firebase_firestore_rest.gd` emits only booleans, HTTP codes, Firestore's own stable
+  error codes, and the test document's own non-sensitive field values; no token/password/
+  Authorization-header content ever printed, confirmed against this pass's actual terminal
+  output.
+
+## Firebase Cloud Save Phase 2B (2026-09-28) - LIVE VERIFIED real CloudSave integration
+
+Full pass detail: `STORE_RELEASE.md` section 10, `ARCHITECTURE.md` "Firebase Cloud Save
+integration (Phase 2B)", `CLAUDE.md` "Firebase Cloud Save integration rules (Phase 2B)".
+Test harness: `scripts/tools/cloud_save_test.gd`/`.tscn` (`status`/`wait`/`push`/
+`payload_size`/`summary`/`signals`/`stress_select`/`offline_save`/`stamp_and_push`).
+Reads `CloudSave`'s underscore-prefixed internals directly (no real privacy in GDScript) to
+make backend identity/signal-connection state observable without adding debug API surface
+to `CloudSave` itself.
+
+- **LIVE - DONE.** Backend selection: a fresh process with a restored Firebase session
+  correctly selected `active_backend=firebase` (`is_signed_in=true`, `is_available=true`,
+  `service_name=BeamShift Cloud Account`) with zero credentials re-entered - PASS.
+- **LIVE - DONE.** First push (`action=push`, forces `CloudSave.sync_now()`): pushed the
+  REAL local `SaveManager` profile (140 completed campaign levels), `synced(true)` - PASS.
+- **LIVE - DONE.** Readback via `firebase_firestore_test.tscn action=read` against
+  `users/<uid>/save/current`: the full real profile returned, representative fields
+  (`version`, `campaign_highest_unlocked_level`, `campaign_completed_levels`,
+  `campaign_best_stars_per_level`, `procedural_current_level`, `procedural_best_stars`,
+  `play_time_seconds`, `saved_at`) all matched local exactly; `entitlements` correctly
+  absent (existing `_flush_push()` stripping, unchanged) - PASS.
+- **LIVE - DONE.** `action=payload_size`: `JSON.stringify(SaveManager.to_dict())` = 3387
+  bytes (≈3.4 KB), comfortably under Firestore's ~1 MiB document limit.
+- **LIVE - DONE.** Empty-cloud preservation: before any push, `pull()` returned
+  `NOT_FOUND` (Phase 2A's disposable document had already been cleaned up),
+  `profile_loaded` never emitted, real local profile (140 levels) completely untouched -
+  PASS.
+- **LIVE - DONE, with a real finding worth keeping.** Fresh-install cloud restore: backed
+  up the real local save, deleted it (simulating a brand-new device), ran a fresh signed-in
+  process. **First attempt did NOT adopt** - both local (fresh defaults) and cloud (the
+  real profile, which predates `play_time_seconds` tracking) had `play_time_seconds=0.0`
+  and `saved_at=""`, so `_cloud_wins()`'s tie-break correctly found no winner under the
+  existing, unchanged rule. This is NOT a Phase 2B bug - it is the existing merge policy
+  needing a real signal (play time or a timestamp) to compare, exactly as designed; a save
+  with `play_time_seconds == 0` and no `saved_at` genuinely looks identical to a fresh
+  install to this rule. Re-ran after stamping the local save with `SaveManager.
+  add_play_time(1.0)` + `SaveManager.save_game()` (a real timestamp) and re-pushing - the
+  second fresh-install simulation correctly adopted the cloud copy via the `local play_time
+  <= 0.0 and cloud play_time > 0.0` branch, restoring all 140 completed campaign levels -
+  PASS. **If this test is ever repeated on a save that already predates play-time tracking,
+  expect the same "needs a real signal" behavior - stamp the save first.**
+- **LIVE - DONE.** Offline local-save integrity (`action=offline_save`): with
+  `InternetManager.is_online` forced false, `SaveManager.save_game()` still succeeded
+  (local file written, `saved_at` stamped) and `CloudSave.sync_now()` failed fast with
+  `last_error="No internet connection."` immediately after the call returned (no hang,
+  confirmed by checking `last_error` in the same synchronous flow, before any timer) - PASS.
+  Session remained signed in and untouched throughout.
+- **LIVE - DONE.** Firebase sign-out fallback: `is_signed_in`/`is_available` correctly
+  dropped to false and `active_backend=none` (this desktop test machine has no native
+  backend to fall back to - `OS.get_name()` is not in `NATIVE_BACKENDS`), with local save
+  data completely untouched - PASS for what could be exercised.
+  **NOT independently verified**: the actual native-fallback path (Play Games/Game Center
+  becoming active again on Firebase sign-out) requires an Android or iOS device; only
+  code-reviewed correct in this pass.
+- **LIVE - DONE.** Duplicate-connection protection (`action=signals`, `action=
+  stress_select`): 20 consecutive in-process calls to `CloudSave._select_backend()` with no
+  underlying state change left `profile_loaded`/`conflict_found`/`push_finished` connection
+  counts at exactly 1 each throughout (verified via `Signal.get_connections().size()`),
+  both across the session and after repeated real sign-out/sign-in cycles (separate
+  processes) - PASS.
+- **NOT independently verified in this pass** (code-reviewed unchanged only, not exercised
+  live): the 1-hour chooser path (`CHOOSER_THRESHOLD`, `chooser_needed` signal,
+  `pending_cloud`/`pending_local`) and mid-level protection (`_held_cloud`, `_in_level()`,
+  `reconcile_held()`) - both would need either a deliberately constructed >=3600s play-time
+  gap or an actual `game.tscn` scene driven mid-puzzle, neither attempted in this desktop
+  headless pass.
+- `play_games_cloud_backend.gd`/`game_center_cloud_backend.gd`: confirmed zero diff
+  (`git diff --stat`) throughout this pass.
+- Sensitive logging: SAFE - `cloud_save_test.gd` prints only booleans, backend
+  identity strings, HTTP-adjacent error codes, and a handful of non-sensitive summary
+  fields (version/play_time/level counts) via `_print_summary()` - never a full profile
+  dump, never a token/password/Authorization-header value.
+
+## Firebase Account UI Phase 3 (2026-09-28) - LIVE VERIFIED (desktop, real network); Android device QA PENDING
+
+Full pass detail: `STORE_RELEASE.md` section 11 (exact manual device checklist),
+`ARCHITECTURE.md` "Firebase Account UI (Phase 3)", `CLAUDE.md` "Firebase Account UI rules
+(Phase 3)". No new dedicated test harness file was needed - the real scene
+(`scenes/ui/account_screen.tscn`) was driven directly, since its own `Button.pressed`
+signals ARE the thing to exercise (the temporary driver used to do this was deleted after
+the pass, per the standing "temporary QA scripts/screenshots don't stay in the repo" rule -
+D78).
+
+- **LIVE - DONE.** Sign-out flow: instantiated `account_screen.tscn` against a real,
+  already-signed-in session (`kavyabommakanti312@gmail.com`), emitted the real
+  `%SignOutButton.pressed` signal, confirmed the Cancel/confirm dialog appears, emitted the
+  confirm button's `pressed`, confirmed `FirebaseAuth.is_signed_in() == false` afterward AND
+  `%SignedOutView.visible == true` - PASS. The real session file was backed up before this
+  test and restored immediately after (`firebase_session.json.bak_qa2` round-trip, verified
+  restored via `firebase_auth_test.tscn action=status`).
+- **LIVE - DONE.** Wrong-password sign-in: real email + a deliberately wrong password via
+  `%PrimaryButton.pressed`, waited for the real `FirebaseAuth.sign_in_finished` signal -
+  `error_code=INVALID_LOGIN_CREDENTIALS`, `%MessageLabel.text=="Email or password is
+  incorrect."`, `%PasswordField.text==""` afterward - PASS (translation table + password-
+  clearing both confirmed against a real API response, not a guessed error string).
+- **LIVE - DONE.** Forgot password: real email via `%ForgotPasswordButton.pressed`, waited
+  for `FirebaseAuth.password_reset_finished` - `success=true`, "Password reset email sent.
+  Check your inbox or spam folder." shown - PASS. (Inbox delivery itself is owner-side
+  manual confirmation, not checked by this pass.)
+- **LIVE - DONE (local only, correctly no network).** Create-account mode with a mismatched
+  Confirm Password: switched `_set_create_mode(true)`, filled email/password/confirm with a
+  deliberate mismatch, emitted `%PrimaryButton.pressed` - "Passwords do not match." shown
+  immediately, with NO `FirebaseAuth.create_account()` call made (confirmed by absence of any
+  network-dependent signal firing) - PASS, confirms local validation runs before the network
+  call as designed.
+- **RENDERED - DONE** (real, non-headless GPU frames via a temporary driver, deleted after
+  use): `account_screen.tscn` captured at 720x1280, 1080x1920, and 1080x2400, in both the
+  signed-in view (real session) and the signed-out view (session file temporarily removed,
+  then restored), and in both sign-in and create-account sub-modes - 6 screenshots total, all
+  clean: no clipped fields, no overlapping text, matches the shared blue/cyan UI. Caught a
+  real bug this way: the first draft's panel reused `bs_panel_settings_portrait.png`, whose
+  RENDERED output showed the word "SETTINGS" and a gear icon baked directly into the texture
+  - fixed with a plain `StyleBoxFlat`, re-rendered clean.
+- **AUTOMATED - DONE.** Headless full-project boot with `run/main_scene` temporarily pointed
+  at `account_screen.tscn` (then `settings_menu.tscn`), per this file's own documented
+  autoload-testing technique: zero script/node errors either way; `run/main_scene` confirmed
+  reverted to `res://scenes/ui/studio_splash.tscn` afterward.
+- **AUTOMATED - DONE.** Debug APK export (`godot --export-debug "Android Debug"`) completed
+  cleanly; `aapt2 dump badging` confirmed `com.foursagez.beamshift` / versionCode `10000` /
+  versionName `1.0.0`; a full zip listing confirmed no `scripts/tools/**` or other dev/temp
+  files were swept into the package (the D78 lesson) - only expected app content plus the
+  gitignored-but-intentionally-bundled `assets/config/firebase_config.local.json` (a
+  client-visible project identifier, not a secret - see `firebase_config.gd`'s doc comment).
+- **NOT independently verified in this pass** (needs a real Android device - see
+  `STORE_RELEASE.md` section 11 for the exact checklist): virtual keyboard behavior for the
+  email/password fields, a full sign-in with the real correct password (this pass never had
+  or requested that password, per the standing "ask the owner, never store it" rule),
+  restart/session-persistence through the Account screen specifically, the 1-hour
+  cloud-vs-local chooser and mid-level-hold scenarios reached through this new entry point,
+  and the native "CONTINUE WITH <service>" fallback button (this desktop test machine has no
+  native Play Games/Game Center backend at all, so the button never rendered here -
+  code-reviewed only).
+- Sensitive logging: SAFE - the temporary test driver printed only booleans, the real
+  Firebase-returned error code string, and rendered UI label text (never the password value
+  itself, never a token/Authorization-header value); both temporary driver files were deleted
+  after the pass, per the standing "no `_tmp_*`/`_qa_*` files left in the repo" rule.
+
+## Account/Settings UI fix + Google Sign-In prep pass (2026-09-28) - RENDERED-verified (desktop); Android device QA PENDING
+
+Full pass detail: `STORE_RELEASE.md` section 12. Temporary driver
+`scripts/tools/_tmp_ui_screenshot.gd`/`.tscn` (deleted after use, per the standing
+"temporary QA drivers don't stay in the repo" rule - D78) temporarily pointed
+`project.godot`'s `run/main_scene` at itself, ran `godot --path .` (real, non-headless GPU
+rendering, D45-D47 tier - not `--headless`, not synthetic `push_input()`, per rule 12a/12d),
+instanced `settings_menu.tscn`/`account_screen.tscn` directly at each target resolution via
+`DisplayServer.window_set_size()`, forced each Account view state (signed-out/create-mode/
+signed-in/native-visible) via the real `%UniqueName` nodes rather than faking network
+responses, and captured `get_viewport().get_texture().get_image().save_png()`.
+`run/main_scene` was reverted to `studio_splash.tscn` immediately after (verified via a
+direct grep of `project.godot` before proceeding to export).
+
+- **RENDERED - DONE.** Settings at 720x1280/1080x1920/1080x2400 with `%StoreSection` forced
+  visible (`StoreManager.has_store()` is false on this desktop machine): RESTORE PURCHASES
+  text fully inside its button frame at all 3 (font_size 24->19 fix) - PASS. SIGN IN/BACK/
+  SYNC NOW/toggle alignment/cloud status text unchanged and correct.
+- **RENDERED - DONE.** Account signed-out at all 3 resolutions: CONTINUE WITH GOOGLE,
+  Email/Password fields, SIGN IN, mode-toggle link, FORGOT PASSWORD, BACK all correctly
+  sized/centered, no clipping, no stretching - PASS. This is the fix for the reported
+  "buttons look unnaturally wide/flat" bug (`460x147` + `SHRINK_CENTER` on every real
+  button, matching Settings' own convention and the button art's native aspect ratio).
+- **RENDERED - DONE.** Account with the native fallback button forced visible
+  (`%NativeContinueButton.visible = true`, since this desktop machine has no real native
+  backend): CONTINUE WITH GOOGLE and CONTINUE WITH PLAY GAMES both render inside their frames
+  without touching the decorative corner ornaments (font_size 22->17 and 20->15 respectively,
+  found necessary by a first RENDERED pass that showed both clipping into the frame art -
+  the fix instruction's "test the actual rendered label" caught this, not a guess).
+- **RENDERED - DONE.** Account CREATE ACCOUNT mode at all 3 resolutions: Confirm Password
+  field appears with no overlap against CREATE ACCOUNT/the mode-switch link/BACK - PASS.
+- **RENDERED - DONE.** Account signed-in mode (`%SignedInView` forced visible, since a real
+  Firebase session was active in this dev environment and could not be safely signed out
+  for the "signed-out" renders without disturbing it) at all 3 resolutions: title, email,
+  cloud status, SIGN OUT (red DangerButton), BACK all correctly proportioned - PASS.
+- **A real regression was caught and fixed by this same RENDERED technique, not assumed
+  away**: the first fix attempt (wrapping the Account panel in a `CenterContainer`) produced
+  a RENDERED screenshot showing the entire panel collapsed to a thin, content-free strip -
+  this would have shipped as a total account-screen blackout if the pass had trusted the
+  scene-tree edit without rendering it. Root-caused to `ScrollContainer` not reporting its
+  content's true minimum size inside a shrink-based container; fixed by removing the
+  `ScrollContainer`, re-rendered, confirmed correct.
+- **NOT tested (MANUAL TEST REQUIRED, same limitation as the Phase 3 entry above)**: real
+  device touch/keyboard behavior, the real native Play Games/Game Center button on an actual
+  device with a real backend, and the GoogleContinueButton's placeholder message rendering
+  under a real Android IME/notch/safe-area combination.
+- Sensitive logging: SAFE - the driver never touched passwords/tokens; it only toggled
+  `visible`/`text` on real UI nodes and forced `_set_create_mode()` (an existing scene
+  method). Both temporary driver files were deleted after the pass.

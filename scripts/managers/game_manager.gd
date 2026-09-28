@@ -7,6 +7,7 @@ const MAIN_MENU_SCENE := "res://scenes/ui/main_menu.tscn"
 const LEVEL_SELECT_SCENE := "res://scenes/ui/level_select.tscn"
 const TUTORIAL_SELECT_SCENE := "res://scenes/ui/tutorial_select.tscn"
 const SETTINGS_SCENE := "res://scenes/ui/settings_menu.tscn"
+const ACCOUNT_SCENE := "res://scenes/ui/account_screen.tscn"
 const GAME_SCENE := "res://scenes/gameplay/game.tscn"
 const LEVEL_EDITOR_SCENE := "res://tools/level_editor/level_editor.tscn"
 
@@ -118,6 +119,12 @@ func go_to_level_select() -> void:
 
 func go_to_settings() -> void:
 	get_tree().change_scene_to_file(SETTINGS_SCENE)
+
+
+## Firebase Account UI Phase 3: the player-facing BeamShift Account screen, reached
+## only from Settings. Its own Back returns here (go_to_settings()), not Main Menu.
+func go_to_account() -> void:
+	get_tree().change_scene_to_file(ACCOUNT_SCENE)
 
 
 func start_level(level_id: int, from_level_select: bool = false) -> void:
