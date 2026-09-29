@@ -2353,6 +2353,30 @@ Main Menu now has a lightweight dynamic blue/cyan particle ambience: `AmbientPar
 
 Real Android AdMob ids (app `~7269770832`, rewarded `/9105596685`, interstitial `/1227106666`, publisher 2730553558670494) are injected at build time by `tools/ci/stamp_store_config.sh android` (gitignored `config/ad_ids.local.json` + `[admob]` project setting); nothing new in tracked source. iOS ids untouched. AdMob app status: "Requires review" - limited/no live ads until approved (expected). Next Play internal-test build is versionCode 10001 / 1.0.0 (preset bumped). Optional local test devices: gitignored `config/ad_test_devices.local.json` (JSON array of hashed ids from logcat "setTestDeviceIds"), read by `AdConfig.test_device_ids()`; register your device before interacting with ads. CloudSave/Play Games (real Game ID) is still a separate pending task; the 10001 AAB was built with a placeholder Game ID that was then restored.
 
+## Android Google Sign-In production failure - ROOT CAUSE FOUND, config gap (2026-09-29)
+
+The versionCode 10001 AAB (below) was uploaded to Play Console Internal Testing and
+installed on a real OnePlus device via the Play Store. Google Sign-In fails on it.
+Pulled the real installed `base.apk` off the device and ran `apksigner verify
+--print-certs`: its actual signing certificate (SHA-1
+`3C:D2:C8:1D:1A:68:1C:D0:71:A1:83:85:8C:61:43:61:A4:0D:64:28`, DN `CN=Android,
+OU=Android, O=Google Inc.`) is **Google Play App Signing's own auto-generated
+certificate** - completely different from both the debug key
+(`F6:B7:C8:8B:89:16:E7:E8:26:78:86:42:70:DD:B3:BE:74:83:D7:A7`, real-device-verified
+working) and the upload key (`A4:82:77:62:47:1D:00:AE:09:CA:AA:FB:34:20:5B:24:1B:1E:
+60:5A`) already registered/verified. This is the first time this project has installed
+a Play-Store-distributed build, and the Play App Signing certificate was never
+registered with Firebase/Google Cloud - Credential Manager's Google Sign-In validates
+the calling app's signature server-side, so it fails before any credential is ever
+returned. **This is a console configuration gap, not a code bug.** Fix: add that SHA-1
+as a fingerprint on the Firebase Android app (Project settings -> SHA certificate
+fingerprints); no new build needed to test the fix, since validation is server-side.
+Added safe, boundary-labelled diagnostic logging (never logs tokens/passwords) to
+`GoogleSignInPlugin.kt`, `account_screen.gd`, `firebase_auth.gd` for the next test if
+the console fix alone isn't enough - not yet in any built APK (would need a Gradle
+rebuild under JDK 17). New standing rule: CLAUDE.md "Google Sign-In signing-certificate
+rule (D115)". Full writeup: `STORE_RELEASE.md` section 17. No commit/push/build.
+
 ## Internal Testing AAB versionCode 10001 - BUILT, SIGNED, VERIFIED (2026-09-28)
 
 The recovered upload keystore (`D:/4Sagez/GodotGames/Keys/BeamShift/beamshift-signing/beamshift-upload.keystore`, alias `beamshift`) was verified via `keytool` to produce SHA-1 `A4:82:77:62:47:1D:00:AE:09:CA:AA:FB:34:20:5B:24:1B:1E:60:5A` - an exact match to the owner-supplied Google Play upload-key certificate. A real bug was found and fixed before building: `addons/GodotGoogleSignIn/export_plugin.gd` shipped **no plugin AAR at all for a release export** (only `bin/debug/` existed) - a first test build's own extracted manifest confirmed `org.godotengine.plugin.v2.GodotGoogleSignIn` was completely absent, meaning every prior release/Internal-Testing AAB would have had a non-functional Google Sign-In button despite the debug APK working. Built the real `bin/release/GodotGoogleSignIn-release.aar` from the existing, unchanged Kotlin plugin source via Gradle and wired `export_plugin.gd`'s release branch to it (mirrors `GodotPlayGameServices`'s existing pattern). Rebuilt `builds/android/beamshift.aab` (123,750,289 bytes, `com.foursagez.beamshift`, versionCode 10001/1.0.0) and re-verified: the plugin-v2 entry + `GoogleSignInPlugin` class + `androidx/credentials` classes are now all present in the packaged manifest/dex; the AAB's own embedded signing certificate (extracted from `META-INF/*.RSA`, not just the keystore file) matches the upload key exactly (`jarsigner -verify`: "jar verified."); Firebase Auth/Firestore/CloudSave/AdMob-config/InternetManager/splash scripts all present; no `scripts/tools/**`/`_qa_tmp/**` dev-harness leakage. **Also found, corrected in docs, not code**: `godot_play_game_services/game_id` is still empty, but a real export with it empty succeeded twice in this pass - the project's long-standing claim that this blocks the Android export does not reproduce with the current Godot/AGP/plugin versions (see `STORE_RELEASE.md` section 16 for the full writeup and the real, separate runtime risk this still leaves for Play Games Saved Games / the native fallback button). AdMob ships OFF in this exact AAB (no local `config/ad_ids.local.json` - expected, hints stay free). No commit/push/upload performed. Full detail: `STORE_RELEASE.md` section 16.

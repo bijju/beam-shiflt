@@ -1690,6 +1690,24 @@ Full architecture, band table, family catalog, measured evidence and known weakn
   always live once shipped (there is nothing to gate: Firebase Auth Phase 1 already
   ships unconditionally). `BuildConfig.QA_TOOLS`/the release checklist are unaffected.
 
+## Google Sign-In signing-certificate rule (D115)
+
+- **Google Sign-In (Credential Manager's `GetSignInWithGoogleOption`) is validated
+  server-side by Google against the calling app's package name + signing certificate.**
+  Every certificate that will ever sign a distributed build must have its SHA-1
+  registered in Firebase Console (Project settings -> the Android app -> SHA
+  certificate fingerprints) - this includes the debug keystore, the upload keystore,
+  AND, separately, **Google Play App Signing's own auto-generated certificate**
+  (`CN=Android, OU=Android, O=Google Inc.` - distinct from the upload key you supply;
+  find it in Play Console -> Setup -> App integrity, or by pulling the real installed
+  APK and running `apksigner verify --print-certs` on it). A build that works when
+  sideloaded (debug key or a direct AAB-derived APK) can still fail Google Sign-In once
+  distributed through Play Store, because Play re-signs with App Signing by default and
+  that certificate is easy to forget to register - this exact gap was found and
+  diagnosed 2026-09-29 (`STORE_RELEASE.md` section 17). Registering the missing SHA-1 is
+  a console-only fix - it never requires a new client build, since the validation is
+  server-side.
+
 ## Production build rules (D114)
 
 - **The committed `BuildConfig.BUILD_MODE` is `MODE_PRODUCTION`; never commit another value.** Internal QA: `tools/ci/set_build_mode.sh internal_qa`, then restore. New QA-only UI must derive from `BuildConfig.QA_TOOLS`.

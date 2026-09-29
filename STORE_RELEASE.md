@@ -1236,3 +1236,173 @@ Testing by hand, confirms the Play App Signing re-signed APK still carries a Goo
 working build, and runs the device checklist in section 11/15 above against the newly
 installed Internal Testing build (not a sideloaded debug APK, so Play-Store-only paths like
 Play Billing/Play App Signing behavior can finally be exercised for real).
+
+**Update (2026-09-29): the AAB WAS uploaded and installed via Play Internal Testing, and
+Google Sign-In DOES fail on it - root cause found, see section 17.**
+
+## 17. Android Google Sign-In production failure diagnosis (2026-09-29) - ROOT CAUSE FOUND (config gap), not a code bug
+
+**Context**: section 16's own AAB (versionCode 10001) was uploaded to Play Console
+Internal Testing (by the owner, outside this session) and installed on a real OnePlus
+device via the Play Store (`installerPackageName=com.android.vending`, confirmed via
+`adb shell dumpsys package com.foursagez.beamshift`, split-APK install layout
+`base.apk`+`split_config.*.apk` - the unmistakable signature of a Play-Store AAB
+install). Google Sign-In fails on this installed build. The owner's filtered logcat
+capture (`findstr /i "Godot GoogleSignIn Credential FirebaseAuth BeamShift"`) did not
+show a conclusive result; the only notable lines were generic Android `AuthPII` "Long
+live credential not available" messages, which are OS/Play-services credential-manager
+noise unrelated to this app (this diagnosis does not rely on them).
+
+**Root cause, proven directly from the real installed APK, not assumed**: pulled the
+real installed `base.apk` off the device (`adb pull` from the path reported by
+`pm path com.foursagez.beamshift`) and ran `apksigner verify --print-certs` on it.
+Its actual signing certificate is:
+
+- DN: `CN=Android, OU=Android, O=Google Inc., L=Mountain View, ST=California, C=US`
+- SHA-1: `3C:D2:C8:1D:1A:68:1C:D0:71:A1:83:85:8C:61:43:61:A4:0D:64:28`
+- SHA-256: `81:97:91:13:D4:E7:07:00:46:80:5B:72:8D:B3:A5:F4:8C:9F:C4:9B:8E:32:AF:60:C2:9E:51:78:81:AF:6B:9C`
+
+This is **Google Play App Signing's own auto-generated certificate** (the generic
+"CN=Android, OU=Android, O=Google Inc." DN is exactly what Play generates when you
+don't supply your own key during the App Signing opt-in) - **completely different from
+both certificates this project has verified/registered before**: the debug keystore
+(`F6:B7:C8:8B:89:16:E7:E8:26:78:86:42:70:DD:B3:BE:74:83:D7:A7`, section 14, confirmed
+real-device-working with Google Sign-In) and the developer's own upload keystore
+(`A4:82:77:62:47:1D:00:AE:09:CA:AA:FB:34:20:5B:24:1B:1E:60:5A`, section 16). **This is
+the first time this project has ever installed a build through Play Store distribution
+with Play App Signing enabled** - every previous "real-device verified" Google Sign-In
+test (section 14) used a sideloaded debug APK signed with the debug key, which was
+already registered. Nothing in this project's history has ever registered the Play App
+Signing certificate above with Firebase or Google Cloud.
+
+**Why this breaks Google Sign-In specifically (and nothing else)**: `GoogleSignInPlugin.
+signIn()` (`tools/android_plugin_src/google_signin/.../GoogleSignInPlugin.kt`) calls
+Android Credential Manager's `GetSignInWithGoogleOption`, which is validated **server-side
+by Google** against the calling app's package name + signing certificate before it will
+mint an ID token for the configured Web OAuth client
+(`FirebaseConfig.GOOGLE_WEB_CLIENT_ID`, itself confirmed correct - it IS a Web-type
+client, matching what `GetSignInWithGoogleOption`'s `serverClientId` parameter requires,
+never the Android client id). Google Cloud/Firebase associates a request's calling
+signature with a client via a separate "Android" OAuth client entry (or Firebase's own
+SHA fingerprint list, which auto-provisions one) keyed on package name + SHA-1. Because
+the Play App Signing SHA-1 above was never added anywhere, Google's backend has no
+record that `com.foursagez.beamshift` signed with that certificate is allowed to use
+this project's OAuth configuration, so `credentialManager.getCredential()` throws a
+`GetCredentialException` before any credential/ID token is ever produced. **Failure
+boundary: (A) before a Google credential is returned** - confirmed by architecture, not
+yet by a fresh logcat capture with the new logging below (the owner's existing capture
+predates the boundary-labelled logging added this pass and used a filter that should
+technically have caught the OLD `Log.w(TAG, "Google Sign-In failed: ${e.type}")` line
+too, but the capture window/scroll may have missed it - not treated as contradicting
+evidence here).
+
+**This is a Firebase/Google Cloud Console configuration gap, not a code defect.**
+Everything downstream (`FirebaseAuth.sign_in_with_google_id_token()`'s
+`accounts:signInWithIdp` call, the NEEDS_LINK linking flow, `CloudSave`'s Firebase
+backend) is unrelated and already real-device verified working (sections 9/10/14) - it
+is simply never reached on this specific build because the native credential step fails
+first.
+
+**Fix required (console-only, no new build needed for this alone)**:
+1. Firebase Console -> Project settings -> General -> Your apps -> the Android app
+   `com.foursagez.beamshift` -> "SHA certificate fingerprints" -> Add fingerprint ->
+   paste `3C:D2:C8:1D:1A:68:1C:D0:71:A1:83:85:8C:61:43:61:A4:0D:64:28` (also add the
+   SHA-256 above if the form asks for it) -> Save.
+2. Wait a few minutes for propagation, then check Google Cloud Console (the same GCP
+   project Firebase uses, `beamshift-game`) -> APIs & Services -> Credentials -> confirm
+   an "Android" OAuth 2.0 Client ID now exists for package `com.foursagez.beamshift`
+   with this SHA-1 (Firebase normally auto-creates/links this from step 1; if it does
+   not appear after a few minutes, create it manually with the same package name + SHA-1,
+   in the same project as the Web client `516411257761-
+   3ufb515qh3tknvkbad1qvt5kqeoafpit.apps.googleusercontent.com`).
+3. Sanity-check (cannot be verified from source): confirm that Web client ID's type in
+   Google Cloud Console -> Credentials really is "Web application", not "Android" -
+   `FirebaseConfig.GOOGLE_WEB_CLIENT_ID`/the Kotlin plugin's doc comments both assert
+   this is required and already correct, but only the console can confirm the client's
+   actual configured type.
+4. **No new APK/AAB is required to test step 1-2** - Google's validation is server-side;
+   the CURRENTLY installed build should start working the moment the fingerprint is
+   registered. Retest with the same installed app (no reinstall needed) once propagation
+   has had a few minutes.
+5. **Standing lesson for any future signing-key change** (already added to CLAUDE.md's
+   Store release rules): whenever a NEW certificate starts signing a Play-distributed
+   build - opting into Play App Signing for the first time, a Play App Signing key
+   upgrade/rotation, or a brand-new app - its SHA-1 must be added to Firebase/Google
+   Cloud BEFORE Google Sign-In can work on that distribution channel. The debug and
+   upload-key SHA-1s being registered is not sufficient once Play Store distribution
+   (which always re-signs with Play App Signing unless the app explicitly opted out) is
+   in play.
+
+**Diagnostic logging added this pass (source-only, NOT yet in any built APK)** - safe,
+boundary-labelled, never logs a token/password/header, matching the numbered boundaries
+1-10 in the owner's own request:
+- `GoogleSignInPlugin.kt`: `signIn()` now logs button-press receipt, "native credential
+  request started"/"returned" with the credential type, "Google ID token obtained:
+  YES/NO", and - the most diagnostically useful change - every catch branch now logs
+  the actual **exception class** (`e.javaClass.name`) alongside Credential Manager's own
+  `e.type` reason string. Previously the generic `catch (e: Exception)` branch logged
+  only a fixed string with no way to tell what actually threw; this was the one gap most
+  likely to make a real logcat capture inconclusive.
+- `account_screen.gd`: logs button press, native-plugin-singleton-found/not-found (with
+  `OS.get_name()`/`has_singleton()` values), the native failure `reason` string
+  (previously captured into an unused `_reason` parameter and never logged at all - a
+  real, if minor, diagnostic gap fixed here), and ID-token-received.
+- `firebase_auth.gd`: `sign_in_with_google_id_token()` now logs "Firebase Google
+  exchange started"/"finished" with the sanitized `ok`/Firebase error-code outcome
+  (chose the existing sanitized Firebase error code over threading a raw numeric HTTP
+  status through the shared `_post_json`/`_handle_http_result` helper used by every
+  other Firebase Auth call path - avoids widening this diagnosis-only change into the
+  already-verified email/password flows) and "Firebase session established" on success.
+- **These log lines only take effect in a build that includes this source** - the
+  currently-installed Play Store build (and the existing debug/AAB artifacts on disk)
+  predate this change. No new build was made this pass (see below for why).
+
+**No APK/AAB was built this pass.** Per the task's own instruction ("if the issue is
+purely a Firebase/Google Console configuration problem, do not build an APK yet") and
+because the fix above needs zero client-side change to test, a rebuild was deliberately
+withheld - rebuilding the native Kotlin plugin requires Gradle under JDK 17 (Gradle
+8.11.1 cannot run under the machine's only readily-available JDK, Android Studio's
+bundled JDK 25 - see section 14's build-environment note; a portable Temurin 17 archive
+exists at `D:\temurin17\jdk17.zip` but has never been extracted). **If registering the
+SHA-1 does not resolve the failure**, the next step is: extract that JDK, rebuild
+`GodotGoogleSignIn-debug.aar` (or `-release.aar`, matching whichever build channel is
+being retested) via `gradlew.bat :google_signin:assembleDebug`/`assembleRelease`,
+re-export, and re-test with the new exception-class-level logging to see the real
+Credential Manager exception type. This is deliberately NOT done speculatively.
+
+**Files changed this pass**: `tools/android_plugin_src/google_signin/src/main/kotlin/
+com/foursagez/beamshift/googlesignin/GoogleSignInPlugin.kt`,
+`scripts/ui/account_screen.gd`, `scripts/managers/firebase_auth.gd` (logging only - no
+behavior change to any success/failure path, no new signal, no new autoload). No git
+commit/push/build/branch change was performed.
+
+**Better logcat capture for the next test** (Windows CMD, tag-filtered instead of
+text-`findstr`-only, so Android/OEM noise like the `AuthPII` lines is excluded by
+`adb` itself rather than scrolled past):
+```
+"C:\Users\shiva\AppData\Local\Android\Sdk\platform-tools\adb.exe" logcat -c
+"C:\Users\shiva\AppData\Local\Android\Sdk\platform-tools\adb.exe" logcat GodotGoogleSignIn:* godot:I *:S
+```
+Procedure: (1) clear logcat with the `-c` command right before testing; (2) launch
+BeamShift fresh; (3) go to Settings -> Account -> tap CONTINUE WITH GOOGLE; (4) wait
+~10 seconds for the flow to resolve (success, cancel, or fail); (5) send back every line
+containing `GodotGoogleSignIn` or `[GoogleSignIn]`/`[FirebaseAuth]` (these are the new
+markers - even without a rebuild, the OLD `Log.w(TAG, "Google Sign-In failed: ...")`
+line from the Kotlin plugin will still show up tagged `GodotGoogleSignIn` and is exactly
+what confirms or refutes boundary A above).
+
+**Expected successful-flow logs (after a rebuild that includes this pass's logging;
+today's build shows the older, less detailed line only)**: a clean run shows, in order,
+`[GoogleSignIn] signIn() called.` -> `[GoogleSignIn] Native credential request
+started.` -> `[GoogleSignIn] Native credential request returned. type=...` ->
+`[GoogleSignIn] Google ID token obtained: YES` -> `[GoogleSignIn] Google ID token
+obtained: YES (len=...)` (GDScript side) -> `[FirebaseAuth] [GoogleSignIn] Firebase
+Google exchange started` -> `[FirebaseAuth] [GoogleSignIn] Firebase Google exchange
+finished: ok=true error_code=` -> `[FirebaseAuth] [GoogleSignIn] Firebase session
+established...`. A failure at the console-gap boundary instead stops right after
+"Native credential request started." with a `GetCredentialException` line naming its
+`exceptionClass`/`type`.
+
+**Git status at end of this pass**: clean before this pass's edits (`0d5b42d` HEAD, no
+prior uncommitted changes); this pass added the three logging-only source edits above,
+uncommitted. **No AAB, no commit, no push.**

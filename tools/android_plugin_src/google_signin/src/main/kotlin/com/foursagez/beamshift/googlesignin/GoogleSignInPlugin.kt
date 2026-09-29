@@ -83,8 +83,10 @@ class GoogleSignInPlugin(godot: Godot) : GodotPlugin(godot) {
 	 */
 	@UsedByGodot
 	fun signIn(serverClientId: String) {
+		Log.i(TAG, "[GoogleSignIn] signIn() called.")
 		val activityRef = activity
 		if (activityRef == null) {
+			Log.w(TAG, "[GoogleSignIn] No activity available - cannot start Credential Manager.")
 			emitSignal("google_sign_in_failed", "NO_ACTIVITY")
 			return
 		}
@@ -97,33 +99,45 @@ class GoogleSignInPlugin(godot: Godot) : GodotPlugin(godot) {
 				val request = GetCredentialRequest.Builder()
 					.addCredentialOption(signInWithGoogleOption)
 					.build()
+				Log.i(TAG, "[GoogleSignIn] Native credential request started.")
 				val result = credentialManager.getCredential(activityRef, request)
 				val credential = result.credential
+				Log.i(TAG, "[GoogleSignIn] Native credential request returned. type=${credential.type}")
 				if (credential is CustomCredential &&
 					credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
 				) {
 					val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
-					Log.i(TAG, "Google ID token obtained.")
+					Log.i(TAG, "[GoogleSignIn] Google ID token obtained: YES")
 					emitSignal("google_id_token_obtained", googleIdTokenCredential.idToken)
 				} else {
+					Log.w(TAG, "[GoogleSignIn] Google ID token obtained: NO - unexpected credential type ${credential.type}")
 					emitSignal("google_sign_in_failed", "UNEXPECTED_CREDENTIAL_TYPE")
 				}
 			} catch (e: GetCredentialCancellationException) {
 				// Reported separately from a real failure - the player just dismissed
 				// the account chooser, not an error worth surfacing as one.
-				Log.i(TAG, "Google Sign-In cancelled by the user.")
+				Log.i(TAG, "[GoogleSignIn] Cancelled by the user.")
 				emitSignal("google_sign_in_cancelled")
 			} catch (e: GetCredentialException) {
 				// e.type is Credential Manager's own stable reason string - never log
-				// e.message, which can include account-identifying details.
-				Log.w(TAG, "Google Sign-In failed: ${e.type}")
+				// e.message, which can include account-identifying details. The
+				// exception CLASS is also logged: this is the boundary that fires when
+				// Google's backend rejects the calling app's package+signing-certificate
+				// (e.g. no matching Android OAuth client for this SHA-1) - a console
+				// config gap, not a code bug, shows up here as a GetCredentialException.
+				Log.w(TAG, "[GoogleSignIn] Native credential request FAILED before a credential was returned. exceptionClass=${e.javaClass.name} type=${e.type}")
 				emitSignal("google_sign_in_failed", e.type ?: "UNKNOWN")
 			} catch (e: GoogleIdTokenParsingException) {
-				Log.w(TAG, "Failed to parse Google ID token credential.")
+				Log.w(TAG, "[GoogleSignIn] Failed to parse Google ID token credential. exceptionClass=${e.javaClass.name}")
 				emitSignal("google_sign_in_failed", "PARSE_FAILED")
 			} catch (e: Exception) {
-				Log.w(TAG, "Google Sign-In failed with an unexpected exception.")
-				emitSignal("google_sign_in_failed", "UNKNOWN")
+				// Previously logged only a generic message with no way to tell WHAT
+				// exception actually fired - this is the one change most likely to turn
+				// an unhelpful logcat capture into a diagnosable one, at zero PII risk
+				// (class name + message-less summary only, never e.message which can
+				// carry account details for some exception types).
+				Log.w(TAG, "[GoogleSignIn] Unexpected exception. exceptionClass=${e.javaClass.name}")
+				emitSignal("google_sign_in_failed", "UNKNOWN:" + e.javaClass.simpleName)
 			}
 		}
 	}

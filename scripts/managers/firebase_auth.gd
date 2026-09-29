@@ -267,6 +267,7 @@ func sign_in_with_google_id_token(id_token: String) -> void:
 		return
 	_google_sign_in_in_progress = true
 	var gen := _session_generation
+	print("[FirebaseAuth] [GoogleSignIn] Firebase Google exchange started (accounts:signInWithIdp).")
 	_post_json(
 		"%s:signInWithIdp?key=%s" % [IDENTITY_BASE, api_key],
 		{
@@ -279,19 +280,20 @@ func sign_in_with_google_id_token(id_token: String) -> void:
 			_google_sign_in_in_progress = false
 			if gen != _session_generation:
 				return
+			print("[FirebaseAuth] [GoogleSignIn] Firebase Google exchange finished: ok=%s error_code=%s" % [ok, err])
 			if ok and bool(json.get("needConfirmation", false)):
 				_pending_google_id_token = id_token
 				_pending_google_email = str(json.get("email", ""))
-				print("[FirebaseAuth] Google sign-in needs account linking.")
+				print("[FirebaseAuth] [GoogleSignIn] Google sign-in needs account linking.")
 				google_sign_in_finished.emit(false, "NEEDS_LINK", true, false)
 				return
 			if ok:
 				var is_new_user := bool(json.get("isNewUser", false))
 				_apply_auth_response(json)
-				print("[FirebaseAuth] Google sign-in succeeded (new_user=%s)." % is_new_user)
+				print("[FirebaseAuth] [GoogleSignIn] Firebase session established. UID match/creation: OK (new_user=%s)." % is_new_user)
 				google_sign_in_finished.emit(true, "", false, is_new_user)
 			else:
-				print("[FirebaseAuth] Request failed: %s" % err)
+				print("[FirebaseAuth] [GoogleSignIn] Google exchange failed: %s" % err)
 				google_sign_in_finished.emit(false, err, false, false)
 	)
 

@@ -313,10 +313,12 @@ func _on_password_reset_finished(success: bool, error_code: String) -> void:
 ## safely: no plugin (desktop, iOS, or a build without it) shows a message and returns,
 ## never crashes and never pretends a sign-in happened.
 func _on_google_continue_pressed() -> void:
+	print("[GoogleSignIn] Sign-in button pressed.")
 	if _busy:
 		return
 	var plugin := _google_plugin_instance()
 	if plugin == null or not bool(plugin.call("isAvailable")):
+		print("[GoogleSignIn] Plugin unavailable (plugin=%s)." % [plugin != null])
 		_show_status("Google Sign-In is only available in the Android app.")
 		return
 	_set_busy(true)
@@ -334,18 +336,22 @@ func _google_plugin_instance() -> Object:
 	_google_plugin_checked = true
 	if OS.get_name() == "Android" and Engine.has_singleton(_GOOGLE_PLUGIN_NAME):
 		_google_plugin = Engine.get_singleton(_GOOGLE_PLUGIN_NAME)
+		print("[GoogleSignIn] Native plugin singleton found: %s" % _GOOGLE_PLUGIN_NAME)
 		if _google_plugin.has_signal("google_id_token_obtained"):
 			_google_plugin.connect("google_id_token_obtained", _on_google_id_token_obtained)
 		if _google_plugin.has_signal("google_sign_in_cancelled"):
 			_google_plugin.connect("google_sign_in_cancelled", _on_google_plugin_cancelled)
 		if _google_plugin.has_signal("google_sign_in_failed"):
 			_google_plugin.connect("google_sign_in_failed", _on_google_plugin_failed)
+	else:
+		print("[GoogleSignIn] Native plugin singleton NOT found (os=%s, has_singleton=%s)." % [
+			OS.get_name(), OS.get_name() == "Android" and Engine.has_singleton(_GOOGLE_PLUGIN_NAME)])
 	return _google_plugin
 
 
 func _on_google_id_token_obtained(id_token: String) -> void:
 	# Never log the token itself - only that one arrived.
-	print("[AccountScreen] Google ID token received from plugin.")
+	print("[GoogleSignIn] Google ID token obtained: YES (len=%d). Starting Firebase exchange." % id_token.length())
 	FirebaseAuth.sign_in_with_google_id_token(id_token)
 
 
@@ -356,7 +362,8 @@ func _on_google_plugin_cancelled() -> void:
 	_clear_message()
 
 
-func _on_google_plugin_failed(_reason: String) -> void:
+func _on_google_plugin_failed(reason: String) -> void:
+	print("[GoogleSignIn] Native plugin reported failure: %s" % reason)
 	_set_busy(false)
 	_show_status("Google Sign-In failed. Please try again.")
 
