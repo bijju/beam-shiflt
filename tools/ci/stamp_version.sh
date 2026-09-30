@@ -9,6 +9,9 @@
 #   project.godot                             config/version (the credits screen reads it)
 #
 # Optional env, set by the workflow when the Apple secrets exist:
+#   IOS_BUILD_RUN     -> "RUN.ATTEMPT" (GitHub run_number.run_attempt); makes the iOS
+#                        CFBundleVersion "CODE.RUN.ATTEMPT" so re-uploading one marketing
+#                        version never repeats a build number. Unset -> plain CODE.
 #   APPLE_TEAM_ID     -> iOS application/app_store_team_id
 #   IOS_PROFILE_UUID  -> iOS application/provisioning_profile_uuid_release
 #   IOS_PROFILE_NAME  -> iOS application/provisioning_profile_specifier_release
@@ -31,6 +34,19 @@ if (( minor > 99 || patch > 99 )); then
 fi
 code=$(( major * 10000 + minor * 100 + patch ))
 
+# iOS CFBundleVersion: 1-3 period-separated integers. "CODE.RUN.ATTEMPT" is numeric,
+# App Store compatible, deterministic per (version, run) and strictly increases for
+# a given marketing version because run_number only ever grows.
+ios_build="$code"
+run_suffix="${IOS_BUILD_RUN:-}"
+if [ -n "$run_suffix" ]; then
+  if ! [[ "$run_suffix" =~ ^[0-9]+\.[0-9]+$ ]]; then
+    echo "stamp failed: IOS_BUILD_RUN must be RUN.ATTEMPT (got '$run_suffix')" >&2
+    exit 2
+  fi
+  ios_build="$code.$run_suffix"
+fi
+
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 presets="$root/export_presets.cfg"
 project="$root/project.godot"
@@ -51,7 +67,7 @@ sub() {
 sub "$presets" '^version/code=[0-9]+$'                 "version/code=$code"                       2 "android version/code"
 sub "$presets" '^version/name=".*"$'                   "version/name=\"$version\""                2 "android version/name"
 sub "$presets" '^application/short_version=".*"$'      "application/short_version=\"$version\""   1 "ios short_version"
-sub "$presets" '^application/version=".*"$'            "application/version=\"$code\""            1 "ios version"
+sub "$presets" '^application/version=".*"$'            "application/version=\"$ios_build\""        1 "ios version"
 sub "$project" '^config/version=".*"$'                 "config/version=\"$version\""              1 "project config/version"
 
 team="${APPLE_TEAM_ID:-}"
@@ -76,4 +92,4 @@ if [ -n "$pname" ]; then
       "application/provisioning_profile_specifier_release=\"$esc\"" 1 "ios profile name"
 fi
 
-echo "stamped version=$version build_code=$code team=${team:--} profile=${uuid:--} profile_name=${pname:--}"
+echo "stamped version=$version build_code=$code ios_build=$ios_build team=${team:--} profile=${uuid:--} profile_name=${pname:--}"

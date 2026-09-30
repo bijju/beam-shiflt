@@ -188,8 +188,10 @@ stamps them into `provisioning_profile_uuid_release` and `provisioning_profile_s
 (and refuses a UUID without a Name). No profile name is hardcoded anywhere.
 
 **Versioning:** dispatch `version=1.0.1` -> `CFBundleShortVersionString=1.0.1`,
-`CFBundleVersion=10001` (major*10000+minor*100+patch). This deliberately does not match the
-Android build number (10004); Apple only needs iOS build numbers to increase per upload.
+`CFBundleVersion=10001.<run_number>.<run_attempt>` (e.g. 10001.9.1: major*10000+minor*100+patch, then the GitHub run number and attempt; `IOS_BUILD_RUN` in `tools/ci/stamp_version.sh`, iOS only). It deliberately does not match the
+Android build number (10004); Apple needs a higher build number for every upload of the same version, and run_number only grows, so a repeated `1.0.1` run can never collide. Android is unchanged (still major*10000+minor*100+patch).
+
+**IPA validation:** the "Validate the built IPA" step runs after the export and before the TestFlight upload and fails the job on any mismatch (bundle id, version, build number, production AdMob id vs `ADMOB_IOS_APP_ID` without printing it, not the Google sample id, 50 SKAdNetworkItems, no NSUserTrackingUsageDescription, ITSAppUsesNonExemptEncryption=false, PrivacyInfo.xcprivacy with NSPrivacyTracking=false and no tracking domains). **TestFlight upload:** runs only when `has_ios` and `has_ios_upload` (ASC_KEY_ID, ASC_ISSUER_ID, ASC_API_PRIVATE_KEY) are true AND (the ref is a `v*` tag OR the manual `testflight_upload` box is ticked).
 
 **The run:** manual `workflow_dispatch`, `lanes=ios`, `version=1.0.1`, artifact only, no
 TestFlight upload. The workflow file must exist on the default branch (`main`) before GitHub

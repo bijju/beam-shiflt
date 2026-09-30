@@ -15,7 +15,7 @@ complete — a stale checklist is worse than none.
 | Ads | Existing rewarded hint + interstitial, **child-safe for everyone** (`AdConfig.CHILD_DIRECTED`: TFCD + TFUA + rating G, non-personalised, no ATT/IDFA) — `ADS_MONETIZATION.md` 6a |
 | IAP | ONE non-consumable: **`beamshift_no_forced_ads`, "No Forced Ads", US $3.99** — removes interstitials only; the optional rewarded hint video stays (owner decision). Never call it "Remove Ads" |
 | Cloud save | **Yes**: Play Games Services Saved Games (Android), Game Center saved games stored in iCloud (iOS) |
-| Version | Stores start at **1.0.0 = build code 10000** (`major*10000+minor*100+patch`, one scheme for both stores, stamped by `tools/ci/stamp_version.sh`) |
+| Version | Stores start at **1.0.0 = build code 10000** (`major*10000+minor*100+patch`, one scheme for both stores, stamped by `tools/ci/stamp_version.sh`; the iOS build number additionally carries `.<run_number>.<run_attempt>` so re-uploads never collide, see `references/ci-cd.md`) |
 
 ## 2. Architecture (all store SDKs behind SDK-free autoloads)
 
