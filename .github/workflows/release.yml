@@ -497,14 +497,14 @@ jobs:
           rm -rf addons/godot_store_kit/bindings  # C# helpers; this project is GDScript
           ls -la addons/godot_store_kit addons/godot_store_kit/bin/ios
 
-      # Game Center (cloud save, GKSavedGame) + AuthenticationServices (Sign in with
+      # AuthenticationServices (Sign in with
       # Apple, and the ASWebAuthenticationSession bridge the iOS Google Sign-In flow
       # reuses - see scripts/ui/account_screen.gd's iOS Apple/Google sections and
-      # tools/ios_plugin_src/README.md). Neither is vendored in-repo: their
-      # xcframeworks are large and only this job ever needs them, so the pinned
-      # release is fetched here instead. Both need the shared SwiftGodot runtime
+      # tools/ios_plugin_src/README.md). Not vendored in-repo: its
+      # xcframework is large and only this job ever needs it, so the pinned
+      # release is fetched here instead. It needs the shared SwiftGodot runtime
       # beside them.
-      - name: Install the Game Center + AuthenticationServices extensions
+      - name: Install the AuthenticationServices extension
         env:
           GAP_BUILD: bfade13ff8b6027ede438bac637b5bf93057d404
         run: |
@@ -512,13 +512,13 @@ jobs:
           url="https://github.com/migueldeicaza/GodotApplePlugins/releases/download"
           curl -fsSL -o /tmp/gap.zip             "$url/build-$GAP_BUILD/GodotApplePlugins-addons-$GAP_BUILD.zip"
           unzip -q -o /tmp/gap.zip -d /tmp/gap
-          for a in GodotApplePluginsGameCenter GodotApplePluginsAuthenticationServices GodotApplePluginsRuntime; do
+          for a in GodotApplePluginsAuthenticationServices GodotApplePluginsRuntime; do
             src=$(find /tmp/gap -type d -name "$a" -maxdepth 3 | head -1)
             [ -n "$src" ] || { echo "::error::$a missing from the release zip"; exit 1; }
             rm -rf "addons/$a"
             cp -R "$src" "addons/$a"
           done
-          ls -la addons/GodotApplePluginsGameCenter addons/GodotApplePluginsAuthenticationServices
+          ls -la addons/GodotApplePluginsAuthenticationServices
 
       - name: Import assets
         run: ~/godot/Godot.app/Contents/MacOS/Godot --headless --path . --import || true
@@ -526,15 +526,12 @@ jobs:
       - name: Verify the StoreKit extension registered
         run: grep -q 'godot_store_kit.gdextension' .godot/extension_list.cfg && cat .godot/extension_list.cfg
 
-      - name: Verify the Game Center extension registered
-        run: grep -q 'godot_apple_plugins_game_center.gdextension' .godot/extension_list.cfg
-
       # AuthenticationServices (Sign in with Apple + the iOS Google Sign-In bridge, see
-      # scripts/ui/account_screen.gd) is fetched by the same step as Game Center above but
+      # scripts/ui/account_screen.gd) is fetched by the step above but
       # was never independently checked - a silently-missing/renamed .gdextension inside
       # the pinned GodotApplePlugins release would otherwise only surface as a confusing
       # runtime null from ClassDB.instantiate() on a real device, long after this job
-      # reported success. Fail fast, the same way Game Center already does.
+      # reported success. Fail fast.
       - name: Verify the AuthenticationServices extension registered
         run: |
           gdext=$(find addons/GodotApplePluginsAuthenticationServices -maxdepth 1 -name '*.gdextension' | head -1)
