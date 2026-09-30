@@ -42,6 +42,10 @@ on:
         description: "Type PUBLISH to allow a production-track upload (ignored for internal/beta)"
         required: false
         default: ""
+      testflight_upload:
+        description: "iOS: also upload the signed IPA to TestFlight (manual runs only; tags always do when the ASC key exists)"
+        type: boolean
+        default: false
 
 env:
   GODOT_VERSION: 4.7.1-stable
@@ -427,6 +431,39 @@ jobs:
           } >> "$GITHUB_ENV"
           echo "Installed provisioning profile '$PROFILE_NAME' ($UUID)"
 
+      # Fail in seconds, before the Godot export and Xcode archive spend macOS
+      # minutes, if the certificate and profile cannot make an App Store IPA
+      # together. Prints only non-secret metadata.
+      - name: Verify signing identity and provisioning profile
+        if: needs.guard.outputs.has_ios == 'true'
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          P="$RUNNER_TEMP/profile.plist"
+          fail() { echo "::error::$1"; exit 1; }
+          appid=$(plutil -extract Entitlements.application-identifier raw "$P")
+          team=$(plutil -extract TeamIdentifier.0 raw "$P")
+          [ "$appid" = "$APPLE_TEAM_ID.$PACKAGE_NAME" ] || fail "Profile app id does not match $PACKAGE_NAME under the APPLE_TEAM_ID team"
+          [ "$team" = "$APPLE_TEAM_ID" ] || fail "Profile team does not match APPLE_TEAM_ID"
+          if plutil -extract ProvisionedDevices raw "$P" >/dev/null 2>&1; then
+            fail "Profile lists devices (Development/Ad Hoc) - an App Store Distribution profile is required"
+          fi
+          [ "$(plutil -extract Entitlements.get-task-allow raw "$P")" = "false" ] || fail "Profile is a development profile (get-task-allow)"
+          expiry=$(plutil -extract ExpirationDate raw "$P")
+          [ "$(date -u +%s)" -lt "$(date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$expiry" +%s)" ] || fail "Provisioning profile expired ($expiry)"
+          ids=$(security find-identity -v -p codesigning)
+          echo "$ids" | grep -q "Distribution" || fail "No Apple Distribution identity in the keychain after import"
+          # The profile must embed the exact certificate that was imported.
+          matched=0; i=0
+          while der=$(plutil -extract DeveloperCertificates.$i raw -o - "$P" 2>/dev/null); do
+            sha=$(printf '%s' "$der" | base64 --decode | openssl sha1 | awk '{print toupper($NF)}')
+            if echo "$ids" | grep -q "$sha"; then matched=1; fi
+            i=$((i+1))
+          done
+          [ "$matched" = 1 ] || fail "Imported certificate is not one of the certificates embedded in the profile"
+          echo "Profile OK: '$IOS_PROFILE_NAME' -> $PACKAGE_NAME, expires $expiry, certificate matches"
+
       - name: Stamp version + signing identifiers
         env:
           # Godot 4.7 refuses to export the iOS preset at all with an empty
@@ -550,7 +587,7 @@ jobs:
         # Uploading needs the ASC key specifically. A signed IPA is still
         # produced and kept as an artifact when only the signing credentials
         # exist; it just isn't handed to TestFlight.
-        if: needs.guard.outputs.has_ios == 'true' && needs.guard.outputs.has_ios_upload == 'true'
+        if: needs.guard.outputs.has_ios == 'true' && needs.guard.outputs.has_ios_upload == 'true' && (startsWith(github.ref, 'refs/tags/') || inputs.testflight_upload == true)
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
