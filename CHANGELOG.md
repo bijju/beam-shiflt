@@ -1,5 +1,100 @@
 # CHANGELOG.md
 
+
+## Android Internal Testing 10002 final release AAB (2026-09-30, uncommitted, not uploaded)
+**Android Internal Testing 10002 final release AAB (2026-09-30, uncommitted, LOCAL ONLY - NOT uploaded).** Built `builds/android/beamshift-internal-10002.aab` (signed release AAB, 123,769,461 bytes), versionCode **10002** / versionName **1.0.1**, package `com.foursagez.beamshift`, both Android presets aligned (the "Android Debug" preset's stale `10003 / 1.0.0-ABOUT-SCROLL-QA` was reset to 10002 / 1.0.1). Cleanup: QA/test UI audit found NOTHING to delete - every QA control (Level Select QA, V3/FUSION/SELECTOR/V5 TEST, QA +50, tutorial debug overlay, unlock-all flags) is already gated behind `BuildConfig.QA_TOOLS`, and the committed `BUILD_MODE` is `MODE_PRODUCTION`; a rendered-node scan of Account/Settings/Main Menu/Level Select/Tutorial Select/About/Game found zero visible QA nodes. Export filters already exclude `scripts/tools/**`, `tools/**`, `_qa_tmp/**`; AAB inspected: none of those, no keystore/password files. Verified in the real AAB: upload-key SHA-1 `A4:82:77:62:47:1D:00:AE:09:CA:AA:FB:34:20:5B:24:1B:1E:60:5A` (matches), plugin-v2 registrations for GodotGoogleSignIn (release AAR, androidx.credentials + googleid classes in dex), GodotGooglePlayBilling (`com.android.vending.BILLING`), GodotPlayGameServices, AdMob; account/settings/splash/tutorial_panel/firebase/cloud scenes+scripts packaged. **AdMob: ads OFF** (no `config/ad_ids.local.json`; production mode => `ads_active()` false; manifest carries only the inert Google sample APPLICATION_ID, as in 10001; hints stay free). **Play Games: `game_id` still empty** (export succeeded; PGS features unverified/unavailable). `config/firebase_config.local.json` (Firebase Web API key, a public client identifier) is packaged on purpose - Firebase Auth needs it. **Not device-tested for this AAB**: everything below. **IAP purchase QA**: not claimed complete for 10002 (no purchase flow code was changed). No commit/push/upload/Play action taken. Remaining manual QA: install from Play Internal Testing, Google Sign-In (Play-signed cert), cloud restore, No Forced Ads purchase + Restore Purchases, Settings button fit with localized price, tutorial UI, Level Select scroll.
+## Android IAP device test documentation + price label UI fix (2026-09-29, uncommitted, NO BUILD)
+
+Owner confirmed `beamshift_no_forced_ads` (purchase option `no-forced-ads-lifetime`) is
+**ACTIVE** in Google Play Console, and a real Android device (Internal Testing, versionCode
+10001) successfully retrieved the live localized price (`₹450.00` in India). This surfaced a
+real UI bug in Settings: the "No Forced Ads" button's dynamic label (`"NO FORCED ADS -
+₹450.00"`) overflowed its fixed 460x147px sci-fi button frame at the existing static 24pt
+font.
+
+**Fixed (UI only, no store logic touched)**: `scenes/ui/settings_menu.tscn`'s
+`BuyNoForcedAdsButton` widened to 640x147 (still `SIZE_SHRINK_CENTER`; every other Settings
+button unchanged at 460x147). `scripts/ui/settings_menu.gd` gained `_set_buy_button_label()`,
+a small last-resort text-fit helper that measures the real label against the button's content
+width and shrinks the font (24pt default, 15pt floor) only as far as needed, so unusually
+long localized price strings (e.g. `US$3.99`) degrade gracefully instead of clipping - the
+price itself is never truncated, and `StoreManager`/`StoreConfig`/purchase/acknowledgement/
+entitlement code is completely untouched. Verified via the project's documented temporary
+`run/main_scene` swap to `settings_menu.tscn` (headless, zero parse/script/resource errors,
+reverted and confirmed via `git diff`) - not yet re-verified on a real device.
+
+**Documentation**: recorded the exact confirmed IAP state (product ACTIVE, base price USD
+$3.99, live-loaded India price ₹450.00, price overflow found+fixed) and added a concrete A-F
+manual Android IAP QA checklist (initial purchase, ad behavior, restart, restore, reinstall,
+refund/revocation-expected-behavior-only, no refund actually performed) - see
+`STORE_RELEASE.md` section 20 and `TEST_PLAN.md`'s matching section. **Android IAP purchase
+flow itself remains NOT device-verified** - do not describe it as complete until the
+checklist is run on a real device. No Play Console/Firebase/AdMob/Google Cloud console
+action performed. No build. No commit/push/merge.
+
+## iOS CI/TestFlight pipeline preparation (2026-09-29, uncommitted, LOCAL ONLY - no commit/push/CI run)
+
+Prepared the never-executed iOS lane of `.github/workflows/release.yml` (built in the pass
+below) for a future signed build, per an explicit owner brief requiring zero git write
+operations, zero GitHub secrets, and zero workflow triggers.
+
+**Fixed a real, confirmed CI blocker**: `export_presets.cfg`'s iOS preset had no
+`application/provisioning_profile_uuid_release` key at all. `tools/ci/stamp_version.sh`'s
+`sub()` helper requires an exact expected match count before substituting a value, so the
+first real run supplying an `IOS_PROVISIONING_PROFILE_B64` secret would have failed with
+`stamp failed: ios profile uuid matched 0 line(s), expected 1`. Added the key empty. **The
+fix was verified against an isolated temp-fixture copy of the preset/project file with a
+dummy team id and dummy UUID - the real, committed `export_presets.cfg` was never stamped
+with fake signing data and was re-confirmed empty afterward.**
+
+**Added a fail-fast AuthenticationServices registration check** to the workflow's iOS job,
+immediately after the existing Game Center registration check - both extensions are
+fetched by the same install step, but only Game Center's presence in
+`.godot/extension_list.cfg` was previously verified. The new check discovers the installed
+module's `.gdextension` filename by glob rather than assuming it, to avoid a false failure
+from an unverified filename guess.
+
+**Static-reviewed the entire uncommitted iOS auth implementation** (Apple Sign-In, iOS
+Google bridge, Firebase exchange/linking, platform branching, token logging) - no defect
+found requiring a code change.
+
+**Decided against adding a `CFBundleURLTypes` Info.plist entry** for the Google OAuth
+callback scheme - documented as unconfirmed either way pending a real device test, per
+`tools/ios_plugin_src/README.md`.
+
+**Created `references/ci-cd.md`** - the workflow's own header comment already referenced
+this file; it did not exist until this pass.
+
+See `DECISIONS.md` D117, `STORE_RELEASE.md` section 19, `ARCHITECTURE.md`'s matching
+section, and `TEST_PLAN.md`'s matching section for the full writeup. **No commit, no push,
+no branch change, no GitHub secret, no workflow_dispatch, no Apple certificate/profile/API
+key created, no signed IPA built, no TestFlight upload, no App Store submission, no
+Android file touched.**
+
+## iOS Authentication + Cross-Platform Cloud Save (2026-09-29, uncommitted, no build, desktop-verified only)
+
+Extended the Play-Store-verified Android Google Sign-In -> Firebase Auth -> Firestore cloud-save flow to iOS: Sign in with Apple + iOS Google Sign-In, both authenticating through the same Firebase identity layer so an Android player who installs on iPhone and signs in with the same Google account recovers the same Firebase UID and cloud save.
+
+**Key architectural finding**: this project already vendors `GodotApplePlugins` (a SwiftGodot GDExtension, pinned build, `.github/workflows/release.yml`) for its Game Center cloud-save backend. The exact same pinned build also ships an `AuthenticationServices` module - `ASAuthorizationController` (Sign in with Apple) and `ASWebAuthenticationSession` (a generic OAuth browser sheet) - confirmed by downloading the real release zip and inspecting its contents, not assumed from documentation. **No new native Swift/GDExtension code was written for this pass.**
+
+**`scripts/managers/firebase_auth.gd`**: added `sign_in_with_apple_id_token(id_token, raw_nonce)` and `link_pending_apple_credential()` (+ `has_pending_apple_link()`/`pending_apple_link_email()`/`cancel_pending_apple_link()`), a structural mirror of the existing, already-verified `sign_in_with_google_id_token()`/`link_pending_google_credential()` pair - same `accounts:signInWithIdp`/`accounts:update` REST calls with `providerId=apple.com`, same `NEEDS_LINK` flow, same in-memory-only/never-logged pending-credential storage. New signals `apple_sign_in_finished`/`apple_link_finished`.
+
+**`scripts/firebase/firebase_config.gd`**: added `GOOGLE_IOS_CLIENT_ID`/`GOOGLE_IOS_REVERSED_CLIENT_ID` constants (the iOS Google OAuth client - never reused from the Android/web client id).
+
+**`scenes/ui/account_screen.tscn` + `scripts/ui/account_screen.gd`**: new `AppleContinueButton` ("SIGN IN WITH APPLE"), visible only on iOS. Both native-provider buttons are now hidden entirely on desktop/editor (previously Google's button stayed visible everywhere and only failed with a click-time message). The iOS Google bridge is architecturally distinct from Android's: Android resolves `Engine.get_singleton("GodotGoogleSignIn")` (Credential Manager); iOS instead `ClassDB.instantiate("ASWebAuthenticationSession")` and opens Google's own OAuth authorization endpoint directly (`response_type=id_token`, the iOS OAuth client id), reading the token off the callback URL's fragment - matching `game_center_cloud_backend.gd`'s existing `ClassDB`/`CONNECT_DEFERRED` convention for this project's other iOS native code, not the Android plugin's Engine-singleton convention. The Apple bridge similarly uses `ClassDB.instantiate("ASAuthorizationController")`. Both fail safely (a status message, never a crash) when the extension isn't present, including on this desktop dev machine.
+
+**`export_presets.cfg`**: iOS preset's `entitlements/additional` gained `com.apple.developer.applesignin` (`["Default"]`), as the vendored module's own setup guide documents.
+
+**`.github/workflows/release.yml`**: the iOS lane's Game Center install step now also fetches `GodotApplePluginsAuthenticationServices` from the identical pinned release (no new pin).
+
+**Account deletion**: inspected (grepped the full `scripts/` tree) and confirmed to not exist anywhere in this codebase. Deliberately NOT implemented this pass - documented as a required follow-up (Firebase `accounts:delete`, a Firestore-cleanup decision, a stronger confirmation UI, a local-save-retention decision) in `CLAUDE.md`'s new "iOS Authentication rules (D116)", since Apple App Store Guideline 5.1.1(v) requires it once account creation is offered.
+
+**Verified**: the pinned GodotApplePlugins release genuinely contains a built `GodotApplePluginsAuthenticationServices.xcframework` (real device + simulator slices); `account_screen.gd`/`firebase_auth.gd` parse cleanly (temporary `run/main_scene` swap to `account_screen.tscn`, headless run, reverted immediately - the project's own established technique, confirmed reverted via `git status`); the new code never statically references either extension's type, so it compiles and no-ops safely on every platform without it.
+
+**NOT verified - needs macOS/Xcode and a physical iPhone** (see `tools/ios_plugin_src/README.md` and `TEST_PLAN.md`'s new manual iPhone test plan, Tests A-I): whether `ASAuthorizationController`'s failure signal reliably distinguishes user-cancellation from a real error (currently a message-text heuristic); whether Google's OAuth endpoint actually honors `response_type=id_token` for an iOS-type client and returns it in the callback URL's fragment as assumed (if not, this needs a follow-up authorization-code + PKCE exchange); whether an additional Info.plist URL scheme registration is required; the real CI vendoring/export; account linking end-to-end against real Apple/Google accounts; account-deletion App Store compliance.
+
+Not committed, not pushed, no branch change (`dev_abhilas` unchanged), no Android code touched, no AAB/IPA built, no Apple certificates/provisioning profiles created or revoked, no Firebase security rule changes.
+
 ## Main Menu Redesign pass (2026-09-28, uncommitted, debug APK built, no version bump)
 
 Restructured Main Menu (`scenes/ui/main_menu.tscn`) into the layout: Logo -> live gameplay preview -> CONTINUE/NEW GAME/TUTORIALS -> Settings icon, matching a user-supplied reference screenshot's rough composition (design reference, not pixel spec). All existing button behavior/wiring (Continue availability, New Game confirmation, Tutorial unlocks, Settings navigation, cloud chooser, Fusion nudge, QA entries) is untouched - only presentation/position changed.
@@ -3439,3 +3534,8 @@ launches, and anything requiring a real Android device are marked
 
 ## 2026-09-26
 - Android AdMob production ids integration (build-time stamped), optional local ad test devices, versionCode 10001.
+
+## Tutorial UI fix - button stretching (2026-09-30, DEVICE QA PENDING)
+- Root cause: tutorial ContinueButton (340x84) and the lesson-complete buttons (h 88-96, width = panel) used the shared theme StyleBoxTexture whose 70x32 px end caps draw unscaled, so on short buttons the caps ate the height, the middle stretched horizontally and the label overflowed.
+- Fix: new `scripts/ui/aspect_art_button.gd` (`AspectArtButton`): aspect-locked TextureRect art (region 1705x545) behind a style-less Button, width derived from height, 12% side text padding. Applied to TAP TO CONTINUE (h 104) and NEXT TUTORIAL/PLAY/RETRY/TUTORIAL SELECT (h 120) only; tutorial panel raised 10px. No gameplay/progression/save code touched.
+- RENDERED checks at 540x960, 720x1280, 540x1200. APK for manual QA: `builds/android/beamshift-tutorial-ui-fix.apk` (debug, placeholder PGS id used for export then reverted). Not device verified.

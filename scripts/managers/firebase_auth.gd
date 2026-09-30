@@ -40,6 +40,11 @@ signal session_restore_finished(success: bool, error_code: String)
 ## meaningful when success=true.
 signal google_sign_in_finished(success: bool, error_code: String, needs_link: bool, is_new_user: bool)
 signal google_link_finished(success: bool, error_code: String)
+## Sign in with Apple (iOS Auth Phase 1). Same needs_link contract as Google's signal
+## above - the caller prompts a normal password sign-in, then calls
+## link_pending_apple_credential() to attach Apple to that SAME UID.
+signal apple_sign_in_finished(success: bool, error_code: String, needs_link: bool, is_new_user: bool)
+signal apple_link_finished(success: bool, error_code: String)
 
 const SESSION_FILE := "user://firebase_session.json"
 const REQUEST_TIMEOUT_SECONDS := 12.0
@@ -77,6 +82,14 @@ var _google_sign_in_in_progress := false
 var _link_in_progress := false
 var _pending_google_id_token := ""
 var _pending_google_email := ""
+
+## Sign in with Apple (iOS Auth Phase 1). Same in-memory-only, never-persisted,
+## never-logged contract as the Google fields above.
+var _apple_sign_in_in_progress := false
+var _apple_link_in_progress := false
+var _pending_apple_id_token := ""
+var _pending_apple_raw_nonce := ""
+var _pending_apple_email := ""
 
 
 func _ready() -> void:
@@ -367,6 +380,144 @@ func _clear_pending_google_link() -> void:
 	_pending_google_email = ""
 
 
+## ---- Sign in with Apple (iOS Auth Phase 1) ----
+##
+## Structural mirror of sign_in_with_google_id_token() above - same needs_link/linking
+## contract, same accounts:signInWithIdp call, this is the ONE place providerId=apple.com
+## is used. id_token is the Apple identityToken (JWT) obtained from the native
+## AuthenticationServices bridge (tools/ios_plugin_src/apple_signin/, ASAuthorizationApple
+## IDProvider). raw_nonce is the UNHASHED nonce the bridge generated before asking Apple
+## for a credential (Apple's identityToken embeds only the SHA-256 hash of it, per Sign in
+## with Apple's replay-protection design) - included in postBody so Firebase can verify it
+## the same way Apple's own servers do. Pass "" if the bridge ever omits it (Firebase will
+## still accept an unhinted id_token; this is defense in depth, not a hard requirement of
+## every code path). NOT yet live-verified against a real Apple credential - see
+## STORE_RELEASE.md's iOS section for exactly what remains to confirm on a real device.
+func sign_in_with_apple_id_token(id_token: String, raw_nonce: String = "") -> void:
+	if _apple_sign_in_in_progress:
+		return
+	var api_key := FirebaseConfig.web_api_key()
+	if api_key == "":
+		push_warning("[FirebaseAuth] Web API key not configured (config/firebase_config.local.json).")
+		apple_sign_in_finished.emit(false, "CONFIG_MISSING", false, false)
+		return
+	if not InternetManager.is_online:
+		apple_sign_in_finished.emit(false, "OFFLINE", false, false)
+		return
+	if id_token == "":
+		apple_sign_in_finished.emit(false, "INVALID_IDP_RESPONSE", false, false)
+		return
+	_apple_sign_in_in_progress = true
+	var gen := _session_generation
+	var post_body := "id_token=%s&providerId=apple.com" % id_token
+	if raw_nonce != "":
+		post_body += "&nonce=%s" % raw_nonce.uri_encode()
+	print("[FirebaseAuth] [AppleSignIn] Firebase Apple exchange started (accounts:signInWithIdp).")
+	_post_json(
+		"%s:signInWithIdp?key=%s" % [IDENTITY_BASE, api_key],
+		{
+			"postBody": post_body,
+			"requestUri": "https://%s.firebaseapp.com" % FirebaseConfig.PROJECT_ID,
+			"returnIdpCredential": true,
+			"returnSecureToken": true,
+		},
+		func(ok: bool, json: Dictionary, err: String) -> void:
+			_apple_sign_in_in_progress = false
+			if gen != _session_generation:
+				return
+			print("[FirebaseAuth] [AppleSignIn] Firebase Apple exchange finished: ok=%s error_code=%s" % [ok, err])
+			if ok and bool(json.get("needConfirmation", false)):
+				_pending_apple_id_token = id_token
+				_pending_apple_raw_nonce = raw_nonce
+				_pending_apple_email = str(json.get("email", ""))
+				print("[FirebaseAuth] [AppleSignIn] Apple sign-in needs account linking.")
+				apple_sign_in_finished.emit(false, "NEEDS_LINK", true, false)
+				return
+			if ok:
+				var is_new_user := bool(json.get("isNewUser", false))
+				_apply_auth_response(json)
+				print("[FirebaseAuth] [AppleSignIn] Firebase session established. UID match/creation: OK (new_user=%s)." % is_new_user)
+				apple_sign_in_finished.emit(true, "", false, is_new_user)
+			else:
+				print("[FirebaseAuth] [AppleSignIn] Apple exchange failed: %s" % err)
+				apple_sign_in_finished.emit(false, err, false, false)
+	)
+
+
+## Attaches the Apple credential cached by a prior NEEDS_LINK response to the CURRENTLY
+## signed-in account - same accounts:update linking pattern as
+## link_pending_google_credential(). If the Apple credential is ALREADY linked to a
+## DIFFERENT Firebase user, Firebase returns FEDERATED_USER_ID_ALREADY_LINKED /
+## CREDENTIAL_ALREADY_IN_USE (mapped by account_screen.gd's _friendly_error()) - this
+## function never merges accounts and never overwrites either account's cloud data; it
+## simply reports the failure and leaves both accounts exactly as they were.
+func link_pending_apple_credential() -> void:
+	if _apple_link_in_progress:
+		return
+	if _pending_apple_id_token == "":
+		apple_link_finished.emit(false, "NO_PENDING_CREDENTIAL")
+		return
+	if not is_signed_in():
+		_clear_pending_apple_link()
+		apple_link_finished.emit(false, "NOT_SIGNED_IN")
+		return
+	var api_key := FirebaseConfig.web_api_key()
+	if api_key == "":
+		_clear_pending_apple_link()
+		apple_link_finished.emit(false, "CONFIG_MISSING")
+		return
+	if not InternetManager.is_online:
+		# Do NOT clear the pending token here - same reasoning as the Google link's own
+		# offline branch: the player is already signed in, offline is transient, and a
+		# retry should be able to complete the link without redoing Sign in with Apple.
+		apple_link_finished.emit(false, "OFFLINE")
+		return
+	_apple_link_in_progress = true
+	var gen := _session_generation
+	var id_token := _pending_apple_id_token
+	var post_body := "id_token=%s&providerId=apple.com" % id_token
+	if _pending_apple_raw_nonce != "":
+		post_body += "&nonce=%s" % _pending_apple_raw_nonce.uri_encode()
+	_post_json(
+		"%s:update?key=%s" % [IDENTITY_BASE, api_key],
+		{
+			"idToken": _id_token,
+			"postBody": post_body,
+			"requestUri": "https://%s.firebaseapp.com" % FirebaseConfig.PROJECT_ID,
+			"returnSecureToken": true,
+		},
+		func(ok: bool, json: Dictionary, err: String) -> void:
+			_apple_link_in_progress = false
+			_clear_pending_apple_link()
+			if gen != _session_generation:
+				return
+			if ok:
+				_apply_auth_response(json)
+				print("[FirebaseAuth] Apple account linked.")
+			else:
+				print("[FirebaseAuth] Request failed: %s" % err)
+			apple_link_finished.emit(ok, err)
+	)
+
+
+func has_pending_apple_link() -> bool:
+	return _pending_apple_id_token != ""
+
+
+func pending_apple_link_email() -> String:
+	return _pending_apple_email
+
+
+func cancel_pending_apple_link() -> void:
+	_clear_pending_apple_link()
+
+
+func _clear_pending_apple_link() -> void:
+	_pending_apple_id_token = ""
+	_pending_apple_raw_nonce = ""
+	_pending_apple_email = ""
+
+
 ## Force a refresh right now (e.g. a manual "Test Refresh" QA action). Normal callers
 ## should prefer ensure_valid_token().
 func refresh_token() -> void:
@@ -382,6 +533,7 @@ func sign_out() -> void:
 	_session_generation += 1
 	_clear_session_state()
 	_clear_pending_google_link()
+	_clear_pending_apple_link()
 	auth_state_changed.emit(false)
 	print("[FirebaseAuth] Signed out.")
 

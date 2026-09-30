@@ -8,6 +8,7 @@ const LEVEL_SELECT_SCENE := "res://scenes/ui/level_select.tscn"
 const TUTORIAL_SELECT_SCENE := "res://scenes/ui/tutorial_select.tscn"
 const SETTINGS_SCENE := "res://scenes/ui/settings_menu.tscn"
 const ACCOUNT_SCENE := "res://scenes/ui/account_screen.tscn"
+const ABOUT_SCENE := "res://scenes/ui/about_screen.tscn"
 const GAME_SCENE := "res://scenes/gameplay/game.tscn"
 const LEVEL_EDITOR_SCENE := "res://tools/level_editor/level_editor.tscn"
 
@@ -115,6 +116,10 @@ func go_to_level_select() -> void:
 	is_v5_test_mode = false
 	is_tutorial_mode = false
 	get_tree().change_scene_to_file(LEVEL_SELECT_SCENE)
+
+
+func go_to_about() -> void:
+	get_tree().change_scene_to_file(ABOUT_SCENE)
 
 
 func go_to_settings() -> void:

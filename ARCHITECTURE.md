@@ -2039,3 +2039,192 @@ interaction, the native-fallback button against a real Play Games session) - see
 `users/{uid}/save/current`), the native backends' own sign-in implementations, or
 `_reconcile()`/`_cloud_wins()`'s conflict policy. No AAB was built and no production
 signing/rollout flag was touched.
+
+## iOS Authentication (iOS Auth Phase 1, D116 - DESKTOP-VERIFIED ONLY, no device testing)
+
+Extends the account screen's Firebase Auth to iOS: Sign in with Apple, and an iOS-specific
+Google Sign-In bridge. Both funnel into the exact same `FirebaseAuth`/`accounts:
+signInWithIdp` REST layer Android's Google Sign-In already uses - Firebase stays the one
+cross-platform identity/cloud-save authority; Game Center/iCloud remain separate,
+platform-specific cloud-save options `CloudSave` may also select, never the primary
+account (see "Firebase Cloud Save integration (Phase 2B)" above for that selection logic,
+completely unchanged by this pass).
+
+**The native bridge is not new code - it's an already-vendored module.** This project
+vendors `GodotApplePlugins` (a SwiftGodot GDExtension, `.github/workflows/release.yml`,
+pinned at build `bfade13ff8b6027ede438bac637b5bf93057d404`) for its Game Center cloud-save
+backend (`scripts/cloud/game_center_cloud_backend.gd`). The identical pinned release also
+ships an `AuthenticationServices` module - confirmed by downloading the real release zip
+and inspecting its contents, not assumed from the upstream repo's own docs - exposing two
+plain `RefCounted` extension classes:
+
+- **`ASAuthorizationController`** - Sign in with Apple. `signin_with_scopes(["email",
+  "full_name"])` → `authorization_completed(credential)` / `authorization_failed
+  (error_message)`. `credential` (an `ASAuthorizationAppleIDCredential`) exposes
+  `identity_token` as a `PackedByteArray` (the JWT, decoded to a UTF-8 string before
+  handing to Firebase), plus `email`/`full_name`/`user`.
+- **`ASWebAuthenticationSession`** - a generic system-presented OAuth browser sheet
+  (`start(auth_url, callback_scheme, prefers_ephemeral) -> bool` →
+  `completed(callback_url)` / `canceled()` / `failed(message)`). Not Apple-specific - the
+  iOS Google Sign-In bridge reuses this SAME class to open Google's own OAuth
+  authorization endpoint directly, since Google publishes no first-party Godot plugin and
+  this project's standing architecture avoids vendoring the (large) Google iOS SDK for one
+  ID token.
+
+Both are resolved via `ClassDB.instantiate("ASAuthorizationController")` /
+`ClassDB.instantiate("ASWebAuthenticationSession")` in `scripts/ui/account_screen.gd`
+(`_apple_auth_instance()`/`_google_web_auth_instance()`) - **never** `Engine.
+get_singleton()` (that pattern is the Android Credential Manager plugin's own, unrelated
+convention). Every signal connection is `CONNECT_DEFERRED`, the same rule
+`game_center_cloud_backend.gd` already documents (SwiftGodot calls back off the main
+thread; connecting non-deferred there refuses `add_child()`/UI updates). Availability is
+`ClassDB.class_exists(...)`, mirroring `game_center_cloud_backend.gd`'s own
+`OS.get_name() != "iOS" or not ClassDB.class_exists(PLUGIN_CLASS)` guard - both fail
+safely (a status message, never a crash) when the extension isn't loaded, including on
+every desktop/editor run (confirmed: this pass's headless parse check ran on a machine
+with neither extension present).
+
+**Sign in with Apple flow**: `_on_apple_continue_pressed()` → `ASAuthorizationController.
+signin_with_scopes()` → `_on_apple_authorization_completed(credential)` decodes
+`identity_token` and calls `FirebaseAuth.sign_in_with_apple_id_token(identity_token, "")`
+- the raw-nonce argument is always empty here because this vendored module's
+`signin_with_scopes()` API exposes no nonce control (Firebase's REST layer accepts an
+empty nonce; `sign_in_with_apple_id_token()`'s own code comment explains why this is
+defense-in-depth, not a hard requirement). `FirebaseAuth.sign_in_with_apple_id_token()` is
+a structural mirror of the already-verified `sign_in_with_google_id_token()`: same
+`accounts:signInWithIdp` call (`providerId=apple.com`), same `needConfirmation` →
+`NEEDS_LINK` handling when the email already owns a different-provider account, same
+`_apply_auth_response()` on success. `link_pending_apple_credential()` mirrors
+`link_pending_google_credential()`'s `accounts:update` call exactly. **Known
+unverified detail**: `authorization_failed` is this module's ONLY failure signal - unlike
+the Android Google plugin's separate cancelled/failed signals, there is no distinct "user
+dismissed the sheet" signal here. `_on_apple_authorization_failed()` currently guesses
+cancellation by checking whether the message text contains "cancel" - a heuristic, not
+confirmed against a real `ASAuthorizationError.canceled` message on a device.
+
+**iOS Google Sign-In flow**: `_start_google_sign_in_ios()` builds a Google OAuth
+authorization URL (`https://accounts.google.com/o/oauth2/v2/auth`) with
+`response_type=id_token` (so the callback carries a usable ID token directly, no
+server-side code exchange needed), `client_id=FirebaseConfig.GOOGLE_IOS_CLIENT_ID` (the
+iOS-specific OAuth client - **never** the Android/web client id: Android's Credential
+Manager flow needs the web client id because it builds the token server-side, while this
+flow authenticates directly AS the iOS client), and `redirect_uri`/`callback_scheme` built
+from `FirebaseConfig.GOOGLE_IOS_REVERSED_CLIENT_ID`. `ASWebAuthenticationSession.start()`
+presents the sheet; `_on_google_web_auth_completed(callback_url)` extracts `id_token=`
+from the callback URL's **fragment** (`_extract_fragment_param()` - Google's implicit
+flow returns it there, never in the query string) and calls the SAME `FirebaseAuth.
+sign_in_with_google_id_token()` Android already uses. **Known unverified detail**: whether
+Google's OAuth endpoint actually honors `response_type=id_token` for an iOS-type client
+via a custom-scheme redirect, and returns the token in the fragment as assumed - if not,
+this needs a follow-up authorization-code + PKCE exchange (structurally similar, one more
+`HTTPRequest` call against `https://oauth2.googleapis.com/token`, no vendored SDK
+required) instead of the current implicit flow.
+
+**Platform-aware account screen**: `_refresh_view()` now shows `AppleContinueButton` only
+when `OS.get_name() == "iOS"`, and hides BOTH native-provider buttons entirely on desktop/
+editor (previously the Google button stayed visible everywhere and only failed with a
+click-time message once pressed - tightened per this pass's brief, which asked for
+unsupported native buttons to be hidden or clearly unavailable, not a redesign of the
+screen). `OrLabel` (the visual divider above the email/password fields) follows the same
+visibility.
+
+**Export configuration**: `export_presets.cfg`'s iOS preset's `entitlements/additional`
+gained `com.apple.developer.applesignin` (`["Default"]`), exactly as the vendored module's
+own `AuthenticationServicesGuide.md` documents as required. No `GoogleService-Info.plist`
+is needed or added - this flow talks to Google's OAuth endpoint and Firebase's REST API
+directly, consistent with the project's standing "REST-only, no native Firebase SDK" rule
+extending naturally to "no vendored Google iOS SDK either."
+
+**Account deletion**: inspected (a full grep of `scripts/`) and confirmed to not exist
+anywhere in this codebase, on either platform. Deliberately NOT implemented this pass -
+Apple App Store Guideline 5.1.1(v) requires in-app account deletion once account creation
+is offered, which BeamShift's existing Create Account flow already qualifies for. See
+`CLAUDE.md`'s "iOS Authentication rules (D116)" for the required architecture as a
+documented follow-up (Firebase `accounts:delete`, a Firestore-cleanup decision, a stronger
+confirmation UI than the existing sign-out dialog, and an explicit local-save-retention
+decision) before any App Store submission that keeps account creation enabled.
+
+**What this pass explicitly did NOT do**: write any new native Swift/GDExtension code (the
+vendored module already covers both providers); touch Android's verified Google Sign-In/
+Firestore path in any way; build an IPA, run CI, or use Xcode/a Mac; create or revoke any
+Apple certificate, key, or provisioning profile; implement account deletion; verify
+anything on a physical device. See `tools/ios_plugin_src/README.md` for the complete list
+of what remains unconfirmed, and `TEST_PLAN.md`'s manual iPhone test plan (Tests A-I) for
+the exact checklist to run once a Mac/iPhone are available.
+
+## iOS CI/TestFlight pipeline preparation (D117 - LOCAL ONLY, never executed)
+
+Prepares the `ios-appstore` job in `.github/workflows/release.yml` (built by the pass
+above) for a future signed build, without running it, touching secrets, or pushing
+anything. Full reference: `references/ci-cd.md` (new this pass - the workflow's own header
+comment already pointed at it).
+
+**Confirmed and fixed CI blocker**: `export_presets.cfg`'s iOS preset
+(`[preset.2.options]`) never contained `application/provisioning_profile_uuid_release` -
+confirmed by direct `grep` before any edit. `tools/ci/stamp_version.sh`'s `sub()` helper
+(the shared substitution function every stamped field goes through) requires the pattern
+it's given to match an exact expected count of lines, and fails loudly (`exit 1`) rather
+than silently skipping if it doesn't. Since the key didn't exist at all, the very first
+real CI run supplying `IOS_PROVISIONING_PROFILE_B64` would have failed with `stamp failed:
+ios profile uuid matched 0 line(s), expected 1` inside the "Stamp version + signing
+identifiers" step - after the certificate and provisioning profile had already been
+imported/installed in the two preceding steps, making it a late, confusing failure point
+rather than an early one. Fixed by adding the key empty
+(`application/provisioning_profile_uuid_release=""`), directly beside its existing sibling
+`application/provisioning_profile_specifier_release` - matching Godot's own convention for
+this preset (every signing-related field defaults to an empty string until CI stamps it).
+
+**Verification method (isolated, never against the real preset)**: copied
+`export_presets.cfg`, `project.godot`, and `tools/ci/stamp_version.sh` into a disposable
+temp-fixture directory outside the repo, then ran the real, unmodified script against that
+copy with `APPLE_TEAM_ID=DUMMYTEAMID01 IOS_PROFILE_UUID=00000000-1111-2222-3333-444444444444`.
+All five substitutions (`version/code`, `version/name`, `application/short_version`,
+`application/version`, `application/app_store_team_id`) plus the newly-added
+`application/provisioning_profile_uuid_release` landed correctly on that copy; the fixture
+was then deleted. The real, tracked `export_presets.cfg` was re-grepped afterward and
+confirmed to still carry the empty string - no fake signing data ever touched the file
+this pass edited for real.
+
+**AuthenticationServices CI verification added**: before this pass, only the step "Verify
+the Game Center extension registered" existed, even though the same install step
+(`GAP_BUILD`-pinned) also fetches `GodotApplePluginsAuthenticationServices` (D116). A
+silently-missing or renamed `.gdextension` inside that release zip would previously have
+gone undetected by CI and only surfaced later as a confusing `null` from
+`ClassDB.instantiate()` on a real device. Added a new step immediately after the Game
+Center check: it globs for the installed module's `.gdextension` filename under
+`addons/GodotApplePluginsAuthenticationServices/` (deliberately not a hardcoded filename,
+since this pass had no way to independently re-download and inspect the pinned release zip
+to confirm the exact name - unlike D116, which did do that download), fails if none is
+found, then fails again if that discovered filename does not appear in
+`.godot/extension_list.cfg` (i.e. Godot's `--import` did not register it).
+
+**Static review of the uncommitted iOS auth implementation**: re-read
+`firebase_auth.gd`'s `sign_in_with_apple_id_token()`/`link_pending_apple_credential()` and
+`account_screen.gd`'s Apple/Google/platform-branching sections in full, independent of
+D116's own claims. No defect found. Confirmed: the Apple pair is a correct structural
+mirror of the Google pair (same `NEEDS_LINK`/session-generation-staleness/never-clear-
+pending-token-on-`OFFLINE` patterns); every native-button visibility check correctly
+excludes desktop; every `print()` statement in both files logs only booleans, lengths, and
+Firebase's stable string error codes - never token/password/Authorization-header content.
+
+**URL scheme decision (Phase 5 of this pass)**: deliberately did NOT add a
+`CFBundleURLTypes` entry to `export_presets.cfg`'s `application/additional_plist_content`
+for the Google OAuth callback (`FirebaseConfig.GOOGLE_IOS_REVERSED_CLIENT_ID`). Apple's
+documented `ASWebAuthenticationSession` behavior is that the session itself intercepts its
+own callback via the `callbackURLScheme` parameter passed to `start()`, without requiring
+the app to separately register that scheme in Info.plist or implement
+`application(_:open:options:)`. This remains explicitly unconfirmed on a real device (item
+5 in `tools/ios_plugin_src/README.md`'s open list) either way, so no export-config change
+was made on an unverified assumption in either direction. If a future physical-device test
+shows the callback failing to route back into the app, the documented fix is adding a
+`CFBundleURLTypes` array entry with that scheme to `additional_plist_content` - not a
+redesign of the bridge itself.
+
+**Not done this pass**: no git add/commit/push/branch/tag/PR; no GitHub secret created,
+read, or modified; no `workflow_dispatch` triggered; no Apple certificate, provisioning
+profile, or App Store Connect API key created or downloaded; no signed IPA built (this
+environment has no macOS runner); no TestFlight upload; no App Store submission; no
+Firebase security rule change; no Android file touched (`git diff --stat` confirms zero
+diff on anything Android-specific). See `DECISIONS.md` D117 and `STORE_RELEASE.md` section
+19 for the full writeup, and `references/ci-cd.md` for the exact approval-gated sequencing
+of the first real signed build.

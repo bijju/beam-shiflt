@@ -6790,3 +6790,223 @@ verified the actual output file, not just "export succeeded":
 - Not verified (needs Play Console / a real device): the Play-App-Signing-re-signed variant
   of this AAB, Play Games Saved Games / native fallback at runtime with an empty Game ID,
   AdMob (deliberately off in this build, no local production ad-id file).
+
+## iOS Authentication + Cross-Platform Cloud Save (2026-09-29) - DESKTOP-VERIFIED ONLY (parse checks), manual iPhone test plan below NOT YET RUN
+
+See `ARCHITECTURE.md`'s "iOS Authentication" section, `CLAUDE.md`'s "iOS Authentication
+rules (D116)", `DECISIONS.md` D116, and `STORE_RELEASE.md` section 18 for the full
+architecture. This section records what desktop verification actually happened, and lays
+out the exact manual checklist for whoever next has a Mac + Xcode + a physical iPhone -
+per CLAUDE.md rule 12a/12d, none of Tests A-I below may be marked done from source review,
+a rendered screenshot, or reasoning about the code; only a real device counts.
+
+### What was actually run this pass (desktop)
+
+- **Parse check**: `project.godot`'s `run/main_scene` was temporarily pointed at
+  `scenes/ui/account_screen.tscn`, `godot --headless --path .` was run under a timeout,
+  the output was grepped for `Parse Error`/`SCRIPT ERROR` (none found, only expected
+  engine-shutdown noise), and `run/main_scene` was reverted via `git checkout --` and
+  confirmed clean via `git status` - the exact technique this project's own history
+  documents for exercising a non-main scene (`CLAUDE.md`'s testing-expectations section).
+  Run twice: once immediately after the first Apple/Google wiring draft (which used an
+  incorrect `Engine.get_singleton()` assumption for the iOS bridges), and again after the
+  correction to `ClassDB.instantiate()` - both passes were clean.
+- **Vendored-module existence check**: the pinned `GodotApplePlugins` release zip
+  (`.github/workflows/release.yml`'s `GAP_BUILD`) was downloaded directly and its listing
+  inspected with `unzip -l`, confirming a real, built
+  `GodotApplePluginsAuthenticationServices.xcframework` (both `ios-arm64` - real device -
+  and `ios-arm64_x86_64-simulator` slices) exists inside it. This proves the CI vendoring
+  step points at real, existing build output; it does NOT prove the extension registers
+  correctly, exports correctly, or behaves correctly at runtime - none of that can be
+  checked without macOS.
+- **Cross-check against Android**: `git diff --stat` confirmed no Android-related file
+  (Kotlin source, `addons/GodotGoogleSignIn/**`, Android export preset, `versionCode`) was
+  touched by this pass - the Play-Store-verified Android Google Sign-In/Firestore path is
+  structurally unaffected.
+
+### Manual iPhone test plan (run once a Mac + Xcode + a physical iPhone are available)
+
+Prerequisites: a real macOS CI run (or local Xcode export) producing a signed IPA/TestFlight
+build with the `GodotApplePluginsAuthenticationServices` extension actually included and the
+`com.apple.developer.applesignin` entitlement actually applied (this alone is unverified -
+confirm the export succeeds and the entitlement appears in the built app's actual
+`embedded.mobileprovision`/entitlements before running any test below). A second real
+device or Android build for the cross-platform tests (C/D).
+
+**TEST A - New Apple account (clean install)**
+1. Fresh install, no prior BeamShift data on this device/Apple ID.
+2. Settings -> Account -> SIGN IN WITH APPLE.
+3. Confirm a new Firebase user is created (no NEEDS_LINK message shown).
+4. Play a level or two to create identifiable progress.
+5. Confirm the Cloud Save status line reads Synced (not "Local progress only").
+6. Relaunch the app - confirm the session persists (still signed in, no re-prompt) and
+   progress is still present.
+
+**TEST B - Apple reinstall (cloud save recovery)**
+1. Starting from Test A's signed-in state with real progress, uninstall the app.
+2. Reinstall, Settings -> Account -> SIGN IN WITH APPLE with the SAME Apple ID.
+3. Confirm the same Firebase UID/account is recovered (not a new account).
+4. Confirm Main Menu CONTINUE resumes the same progress that existed before uninstall.
+
+**TEST C - Android -> iOS Google cross-platform**
+1. On an Android device/build, sign in with a real Google account via CONTINUE WITH
+   GOOGLE, create identifiable progress (a level or two beyond a fresh save).
+2. On the iOS build, Settings -> Account -> CONTINUE WITH GOOGLE, choosing the SAME
+   Google account.
+3. Confirm the resulting Firebase UID matches the Android session's (check via a
+   temporary debug print of `FirebaseAuth.get_uid()`, or infer from the SAME cloud save
+   being recovered - never surface the UID to the player permanently).
+4. Confirm Main Menu CONTINUE on iOS resumes the Android-created progress.
+
+**TEST D - Email/password cross-platform**
+1. Create an account via email/password on Android (Settings -> Account -> CREATE
+   ACCOUNT), with identifiable progress.
+2. On iOS, Settings -> Account -> sign in with the SAME email/password.
+3. Confirm the same UID/save is recovered, same as Test C.
+
+**TEST E - Link Apple to an existing Google account**
+1. On iOS, sign in with an existing Google account (CONTINUE WITH GOOGLE).
+2. Trigger an Apple link (this pass did not build a dedicated "link" UI entry point
+   beyond the existing NEEDS_LINK flow - if no explicit "link" affordance exists yet when
+   this test runs, that itself is a finding to report, not a test failure to force past).
+3. Confirm the Firebase UID is unchanged after linking.
+4. Sign out, then SIGN IN WITH APPLE using the now-linked Apple ID.
+5. Confirm the SAME Firebase UID/save is returned (not a new account).
+
+**TEST F - Link conflict (Apple credential already belongs to another Firebase user)**
+1. Have two distinct Firebase accounts on record, one of which already has an Apple
+   credential linked (e.g. from Test A/B, under a different Apple ID than the account
+   under test).
+2. Attempt to link that SAME Apple credential to a different, currently-signed-in
+   account.
+3. Confirm: no automatic merge occurs, neither account's cloud save is overwritten, and a
+   clear, non-technical error message is shown (`_friendly_error()`'s
+   `FEDERATED_USER_ID_ALREADY_LINKED`/`CREDENTIAL_ALREADY_IN_USE` mapping - "This account
+   is already linked to a different BeamShift account.").
+
+**TEST G - Cancel**
+1. Tap SIGN IN WITH APPLE, then dismiss the system Apple ID sheet without completing it.
+2. Confirm the app remains fully usable (no stuck "Working..."/busy state, no error
+   message shown - `_on_apple_authorization_failed()`'s cancel-message heuristic is
+   exactly what this test validates or disproves; if a real failure gets miscategorized
+   as a cancel, or vice versa, that is the finding to report).
+3. Repeat for CONTINUE WITH GOOGLE, dismissing the `ASWebAuthenticationSession` sheet.
+
+**TEST H - Offline**
+1. Disable network connectivity (airplane mode) before attempting either sign-in.
+2. Confirm the attempt fails safely (no crash, no stuck busy state) and the LOCAL save
+   remains completely intact and playable - `InternetManager.is_online` is checked
+   before every `FirebaseAuth` network call, same as the already-verified Android path.
+
+**TEST I - Session restore**
+1. Sign in via either provider, confirm success.
+2. Force-close the app completely (not just background it).
+3. Relaunch.
+4. Confirm the Firebase session restores automatically (no re-prompt) and the Cloud Save
+   status line reflects the signed-in/synced state without any user action.
+
+### Known unknowns Tests A-I are specifically expected to resolve
+
+From `tools/ios_plugin_src/README.md` - report the actual finding for each, do not assume
+the current implementation is correct just because it compiled:
+1. Whether `_on_apple_authorization_failed()`'s "contains 'cancel'" heuristic correctly
+   distinguishes Test G's cancellation from a real failure.
+2. Whether Google's OAuth endpoint actually returns `id_token=` in the callback URL's
+   FRAGMENT (not query string, not an authorization `code=`) for the iOS OAuth client
+   type used here - if it returns a `code` instead, `_start_google_sign_in_ios()`/
+   `_on_google_web_auth_completed()` need a follow-up authorization-code + PKCE exchange.
+3. Whether any additional `CFBundleURLTypes` entry in the iOS Info.plist is needed for
+   `ASWebAuthenticationSession`'s custom-scheme callback to route back into the app
+   reliably (Apple's documented behavior says no; unconfirmed here).
+4. Whether the CI vendoring step (`.github/workflows/release.yml`) actually produces a
+   working signed export with both `GodotApplePluginsAuthenticationServices` and
+   `GodotApplePluginsGameCenter` coexisting correctly.
+
+## iOS CI/TestFlight pipeline preparation (D117, 2026-09-29) - LOCAL-ONLY verification, no CI run
+
+Covers what was actually checked in this pass for the `ios-appstore` job's readiness, and
+what is still explicitly untested pending a real macOS CI run and boss/owner approval to
+add signing secrets. See `ARCHITECTURE.md`'s matching section and `DECISIONS.md` D117 for
+the full architecture writeup.
+
+**What was actually run this pass (isolated fixture, not the real environment or CI):**
+- Copied `export_presets.cfg`, `project.godot`, and `tools/ci/stamp_version.sh` into a
+  disposable temp directory outside the repo. Ran the real script with
+  `APPLE_TEAM_ID=DUMMYTEAMID01 IOS_PROFILE_UUID=00000000-1111-2222-3333-444444444444
+  tools/ci/stamp_version.sh 1.0.7`. Confirmed via `grep` that all six expected
+  substitutions landed correctly on the fixture copy, including the newly-added
+  `application/provisioning_profile_uuid_release`. Deleted the fixture. Re-grepped the
+  real, tracked `export_presets.cfg` afterward and confirmed the key is still present and
+  empty (`""`) - the real file was never stamped with the dummy values.
+- Re-read `.github/workflows/release.yml`'s `ios-appstore` job end to end against a
+  checklist (trigger conditions, `has_ios`/`has_ios_upload` guard outputs, certificate
+  import, provisioning-profile decode/install + `IOS_PROFILE_UUID` propagation via
+  `$GITHUB_ENV`, the StoreKit/Game Center/AuthenticationServices install and verification
+  steps, the signed-vs-unsigned export branch, artifact upload, and the TestFlight
+  upload's `if:` condition) - all structurally present and consistent. **No YAML linter
+  was available in this environment**, so this is a read-through, not a schema-validated
+  pass - the same limitation every prior pass touching this file has had.
+- Re-read `firebase_auth.gd`'s Apple sign-in/linking functions and `account_screen.gd`'s
+  Apple/Google/platform-branching sections and every `print()` call in both files. No
+  defect found; logging confirmed safe (booleans/lengths/error codes only).
+
+**What was NOT run this pass (needs a real macOS CI run - this environment has no macOS
+runner and made no attempt to fake one):**
+1. Whether the new "Verify the AuthenticationServices extension registered" CI step's
+   glob-based filename discovery actually finds and correctly validates the real
+   `.gdextension` file inside the pinned `GodotApplePlugins` release zip - this pass could
+   not itself download and inspect that zip to confirm the exact filename (D116's own pass
+   did do that download; this pass relied on discovering the name via `find` rather than
+   re-verifying it independently).
+2. Whether the newly-added `application/provisioning_profile_uuid_release` key, once a
+   real `IOS_PROVISIONING_PROFILE_B64` secret exists, actually gets picked up correctly by
+   Godot's iOS exporter during a real signed export (the fixture test above only proves
+   `stamp_version.sh`'s own substitution step works - it says nothing about whether Godot's
+   exporter reads that key correctly).
+3. Whether the `ios-appstore` job as a whole still produces a valid signed `.ipa` end to
+   end - unchanged from every prior pass's own disclosure: **the iOS lane has never been
+   executed, on any commit, ever.**
+
+**Do not mark any of the above as verified until a real `workflow_dispatch` run (with
+signing-only secrets, per `references/ci-cd.md` section 10) actually produces and this
+pass's successor actually inspects a signed `.ipa` artifact.**
+
+## Android IAP device test (2026-09-29) - price label fix AUTOMATED-checked; purchase flow MANUAL TEST REQUIRED
+
+Confirmed state: `beamshift_no_forced_ads` (purchase option `no-forced-ads-lifetime`) is
+**ACTIVE** in Google Play Console; a real Android device (Internal Testing, versionCode
+10001) successfully retrieved the live localized price (`₹450.00` in India) via
+`StoreManager.price_text()`. That confirmed a text-overflow bug in the Settings "No Forced
+Ads" button: see `STORE_RELEASE.md` section 20 (section 19b) for the root cause and fix
+(`BuyNoForcedAdsButton` widened 460->640px + a dynamic font-fit safeguard in
+`scripts/ui/settings_menu.gd`). AUTOMATED check performed: headless Godot run with
+`run/main_scene` temporarily pointed at `settings_menu.tscn` completed with zero
+parse/script/resource errors; reverted and confirmed via `git diff`. **The fix has NOT been
+re-screenshotted on a real device** - do that as part of checklist item A below.
+
+**MANUAL TEST REQUIRED - none of the following has been run by any automated pass. Full
+checklist (rationale, expected behavior per step): `STORE_RELEASE.md` section 20.**
+
+- [ ] **A. Initial purchase** - Play Internal Testing install, licensed tester account,
+  Settings shows localized price fitting inside the button (re-verify the fix above), BUY ->
+  Play test-payment sheet -> completes -> button shows OWNED.
+- [ ] **B. Ad behavior** - interstitials stop after purchase; rewarded Hint video still works
+  for an owner (owning No Forced Ads never removes the rewarded hint - it's a separate,
+  intentionally-kept monetization path).
+- [ ] **C. Restart** - force-close + relaunch, entitlement still present.
+- [ ] **D. Restore** - Restore Purchases button correctly restores/confirms ownership.
+- [ ] **E. Reinstall** - uninstall + reinstall from Internal Testing, ownership returns
+  without a second purchase.
+- [ ] **F. Refund/revocation** - DOCUMENTED expected behavior only (`StoreManager`'s next
+  full entitlement query drops the revoked purchase, `SaveManager.entitlements` updates,
+  button returns to purchasable, interstitials resume) - **do not perform an actual refund**
+  without the owner's explicit, separate go-ahead, since a Play Console refund is itself a
+  real remote/console action.
+
+**Do not mark Android IAP purchase flow COMPLETE or device-verified until A-E are actually
+run on a real device and reported back.** This is distinct from and does not supersede the
+existing "Device test checklist" (`STORE_RELEASE.md` section 7), which this supplements with
+IAP-specific detail.
+
+## Android Internal Testing 10002 release AAB checks (2026-09-30)
+AUTOMATED: import clean, headless boot clean, 7 scenes instantiated with zero visible QA nodes, real AAB inspected (version/package/signature/plugins/leak scan). MANUAL TEST REQUIRED: all on-device behavior (Play install, Google Sign-In, cloud restore, IAP purchase/restore, Settings fit, tutorial UI, Level Select scroll).

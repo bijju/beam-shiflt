@@ -88,6 +88,7 @@ custom_minimum_size = Vector2(144, 0)
 layout_mode = 2
 size_flags_vertical = 3
 horizontal_scroll_mode = 0
+scroll_deadzone = 24
 
 [node name="GridCenter" type="CenterContainer" parent="Margin/Layout/ScrollContainer"]
 layout_mode = 2

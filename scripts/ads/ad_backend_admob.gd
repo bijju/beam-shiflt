@@ -84,6 +84,7 @@ func _init_sdk() -> void:
 	for id in AdConfig.test_device_ids():
 		config.test_device_ids.append(id)
 	MobileAds.set_request_configuration(config)
+	print("[Ads] AdMob test devices configured: %d" % config.test_device_ids.size())
 	var listener := OnInitializationCompleteListener.new()
 	listener.on_initialization_complete = _on_initialization_complete
 	MobileAds.initialize(listener)

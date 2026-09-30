@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/tutorial_complete_popup.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/ui/aspect_art_button.gd" id="2"]
 
 [sub_resource type="StyleBoxFlat" id="SBPanel"]
 bg_color = Color(0.05, 0.08, 0.11, 0.96)
@@ -67,28 +68,32 @@ text = "LESSON COMPLETE"
 [node name="NextTutorialButton" type="Button" parent="Center/Panel/Body"]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(0, 96)
-theme_override_font_sizes/font_size = 26
+script = ExtResource("2")
+button_height = 120.0
+theme_override_font_sizes/font_size = 24
 text = "NEXT TUTORIAL"
 
 [node name="CampaignButton" type="Button" parent="Center/Panel/Body"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
-custom_minimum_size = Vector2(0, 96)
-theme_override_font_sizes/font_size = 26
+script = ExtResource("2")
+button_height = 120.0
+theme_override_font_sizes/font_size = 24
 text = "PLAY"
 
 [node name="RetryButton" type="Button" parent="Center/Panel/Body"]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(0, 88)
+script = ExtResource("2")
+button_height = 120.0
 theme_override_font_sizes/font_size = 24
 text = "RETRY"
 
 [node name="TutorialSelectButton" type="Button" parent="Center/Panel/Body"]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(0, 88)
+script = ExtResource("2")
+button_height = 120.0
 theme_override_font_sizes/font_size = 24
 text = "TUTORIAL SELECT"

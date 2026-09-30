@@ -1,5 +1,7 @@
 # CLAUDE.md — Permanent Instructions for Future Claude Sessions
 
+> **iOS CI/TestFlight pipeline preparation (2026-09-29, local-only, no commit/push/CI run):** owner asked to prepare the never-executed iOS GitHub Actions lane (built during the iOS Authentication pass below) for a future signed build, strictly locally. Fixed a real confirmed CI blocker: `export_presets.cfg`'s iOS preset never contained `application/provisioning_profile_uuid_release` at all, which `tools/ci/stamp_version.sh` would have failed on the moment a real `IOS_PROVISIONING_PROFILE_B64` secret was ever supplied - added the key empty, verified the fix in an isolated temp-fixture copy (never against the real preset), confirmed the real committed file still holds the empty string. Added a fail-fast "Verify the AuthenticationServices extension registered" step to `.github/workflows/release.yml` (Game Center's own registration was already checked; AuthenticationServices, installed by the same step, was not). Re-read the entire uncommitted iOS auth implementation (Apple Sign-In, iOS Google bridge, linking, platform branching, token logging) and found no defect. Decided NOT to add a `CFBundleURLTypes` Info.plist entry for the Google OAuth callback - `ASWebAuthenticationSession` is documented to intercept its own callback without one, and this remains genuinely unconfirmed on-device either way (see `tools/ios_plugin_src/README.md` item 5); do not add it speculatively. Created `references/ci-cd.md` (the workflow's own header comment already pointed at it). See `DECISIONS.md` D117 for the full writeup. **No git add/commit/push/branch/tag/PR, no GitHub secret touched, no `workflow_dispatch` triggered, no Apple certificate/profile/API key created, no signed IPA built, no TestFlight upload, no App Store submission.** Boss/owner approval is required before any of: adding GitHub secrets, pushing this branch, or running the workflow - see `references/ci-cd.md` section 10 for the exact first-build sequencing once approved.
+> **iOS Authentication + Cross-Platform Cloud Save (2026-09-29):** owner asked to extend the Play-Store-verified Android Google Sign-In -> Firebase Auth -> Firestore cloud-save flow to iOS, adding Sign in with Apple, with Firebase as the one authoritative cross-platform identity/cloud-save layer. Inspection found this project already vendors a SwiftGodot GDExtension (`GodotApplePlugins`, pinned build `bfade13ff8b6027ede438bac637b5bf93057d404`) for Game Center - the SAME pinned build also ships an `AuthenticationServices` module (`ASAuthorizationController` for Sign in with Apple, `ASWebAuthenticationSession` for a generic OAuth browser sheet, confirmed by downloading and inspecting the real release zip), so **zero new native Swift code was needed**: `FirebaseAuth` gained `sign_in_with_apple_id_token()`/`link_pending_apple_credential()` (a structural mirror of the already-verified Google pair), `account_screen.gd` gained platform-aware Apple/Google buttons (iOS routes Google through `ASWebAuthenticationSession` hitting Google's OAuth endpoint directly with `response_type=id_token`, never the Android Credential Manager path), `export_presets.cfg`'s iOS entitlements gained `com.apple.developer.applesignin`, and `.github/workflows/release.yml` now vendors the AuthenticationServices module alongside Game Center. Provider linking follows the same NEEDS_LINK -> password sign-in -> `accounts:update` pattern Google's Phase 4A already established - never merges accounts, never guesses by email. Account deletion was inspected (none exists anywhere in the codebase) and deliberately NOT implemented - see STORE_RELEASE.md's iOS section for the required architecture as a documented follow-up. **Desktop-verified only** (headless parse checks via the project's own `run/main_scene` swap technique) - nothing here has touched a real device, macOS, or Xcode; see `tools/ios_plugin_src/README.md` for the exact list of what remains unverified (Apple cancellation-message heuristic, Google's `response_type=id_token` behavior for an iOS OAuth client, whether a Info.plist URL scheme is additionally required). No commit/push/merge; branch `dev_abhilas` unchanged; no Android code touched; no AAB built.
 > **Firebase REST Auth Phase 1 (2026-09-28):** owner chose Firebase Auth REST API + Firestore REST API (later) over the native SDK. Phase 1 (this pass) implemented Firebase Authentication only - `FirebaseAuth` autoload + `FirebaseConfig` - create account / sign in / refresh / password reset / sign out / session restore, all REST, no `google-services.json`. BLOCKED on the real Firebase Web API key (owner must supply `config/firebase_config.local.json`, gitignored - see "Firebase REST Auth rules" below for exactly where to get it). No Account UI, no Firestore, no Settings SIGN IN wiring yet - see `STORE_RELEASE.md` for phase status and next step.
 > **Store-release pass (2026-09-26):** owner asked to prepare Google Play + App Store: bundle `com.foursagez.beamshift`, child-directed ads, "No Forced Ads" IAP, cloud save, AAB/iOS presets, CI - code done, console work pending (`STORE_RELEASE.md` section 5). The IAP/SDK additions were explicitly requested; the "no IAP/external SDKs" scope line below predates them.
 > **Current phase (2026-09-25): S3.1 NEXT - V5 J/K difficulty refinement.** S1/S2 complete, S3 implemented but NOT certified, S4 (APK) not started. Tool-independent continuation prompt: `NEXT_AI_PROMPT.md`. Nothing from S1-S3 is committed; do not commit/push/build unless asked.
@@ -1707,6 +1709,75 @@ Full architecture, band table, family catalog, measured evidence and known weakn
   diagnosed 2026-09-29 (`STORE_RELEASE.md` section 17). Registering the missing SHA-1 is
   a console-only fix - it never requires a new client build, since the validation is
   server-side.
+
+## iOS Authentication rules (iOS Auth Phase 1, D116)
+
+- **Firebase remains the ONE authoritative cross-platform identity/cloud-save layer.**
+  Android's Google Sign-In -> Firebase -> Firestore path (Play-Store device-verified) is
+  unchanged. iOS Sign in with Apple and iOS Google Sign-In both fold into the SAME
+  `FirebaseAuth`/`CloudSave`/Firestore stack - never a separate iOS-only identity system.
+  Game Center/iCloud may still exist for platform-specific cloud save (see the existing
+  `CloudSave` backend-selection rules), but they are never the primary account.
+- **No native Firebase SDK, no `GoogleService-Info.plist`, ever - this holds for iOS too,
+  not just Android.** Every Firebase call stays REST-only through `FirebaseAuth`/
+  `FirebaseFirestoreREST`, matching the existing Firebase REST Auth rules above. The
+  Google iOS OAuth client id (`FirebaseConfig.GOOGLE_IOS_CLIENT_ID`) is used directly
+  against Google's own OAuth endpoint - it needs no Google iOS SDK and no
+  `GoogleService-Info.plist` to function.
+- **iOS native auth reuses the ALREADY-VENDORED `GodotApplePlugins`
+  `AuthenticationServices` module - never a second, bespoke Swift plugin.** The same
+  pinned build (`.github/workflows/release.yml`'s `GAP_BUILD`) that supplies
+  `GodotApplePluginsGameCenter` also supplies `GodotApplePluginsAuthenticationServices`
+  (`ASAuthorizationController` for Sign in with Apple, `ASWebAuthenticationSession` - a
+  generic OAuth browser sheet - reused for the iOS Google Sign-In bridge, since Google
+  publishes no first-party Godot plugin and this project does not vendor the Google iOS
+  SDK). Both are plain `RefCounted` extension classes, resolved via
+  `ClassDB.instantiate("ASAuthorizationController")` /
+  `ClassDB.instantiate("ASWebAuthenticationSession")` - **never** an `Engine.get_singleton()`
+  lookup (that pattern is Android Credential Manager-only); every signal connection is
+  `CONNECT_DEFERRED`, the same rule `game_center_cloud_backend.gd` already documents
+  (SwiftGodot calls back off the main thread). See `tools/ios_plugin_src/README.md`
+  before touching any of this - it is a decision record, not a buildable plugin folder;
+  there is no Swift source to compile for this feature.
+- **`export_presets.cfg`'s iOS `entitlements/additional` carries
+  `com.apple.developer.applesignin` (array `["Default"]`), required by the vendored
+  module's own documented setup.** Do not remove it while Sign in with Apple exists in
+  the account screen.
+- **Provider linking never merges accounts by email and never guesses.** Both
+  `link_pending_google_credential()` and `link_pending_apple_credential()`
+  (`scripts/managers/firebase_auth.gd`) only ever attach a NEW provider credential to the
+  CURRENTLY signed-in Firebase UID via `accounts:update`, after the player has proven
+  ownership of that account through a real password sign-in following a `NEEDS_LINK`
+  response - the same pattern Google's Phase 4A established. A credential already linked
+  to a DIFFERENT Firebase user surfaces `FEDERATED_USER_ID_ALREADY_LINKED`/
+  `CREDENTIAL_ALREADY_IN_USE` as a friendly, non-blocking message - never an automatic
+  merge, never an overwrite of either account's cloud data.
+- **Account deletion does not exist anywhere in this codebase (confirmed by inspection,
+  iOS Auth Phase 1) and was deliberately NOT implemented this pass.** Apple App Store
+  Review Guideline 5.1.1(v) requires in-app account deletion once account creation is
+  offered - BeamShift's Create Account flow already qualifies. Before any App Store
+  submission that keeps account creation enabled, build: (1) `FirebaseAuth.delete_account()`
+  via `accounts:delete` (requires a fresh `idToken` - Firebase's `requiresRecentLogin`-
+  style constraint may force a re-authentication prompt first), (2) a
+  `FirebaseFirestoreREST` call to remove `users/{uid}/save/current` (or an accepted
+  decision to leave orphaned Firestore data, which needs its own sign-off), (3) a
+  destructive-action confirmation UI matching this project's existing sign-out
+  confirmation pattern (`account_screen.gd`'s `_show_sign_out_confirmation()`) but with
+  stronger wording, and (4) a decision on what happens to the LOCAL save (kept, per this
+  project's existing "sign-out preserves local progress" philosophy, is the most
+  consistent default, but confirm explicitly - deletion feels different from sign-out to
+  a player). Never build this without being explicitly asked, and never delete a real
+  test/production Firebase user while testing it.
+- **Do not claim iOS Sign in with Apple or Google Sign-In as DEVICE VERIFIED without a
+  real iPhone/iPad test** (rule 12a/12d - unchanged, restated here because this is the
+  first iOS-native feature this project has driven end-to-end). `tools/ios_plugin_src/
+  README.md` lists exactly what remains unconfirmed: the Apple cancellation-message
+  heuristic (`account_screen.gd`'s `_on_apple_authorization_failed()`), whether Google's
+  OAuth endpoint actually honors `response_type=id_token` for this iOS client type and
+  returns it in the callback URL's fragment (vs. requiring an authorization-code + PKCE
+  follow-up), and whether an additional Info.plist `CFBundleURLTypes` entry is needed for
+  `ASWebAuthenticationSession`'s custom-scheme callback. See `TEST_PLAN.md`'s manual
+  iPhone test plan (Tests A-I) for the exact checklist once a Mac/iPhone are available.
 
 ## Production build rules (D114)
 

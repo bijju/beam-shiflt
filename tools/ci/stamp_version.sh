@@ -11,6 +11,8 @@
 # Optional env, set by the workflow when the Apple secrets exist:
 #   APPLE_TEAM_ID     -> iOS application/app_store_team_id
 #   IOS_PROFILE_UUID  -> iOS application/provisioning_profile_uuid_release
+#   IOS_PROFILE_NAME  -> iOS application/provisioning_profile_specifier_release
+#                        (required whenever the UUID is set)
 #
 # Every substitution must hit the expected number of lines or the script
 # fails: a silent miss would ship a stale versionCode and Play would refuse it.
@@ -62,4 +64,16 @@ if [ -n "$uuid" ]; then
       "application/provisioning_profile_uuid_release=\"$uuid\"" 1 "ios profile uuid"
 fi
 
-echo "stamped version=$version build_code=$code team=${team:--} profile=${uuid:--}"
+pname="${IOS_PROFILE_NAME:-}"
+if [ -n "$uuid" ] && [ -z "$pname" ]; then
+  echo "stamp failed: IOS_PROFILE_UUID is set but IOS_PROFILE_NAME is empty" >&2
+  exit 1
+fi
+if [ -n "$pname" ]; then
+  # Escape for the .cfg string (\ and "), then for the sed replacement (\ & |).
+  esc=$(printf '%s' "$pname" | sed -e 's/[\\"]/\\&/g' -e 's/[\\&|]/\\&/g')
+  sub "$presets" '^application/provisioning_profile_specifier_release=".*"$' \
+      "application/provisioning_profile_specifier_release=\"$esc\"" 1 "ios profile name"
+fi
+
+echo "stamped version=$version build_code=$code team=${team:--} profile=${uuid:--} profile_name=${pname:--}"

@@ -8,6 +8,7 @@ custom_minimum_size = Vector2(240, 253)
 layout_mode = 2
 size_flags_horizontal = 4
 size_flags_vertical = 4
+mouse_filter = 1
 flat = true
 text = ""
 script = ExtResource("1")

@@ -24,7 +24,9 @@ const MIN_PASSWORD_LENGTH := 6
 @onready var _primary_button: Button = %PrimaryButton
 @onready var _mode_toggle_button: Button = %ModeToggleButton
 @onready var _forgot_password_button: Button = %ForgotPasswordButton
+@onready var _apple_continue_button: Button = %AppleContinueButton
 @onready var _google_continue_button: Button = %GoogleContinueButton
+@onready var _or_label: Label = %OrLabel
 @onready var _native_continue_button: Button = %NativeContinueButton
 
 @onready var _signed_in_view: VBoxContainer = %SignedInView
@@ -42,15 +44,47 @@ var _create_mode := false
 var _busy := false
 var _sign_out_confirm_layer: Control = null
 
-## Google Sign-In (Phase 4A). Native Android Credential Manager plugin, checked lazily
-## and cached - never assumed present (desktop/iOS/a debug build without the plugin must
-## all fail safely, never crash). See _google_plugin() / _on_google_continue_pressed().
+## Google Sign-In (Phase 4A, extended to iOS in the iOS Auth pass). Native Credential
+## Manager (Android) / ASWebAuthenticationSession (iOS) plugin, checked lazily and cached
+## - never assumed present (desktop, or a build without the plugin, must fail safely,
+## never crash). Both platforms register the SAME singleton name/signal contract (see
+## tools/android_plugin_src/google_signin/ and tools/ios_plugin_src/google_signin_ios/),
+## so this GDScript layer needs no per-platform branching beyond which client id to send.
+## See _google_plugin_instance() / _on_google_continue_pressed().
 const _GOOGLE_PLUGIN_NAME := "GodotGoogleSignIn"
 var _google_plugin: Object = null
 var _google_plugin_checked := false
 ## True while the player must sign in with their existing password account to link a
 ## Google credential that NEEDS_LINK surfaced (see FirebaseAuth.google_sign_in_finished).
 var _pending_google_link := false
+
+## Sign in with Apple (iOS Auth Phase 1). iOS-only, via the vendored GodotApplePlugins
+## AuthenticationServices GDExtension (addons/GodotApplePluginsAuthenticationServices/,
+## same pinned-release vendoring CI already uses for scripts/cloud/
+## game_center_cloud_backend.gd's Game Center backend - see .github/workflows/release.yml).
+## UNLIKE the Android/iOS Google plugin above, this is NOT an Engine singleton - it is a
+## plain RefCounted extension class (ASAuthorizationController), instantiated via
+## ClassDB.instantiate() exactly like game_center_cloud_backend.gd's PLUGIN_CLASS pattern,
+## with its signals CONNECT_DEFERRED (SwiftGodot calls back off the main thread - see that
+## file's own header comment; the same rule applies here). See
+## _apple_auth_instance() / _on_apple_continue_pressed().
+const _APPLE_AUTH_CLASS := "ASAuthorizationController"
+var _apple_auth: Object = null
+var _apple_auth_checked := false
+
+## iOS Google Sign-In (iOS Auth Phase 1) reuses the SAME vendored AuthenticationServices
+## extension's generic ASWebAuthenticationSession class (a system-presented OAuth browser
+## sheet) rather than a second plugin - Google publishes no first-party Godot bridge, and
+## this project's own architecture deliberately avoids vendoring a large third-party
+## Google iOS SDK when the generic OS-level primitive already does the job. See
+## _google_web_auth_instance() / _start_google_sign_in_ios().
+const _GOOGLE_WEB_AUTH_CLASS := "ASWebAuthenticationSession"
+var _google_web_auth: Object = null
+var _google_web_auth_checked := false
+
+## True while the player must sign in with their existing password account to link an
+## Apple credential that NEEDS_LINK surfaced (see FirebaseAuth.apple_sign_in_finished).
+var _pending_apple_link := false
 
 ## Android keyboard/IME visibility (Phase 4B-B). Two independent, complementary
 ## mechanisms, because Android's soft keyboard behaves differently across devices/
@@ -86,12 +120,13 @@ func _ready() -> void:
 	_primary_button.pressed.connect(_on_primary_pressed)
 	_mode_toggle_button.pressed.connect(_on_mode_toggle_pressed)
 	_forgot_password_button.pressed.connect(_on_forgot_password_pressed)
+	_apple_continue_button.pressed.connect(_on_apple_continue_pressed)
 	_google_continue_button.pressed.connect(_on_google_continue_pressed)
 	_native_continue_button.pressed.connect(_on_native_continue_pressed)
 	_sign_out_button.pressed.connect(_on_sign_out_pressed)
 	_back_button.pressed.connect(func() -> void: GameManager.go_to_settings())
 
-	for button: Button in [_primary_button, _mode_toggle_button, _forgot_password_button, _google_continue_button, _native_continue_button, _sign_out_button, _back_button]:
+	for button: Button in [_primary_button, _mode_toggle_button, _forgot_password_button, _apple_continue_button, _google_continue_button, _native_continue_button, _sign_out_button, _back_button]:
 		button.pressed.connect(AudioManager.play_ui_button_press)
 
 	for field: LineEdit in [_email_field, _password_field, _confirm_password_field]:
@@ -105,6 +140,8 @@ func _ready() -> void:
 	FirebaseAuth.auth_state_changed.connect(_on_auth_state_changed)
 	FirebaseAuth.google_sign_in_finished.connect(_on_google_sign_in_finished)
 	FirebaseAuth.google_link_finished.connect(_on_google_link_finished)
+	FirebaseAuth.apple_sign_in_finished.connect(_on_apple_sign_in_finished)
+	FirebaseAuth.apple_link_finished.connect(_on_apple_link_finished)
 	CloudSave.synced.connect(_on_cloud_synced)
 	CloudSave.signed_in_changed.connect(_on_cloud_signed_in_changed)
 
@@ -120,6 +157,14 @@ func _refresh_view() -> void:
 		_email_value_label.text = FirebaseAuth.get_email()
 		_refresh_cloud_status()
 	else:
+		# Platform-aware provider buttons (iOS Auth Phase 1): Apple only ever shows on
+		# iOS (Apple's own guideline - Sign in with Apple has no meaning elsewhere), and
+		# both native-provider buttons are hidden entirely on desktop/editor rather than
+		# left visible to fail with a click-time message - there is no real account
+		# system to try there. Email/password stays available on every platform.
+		_apple_continue_button.visible = OS.get_name() == "iOS"
+		_google_continue_button.visible = OS.get_name() in ["Android", "iOS"]
+		_or_label.visible = _apple_continue_button.visible or _google_continue_button.visible
 		_native_continue_button.visible = CloudSave.has_native_backend()
 		_native_continue_button.text = _native_continue_label()
 
@@ -203,11 +248,13 @@ func _on_mode_toggle_pressed() -> void:
 
 
 func _set_create_mode(create: bool) -> void:
-	if create and _pending_google_link:
+	if create and (_pending_google_link or _pending_apple_link):
 		# A NEEDS_LINK flow requires signing in to the EXISTING account, not creating a
 		# new one - switching to Create Account abandons the pending link.
 		_pending_google_link = false
+		_pending_apple_link = false
 		FirebaseAuth.cancel_pending_google_link()
+		FirebaseAuth.cancel_pending_apple_link()
 	_create_mode = create
 	_confirm_password_field.visible = create
 	_forgot_password_button.visible = not create
@@ -256,6 +303,9 @@ func _on_sign_in_finished(success: bool, error_code: String) -> void:
 			# does; a link failure here must never undo or block the sign-in.
 			_show_status("Linking Google account...")
 			FirebaseAuth.link_pending_google_credential()
+		elif _pending_apple_link:
+			_show_status("Linking Apple account...")
+			FirebaseAuth.link_pending_apple_credential()
 	else:
 		_show_error(_friendly_error(error_code))
 		_password_field.text = ""
@@ -306,30 +356,38 @@ func _on_password_reset_finished(success: bool, error_code: String) -> void:
 		_show_error(_friendly_error(error_code))
 
 
-## ---- Google Sign-In (Firebase, Phase 4A) ----
+## ---- Google Sign-In (Firebase, Phase 4A + iOS Auth Phase 1) ----
 ##
-## Android Credential Manager (native plugin, GodotGoogleSignIn) -> a Google ID token ->
+## Android: Credential Manager (native plugin, GodotGoogleSignIn, Engine singleton) -> a
+## Google ID token. iOS: ASWebAuthenticationSession (vendored GodotApplePlugins
+## AuthenticationServices extension, a plain instantiated object, NOT an Engine singleton
+## - see the class-level comment on _GOOGLE_WEB_AUTH_CLASS) opens Google's OAuth endpoint
+## directly and reads the id_token off the callback URL. Both funnel into the SAME
 ## FirebaseAuth.sign_in_with_google_id_token() -> accounts:signInWithIdp. Every step fails
-## safely: no plugin (desktop, iOS, or a build without it) shows a message and returns,
-## never crashes and never pretends a sign-in happened.
+## safely: no plugin/extension (desktop, or a build without it) shows a message and
+## returns, never crashes and never pretends a sign-in happened. This button is hidden
+## outright on desktop (see _refresh_view()).
 func _on_google_continue_pressed() -> void:
 	print("[GoogleSignIn] Sign-in button pressed.")
 	if _busy:
 		return
+	if OS.get_name() == "iOS":
+		_start_google_sign_in_ios()
+		return
 	var plugin := _google_plugin_instance()
 	if plugin == null or not bool(plugin.call("isAvailable")):
 		print("[GoogleSignIn] Plugin unavailable (plugin=%s)." % [plugin != null])
-		_show_status("Google Sign-In is only available in the Android app.")
+		_show_status("Google Sign-In is unavailable on this build.")
 		return
 	_set_busy(true)
 	_show_status("Continue with Google...")
 	plugin.call("signIn", FirebaseConfig.GOOGLE_WEB_CLIENT_ID)
 
 
-## Lazily resolves and caches the native plugin singleton. Returns null (never throws) on
-## desktop/iOS or an Android build that doesn't bundle the plugin - callers must always
-## null-check (and, before calling signIn(), also check isAvailable()). Connects the
-## plugin's three result signals exactly once.
+## Lazily resolves and caches the Android Credential Manager plugin's Engine singleton.
+## Returns null (never throws) on desktop, iOS, or an Android build that doesn't bundle
+## the plugin - callers must always null-check (and, before calling signIn(), also check
+## isAvailable()). Connects the plugin's three result signals exactly once.
 func _google_plugin_instance() -> Object:
 	if _google_plugin_checked:
 		return _google_plugin
@@ -368,6 +426,87 @@ func _on_google_plugin_failed(reason: String) -> void:
 	_show_status("Google Sign-In failed. Please try again.")
 
 
+## ---- Google Sign-In on iOS (ASWebAuthenticationSession bridge, iOS Auth Phase 1) ----
+##
+## No first-party Google Godot plugin exists, and this project deliberately avoids
+## vendoring the large Google Sign-In iOS SDK just for one ID token. Instead this opens
+## Google's own OAuth 2.0 / OpenID Connect authorization endpoint in the system-presented
+## ASWebAuthenticationSession sheet (the SAME vendored GodotApplePlugins
+## AuthenticationServices extension the Apple section below uses), requesting an ID token
+## directly (response_type=id_token) so no server-side code exchange is needed - the
+## callback URL's fragment already carries a Firebase-ready id_token. Uses
+## FirebaseConfig.GOOGLE_IOS_CLIENT_ID (never the Android/web client id - see that
+## constant's own comment) and GOOGLE_IOS_REVERSED_CLIENT_ID as both the redirect URL
+## scheme and the session's callback_scheme filter. NOT YET LIVE-VERIFIED against a real
+## Google OAuth response on a device - confirm the callback URL actually carries
+## `id_token=` in its fragment (not `code=`) before treating this as working; if Google's
+## endpoint refuses response_type=id_token for this client type, this needs an
+## authorization-code + PKCE flow instead (a real, but larger, follow-up).
+func _start_google_sign_in_ios() -> void:
+	var web_auth := _google_web_auth_instance()
+	if web_auth == null:
+		print("[GoogleSignIn] ASWebAuthenticationSession unavailable.")
+		_show_status("Google Sign-In is unavailable on this build.")
+		return
+	_set_busy(true)
+	_show_status("Continue with Google...")
+	var nonce := _random_token()
+	var state := _random_token()
+	var redirect_uri := "%s:/oauth2redirect" % FirebaseConfig.GOOGLE_IOS_REVERSED_CLIENT_ID
+	var auth_url := "https://accounts.google.com/o/oauth2/v2/auth" \
+		+ "?client_id=" + FirebaseConfig.GOOGLE_IOS_CLIENT_ID.uri_encode() \
+		+ "&redirect_uri=" + redirect_uri.uri_encode() \
+		+ "&response_type=id_token" \
+		+ "&scope=" + "openid email".uri_encode() \
+		+ "&nonce=" + nonce \
+		+ "&state=" + state
+	var started := bool(web_auth.call("start", auth_url, FirebaseConfig.GOOGLE_IOS_REVERSED_CLIENT_ID, false))
+	if not started:
+		print("[GoogleSignIn] ASWebAuthenticationSession.start() returned false.")
+		_set_busy(false)
+		_show_status("Google Sign-In failed. Please try again.")
+
+
+## Lazily resolves and caches an ASWebAuthenticationSession instance. Returns null (never
+## throws) off iOS or on a build that doesn't bundle the extension.
+func _google_web_auth_instance() -> Object:
+	if _google_web_auth_checked:
+		return _google_web_auth
+	_google_web_auth_checked = true
+	if OS.get_name() == "iOS" and ClassDB.class_exists(_GOOGLE_WEB_AUTH_CLASS):
+		_google_web_auth = ClassDB.instantiate(_GOOGLE_WEB_AUTH_CLASS)
+		if _google_web_auth != null:
+			print("[GoogleSignIn] %s available." % _GOOGLE_WEB_AUTH_CLASS)
+			_google_web_auth.connect("completed", _on_google_web_auth_completed, CONNECT_DEFERRED)
+			_google_web_auth.connect("canceled", _on_google_web_auth_canceled, CONNECT_DEFERRED)
+			_google_web_auth.connect("failed", _on_google_web_auth_failed, CONNECT_DEFERRED)
+	else:
+		print("[GoogleSignIn] %s NOT available (os=%s)." % [_GOOGLE_WEB_AUTH_CLASS, OS.get_name()])
+	return _google_web_auth
+
+
+func _on_google_web_auth_completed(callback_url: String) -> void:
+	var id_token := _extract_fragment_param(callback_url, "id_token")
+	if id_token == "":
+		print("[GoogleSignIn] Callback URL carried no id_token.")
+		_set_busy(false)
+		_show_status("Google Sign-In failed. Please try again.")
+		return
+	print("[GoogleSignIn] Google ID token obtained: YES (len=%d). Starting Firebase exchange." % id_token.length())
+	FirebaseAuth.sign_in_with_google_id_token(id_token)
+
+
+func _on_google_web_auth_canceled() -> void:
+	_set_busy(false)
+	_clear_message()
+
+
+func _on_google_web_auth_failed(message: String) -> void:
+	print("[GoogleSignIn] ASWebAuthenticationSession failed: %s" % message)
+	_set_busy(false)
+	_show_status("Google Sign-In failed. Please try again.")
+
+
 func _on_google_sign_in_finished(success: bool, error_code: String, needs_link: bool, _is_new_user: bool) -> void:
 	_set_busy(false)
 	if success:
@@ -400,6 +539,145 @@ func _on_google_link_finished(success: bool, error_code: String) -> void:
 		print("[AccountScreen] Google link failed: %s" % error_code)
 		if error_code != "OFFLINE":
 			_show_status("Signed in. Google linking will be retried later.")
+
+
+## ---- Sign in with Apple (Firebase, iOS Auth Phase 1) ----
+##
+## ASAuthorizationController (vendored GodotApplePlugins AuthenticationServices extension
+## - the SAME addon the iOS Google bridge above and game_center_cloud_backend.gd's Game
+## Center backend already use) -> an ASAuthorizationAppleIDCredential's identity_token
+## (PackedByteArray, decoded to a UTF-8 JWT string here) ->
+## FirebaseAuth.sign_in_with_apple_id_token() -> accounts:signInWithIdp. Structural mirror
+## of the Google Sign-In section above's NEEDS_LINK/linking flow. This button is hidden
+## outright on every platform except iOS (see _refresh_view()), so reaching here with no
+## extension means an iOS build that doesn't bundle it yet. NOT YET LIVE-VERIFIED against
+## a real Apple ID on a device.
+func _on_apple_continue_pressed() -> void:
+	print("[AppleSignIn] Sign-in button pressed.")
+	if _busy:
+		return
+	var auth := _apple_auth_instance()
+	if auth == null:
+		print("[AppleSignIn] %s unavailable." % _APPLE_AUTH_CLASS)
+		_show_status("Sign in with Apple is unavailable on this build.")
+		return
+	_set_busy(true)
+	_show_status("Sign in with Apple...")
+	auth.call("signin_with_scopes", ["email", "full_name"])
+
+
+## Lazily resolves and caches an ASAuthorizationController instance - same
+## ClassDB.instantiate() pattern as _google_web_auth_instance() and
+## game_center_cloud_backend.gd's PLUGIN_CLASS. iOS-only; every other platform gets null
+## and every caller null-checks first.
+func _apple_auth_instance() -> Object:
+	if _apple_auth_checked:
+		return _apple_auth
+	_apple_auth_checked = true
+	if OS.get_name() == "iOS" and ClassDB.class_exists(_APPLE_AUTH_CLASS):
+		_apple_auth = ClassDB.instantiate(_APPLE_AUTH_CLASS)
+		if _apple_auth != null:
+			print("[AppleSignIn] %s available." % _APPLE_AUTH_CLASS)
+			_apple_auth.connect("authorization_completed", _on_apple_authorization_completed, CONNECT_DEFERRED)
+			_apple_auth.connect("authorization_failed", _on_apple_authorization_failed, CONNECT_DEFERRED)
+	else:
+		print("[AppleSignIn] %s NOT available (os=%s)." % [_APPLE_AUTH_CLASS, OS.get_name()])
+	return _apple_auth
+
+
+## credential is an ASAuthorizationAppleIDCredential (identity_token/email/full_name) on a
+## real Sign in with Apple, or an ASPasswordCredential (iCloud Keychain autofill - never
+## requested by signin_with_scopes()'s email/full_name scopes, so not expected here) or
+## null for an unsupported type. Never reference either extension type statically (this
+## script must still compile on platforms/builds where the extension isn't loaded) -
+## checked structurally via has_method() instead, same convention
+## game_center_cloud_backend.gd uses for its own untyped Object results.
+func _on_apple_authorization_completed(credential: Object) -> void:
+	if credential == null or not credential.has_method("get_identity_token"):
+		print("[AppleSignIn] Unsupported credential type returned.")
+		_set_busy(false)
+		_show_status("Sign in with Apple failed. Please try again.")
+		return
+	var token_bytes: PackedByteArray = credential.get("identity_token")
+	var identity_token := token_bytes.get_string_from_utf8()
+	# Never log the token itself - only that one arrived. No nonce is sent: this vendored
+	# module's signin_with_scopes() does not expose nonce control, so
+	# FirebaseAuth.sign_in_with_apple_id_token() is called with raw_nonce="" (it already
+	# handles that case - see its own comment on why a nonce is optional/defense-in-depth,
+	# not a hard requirement of every code path).
+	print("[AppleSignIn] Apple identityToken obtained: YES (len=%d). Starting Firebase exchange." % identity_token.length())
+	FirebaseAuth.sign_in_with_apple_id_token(identity_token, "")
+
+
+## This module reports both cancellation AND a genuine failure through the SAME
+## authorization_failed signal - unlike the Android Google plugin's separate cancelled/
+## failed signals, there is no distinct "user dismissed the sheet" signal here. Apple's
+## own ASAuthorizationError.canceled case is heuristically detected by checking the
+## localized message for "cancel" - THIS IS UNVERIFIED against a real device/iOS version
+## (Phase 7/8's TEST G must confirm the real string, or that this even needs handling
+## specially at all, before this is considered done).
+func _on_apple_authorization_failed(error_message: String) -> void:
+	_set_busy(false)
+	if error_message.to_lower().contains("cancel"):
+		print("[AppleSignIn] Treated as user cancellation: %s" % error_message)
+		_clear_message()
+		return
+	print("[AppleSignIn] Native extension reported failure: %s" % error_message)
+	_show_status("Sign in with Apple failed. Please try again.")
+
+
+## Shared by the iOS Apple/Google bridges above for OAuth nonce/state values - a
+## cryptographically random hex string, not tied to either provider's own crypto
+## requirements (Google's implicit id_token flow only needs an unguessable nonce/state;
+## this project does not itself verify either value, Firebase/Google's own servers do).
+func _random_token(byte_length: int = 16) -> String:
+	var crypto := Crypto.new()
+	return crypto.generate_random_bytes(byte_length).hex_encode()
+
+
+## Extracts one key from a URL's fragment (the part after '#') - Google's implicit
+## response_type=id_token flow returns id_token there, never in the query string.
+func _extract_fragment_param(url: String, key: String) -> String:
+	var frag_index := url.find("#")
+	if frag_index == -1:
+		return ""
+	var fragment := url.substr(frag_index + 1)
+	for pair: String in fragment.split("&"):
+		var kv := pair.split("=", true, 1)
+		if kv.size() == 2 and kv[0] == key:
+			return kv[1].uri_decode()
+	return ""
+
+
+func _on_apple_sign_in_finished(success: bool, error_code: String, needs_link: bool, _is_new_user: bool) -> void:
+	_set_busy(false)
+	if success:
+		_pending_apple_link = false
+		_on_auth_success()
+		if _is_new_user:
+			CloudSave.sync_now()
+		return
+	if needs_link:
+		var email := FirebaseAuth.pending_apple_link_email()
+		_pending_apple_link = true
+		_set_create_mode(false)
+		if email != "":
+			_email_field.text = email
+		_password_field.text = ""
+		_show_status("An account already exists for this email. Sign in with your password to link Apple.")
+		return
+	_show_error(_friendly_error(error_code))
+
+
+func _on_apple_link_finished(success: bool, error_code: String) -> void:
+	if success:
+		_show_success("Apple account linked.")
+	else:
+		# The player is already signed in via password at this point (link only ever
+		# runs after that succeeds) - a link failure is informational, not blocking.
+		print("[AccountScreen] Apple link failed: %s" % error_code)
+		if error_code != "OFFLINE":
+			_show_status("Signed in. Apple linking will be retried later.")
 
 
 ## ---- Native (Play Games / Game Center) fallback ----
@@ -485,7 +763,9 @@ func _on_sign_out_confirmed() -> void:
 	_close_sign_out_confirmation()
 	FirebaseAuth.sign_out()
 	FirebaseAuth.cancel_pending_google_link()
+	FirebaseAuth.cancel_pending_apple_link()
 	_pending_google_link = false
+	_pending_apple_link = false
 	_set_create_mode(false)
 	_email_field.text = ""
 	_clear_message()
@@ -515,6 +795,7 @@ func _set_busy(busy: bool) -> void:
 	_primary_button.disabled = busy
 	_mode_toggle_button.disabled = busy
 	_forgot_password_button.disabled = busy
+	_apple_continue_button.disabled = busy
 	_google_continue_button.disabled = busy
 	_native_continue_button.disabled = busy
 
@@ -562,10 +843,10 @@ func _friendly_error(code: String) -> String:
 			return "Account sign-in is unavailable right now."
 		"USER_DISABLED":
 			return "This account has been disabled."
-		"FEDERATED_USER_ID_ALREADY_LINKED":
-			return "This Google account is already linked to a different BeamShift account."
+		"FEDERATED_USER_ID_ALREADY_LINKED", "CREDENTIAL_ALREADY_IN_USE":
+			return "This account is already linked to a different BeamShift account."
 		"INVALID_IDP_RESPONSE":
-			return "Google Sign-In failed. Please try again."
+			return "Sign-in failed. Please try again."
 		"NOT_SIGNED_IN", "NO_PENDING_CREDENTIAL":
 			return "Unable to complete the request. Please try again."
 		_:

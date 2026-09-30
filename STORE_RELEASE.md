@@ -194,7 +194,7 @@ added via **"Draft Submission (N)"** (never "Create New Submission"). Before Pla
 **ANDROID**
 - [ ] production AdMob ids -> secrets `ADMOB_ANDROID_APP_ID`, `ADMOB_ANDROID_REWARDED_ID`, `ADMOB_ANDROID_INTERSTITIAL_ID` (else ads ship OFF; required on `v*` tags / production track)
 - [ ] Play Games project id -> secret `PLAY_GAMES_GAME_ID` (the Android lane fails without it)
-- [ ] IAP product `beamshift_no_forced_ads` created in Play Console (same id on both stores - `StoreConfig.NO_FORCED_ADS`)
+- [x] IAP product `beamshift_no_forced_ads` created in Play Console (same id on both stores - `StoreConfig.NO_FORCED_ADS`), purchase option `no-forced-ads-lifetime`, status **ACTIVE**; Android device confirmed live localized price retrieval (INR ₹450.00) 2026-09-29 - see section 20. **Purchase/restore/reinstall/refund still NOT device-verified** - see section 20's manual QA checklist.
 - [ ] upload keystore -> secrets `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_USER`, `ANDROID_KEYSTORE_PASSWORD`
 - [ ] cloud save: PGS Saved Games enabled, OAuth client with the App Signing SHA-1, testers
 - [ ] signed AAB (`Release CD`), uploaded via `PLAY_SERVICE_ACCOUNT_JSON` or by hand
@@ -223,6 +223,8 @@ added via **"Draft Submission (N)"** (never "Create New Submission"). Before Pla
 - iOS (TestFlight, sandbox): same purchase/restore flow; Game Center sign-in; save/restore round trip; no ATT prompt; no QUIT button.
 
 **2026-09-26:** Android AdMob production ids configured via the stamp script; next internal-test build = versionCode 10001 (1.0.0). Still pending: real Play Games Game ID, iOS AdMob ids, AdMob app review, test-device registration.
+
+**2026-09-29:** `beamshift_no_forced_ads` is ACTIVE in Play Console; a real Android device confirmed live localized price retrieval (₹450.00) and a price-label overflow bug was found and fixed. **See section 20 for the full state and the detailed A-F manual purchase/restore/reinstall/refund checklist - none of it has been run yet.**
 
 ## 8. Firebase REST Auth (Phase 1, 2026-09-28)
 
@@ -1406,3 +1408,345 @@ established...`. A failure at the console-gap boundary instead stops right after
 **Git status at end of this pass**: clean before this pass's edits (`0d5b42d` HEAD, no
 prior uncommitted changes); this pass added the three logging-only source edits above,
 uncommitted. **No AAB, no commit, no push.**
+
+## 18. iOS Authentication + Cross-Platform Cloud Save (2026-09-29) - DESKTOP-VERIFIED ONLY, no macOS/Xcode/device testing
+
+Extends the Android Play-Store-verified Google Sign-In -> Firebase Auth -> Firestore
+cloud-save flow (sections 8-17 above) to iOS: Sign in with Apple + iOS Google Sign-In,
+both authenticating through the same Firebase identity layer, so an Android player who
+installs BeamShift on iPhone and signs in with the SAME Google account recovers the same
+Firebase UID and cloud save. Full architecture: `ARCHITECTURE.md`'s "iOS Authentication"
+section, `CLAUDE.md`'s "iOS Authentication rules (D116)", `DECISIONS.md` D116,
+`tools/ios_plugin_src/README.md`.
+
+**Owner-supplied configuration this pass recorded (non-secret identifiers only - see
+"Secret hygiene" below for what was deliberately NOT touched):**
+- Apple Developer Team: Maclepro Inc., Team ID `C25DZSY3U8`.
+- BeamShift Apple App ID: `C25DZSY3U8.com.foursagez.beamshift`; App Store Connect numeric
+  App ID `6817298056`.
+- Firebase iOS App ID: `1:516411257761:ios:361abbd540f16bc32f91e0`.
+- Google iOS OAuth client id: `516411257761-sv11p2kflgi617bcr1po4jqn4tc0d5ai.apps.googleusercontent.com`
+  (`FirebaseConfig.GOOGLE_IOS_CLIENT_ID`) / reversed `com.googleusercontent.apps.516411257761-sv11p2kflgi617bcr1po4jqn4tc0d5ai`
+  (`FirebaseConfig.GOOGLE_IOS_REVERSED_CLIENT_ID`) - both are plain consts in
+  `firebase_config.gd`, matching `GOOGLE_WEB_CLIENT_ID`'s own precedent (visible in every
+  ID token/request the client makes, not a secret).
+- Sign in with Apple key: Key ID `AT5K2P9V89`, `.p8` retained by the owner. **This pass
+  never requested, read, copied, or logged the `.p8` file or its contents** - it is not
+  needed for this pass's client-side identityToken -> Firebase REST exchange
+  (`accounts:signInWithIdp` verifies Apple's JWT against Apple's own public JWKS
+  server-side; the `.p8`/Key ID pair is only needed for a server-to-server "Sign In with
+  Apple REST API" flow such as token revocation or a client-secret JWT, neither of which
+  this pass implements).
+- `GoogleService-Info.plist`: downloaded locally by the owner, **not required by this
+  architecture and not added to the repository** - this project's REST-only design (no
+  native Firebase SDK, confirmed extending to iOS: no Google iOS SDK either) needs neither
+  the file nor the Xcode project setup it normally drives. If a future pass ever adopts
+  the native Google Sign-In iOS SDK instead of the `ASWebAuthenticationSession` bridge
+  below, this decision should be revisited explicitly, not silently reversed.
+
+**What was implemented** (see `ARCHITECTURE.md`'s "iOS Authentication" section for the
+full technical detail): `FirebaseAuth.sign_in_with_apple_id_token()`/
+`link_pending_apple_credential()` (REST, mirrors the verified Google pair);
+`account_screen.gd`'s platform-aware Apple/Google buttons, using the already-vendored
+`GodotApplePlugins` `AuthenticationServices` module (`ASAuthorizationController`/
+`ASWebAuthenticationSession`, the SAME pinned build already used for Game Center) via
+`ClassDB.instantiate()` - **zero new native Swift code was written**;
+`export_presets.cfg`'s iOS entitlement `com.apple.developer.applesignin`; CI vendoring
+of the AuthenticationServices module alongside Game Center.
+
+**Account linking** (Phase 4 of this pass's brief): implemented via the same
+`NEEDS_LINK` -> real password sign-in -> `accounts:update` pattern Android's Google
+Sign-In already established and has structurally verified (Phase 4A/4B above). Preserves
+the Firebase UID on a successful link; a credential already linked to a DIFFERENT
+Firebase user surfaces `FEDERATED_USER_ID_ALREADY_LINKED`/`CREDENTIAL_ALREADY_IN_USE` as
+a safe, non-blocking, player-friendly message - never an automatic merge, never an
+overwrite of either account's cloud data. Cancellation (Apple sheet dismissed, Google
+session cancelled) is treated as a non-error, clearing the busy/status state without
+showing a failure. **Real end-to-end linking against live Apple/Google accounts has NOT
+been run** - this needs a real iPhone (Phase 7/8's own constraint: this environment has
+no Apple ID/Google account interactive UI to drive at all, unlike the Android Firebase
+REST tests which could exercise real HTTP calls from a desktop test harness).
+
+**Account deletion** (Phase 5's inspection requirement): confirmed absent from the
+codebase entirely (grepped `scripts/` for `delete.*account`/`deleteAccount`/
+`accounts:delete` - zero matches, both before and after this pass's own additions).
+Deliberately NOT implemented, per the brief's own instruction to document rather than
+build a destructive flow under this pass's time/verification constraints. Required
+architecture, for whenever this is explicitly requested:
+1. `FirebaseAuth.delete_account()` calling `accounts:delete` with the current `idToken` -
+   Firebase may require a FRESH token (a recent sign-in), which could mean prompting
+   re-authentication first if the cached token has aged.
+2. A `FirebaseFirestoreREST` call removing `users/{uid}/save/current` - or an explicit,
+   signed-off decision to leave it orphaned (Firestore has no cascade-delete; an orphaned
+   document under a dead UID is harmless but not automatically cleaned up).
+3. A stronger confirmation UI than the existing sign-out dialog
+   (`account_screen.gd`'s `_show_sign_out_confirmation()`) - deletion is irreversible,
+   sign-out is not.
+4. An explicit decision on the LOCAL save: this project's standing philosophy (sign-out
+   preserves local progress) suggests keeping it, but account deletion feels different to
+   a player and deserves its own explicit sign-off, not an assumed default.
+5. Apple App Store Guideline 5.1.1(v) is the actual trigger for building this: it applies
+   once account creation is offered in-app, which BeamShift's Create Account flow already
+   is - this needs to land before any App Store submission that keeps that flow enabled.
+
+**iOS export configuration** (Phase 5): only the one entitlement above was added.
+`application/bundle_identifier="com.foursagez.beamshift"` was already correct (unchanged
+from the store-release pass). No certificates, provisioning profiles, or other
+capabilities were created, requested, or modified - per this pass's own STOP CONDITIONS.
+
+**Secret hygiene** (Phase 6): no `.p8`, private key, password, ID token, refresh token,
+or service-account JSON was read, copied, logged, or committed. The Web API key's
+existing centralization (`config/firebase_config.local.json`, gitignored) is unchanged
+and unextended - the iOS Google OAuth client id is NOT a secret (see above) and stays a
+plain const, matching the existing `GOOGLE_WEB_CLIENT_ID` precedent.
+
+**Testing** (Phase 7): see `TEST_PLAN.md`'s new "iOS Authentication manual test plan"
+section for the full Tests A-I checklist (new Apple account, Apple reinstall,
+Android-to-iOS Google cross-platform, email/password cross-platform, link Apple, link
+conflict, cancel, offline, session restore). None of these have been run - this
+environment has no macOS, no Xcode, and no physical iPhone. What WAS run: a headless
+GDScript parse check of every modified file (temporary `run/main_scene` swap to
+`account_screen.tscn`, reverted immediately, confirmed via `git status`) and a direct
+download/inspection of the pinned `GodotApplePlugins` release zip confirming the
+`AuthenticationServices` xcframework genuinely exists and is built for real iOS device
+architectures (not just simulator). **Do not claim iOS Sign in with Apple or Google
+Sign-In as DEVICE VERIFIED until Tests A-I actually run on a real iPhone.**
+
+**Android regression**: zero Android files touched. `git diff --stat` for this pass
+touches only `scripts/firebase/firebase_config.gd` (additive consts),
+`scripts/managers/firebase_auth.gd` (additive Apple methods/signals),
+`scripts/ui/account_screen.gd`/`scenes/ui/account_screen.tscn` (new Apple button + iOS
+Google branch, alongside the existing Android branch, unchanged), `export_presets.cfg`
+(iOS preset only - Android presets 0/1 untouched), and `.github/workflows/release.yml`
+(the iOS lane's Game Center install step, unrelated to the Android lane). The verified
+Google Sign-In -> Firebase -> Firestore path on Android (sections 16-17) is unaffected.
+
+**Git status at end of this pass**: clean before this pass's edits; the files listed
+above are uncommitted. **No commit, no push, no merge, no branch change. No AAB/IPA
+built. No Apple certificate, key, or provisioning profile created or revoked. No Firebase
+security rule changes. No Firebase user deleted.**
+
+## 19. iOS CI/TestFlight pipeline preparation (2026-09-29) - LOCAL ONLY, no commit/push/CI run
+
+Owner asked to prepare the iOS lane of `.github/workflows/release.yml` (built in section 18
+above) for a future signed build, strictly locally: no git write operations, no GitHub
+secrets, no `workflow_dispatch`, no signing material creation. Full writeup:
+`DECISIONS.md` D117. Full pipeline reference (new): `references/ci-cd.md`.
+
+**Status summary (precise wording for this and future passes):**
+
+| Item | Status |
+|---|---|
+| Android Google Sign-In + Firebase Cloud Save | **PLAY STORE DEVICE VERIFIED / COMPLETE** (sections 16-17) |
+| iOS authentication (Sign in with Apple, iOS Google bridge) | **CODE IMPLEMENTED / DEVICE VALIDATION PENDING** |
+| iOS CI (`.github/workflows/release.yml` `ios-appstore` job) | **LOCALLY PREPARED / NEVER EXECUTED** |
+| Apple signing (cert, provisioning profile, team id) | **NOT YET CONFIGURED IN GITHUB SECRETS** |
+| Signed IPA | **NOT BUILT YET** |
+| TestFlight upload | **NOT UPLOADED** |
+| App Store submission | **NOT STARTED** |
+| Boss/owner approval | **REQUIRED BEFORE PUSH / CI RUN / TESTFLIGHT UPLOAD** |
+
+**Confirmed CI blocker, fixed**: `export_presets.cfg`'s iOS preset had no
+`application/provisioning_profile_uuid_release` key at all (confirmed by direct
+inspection before editing). `tools/ci/stamp_version.sh`'s `sub()` helper requires an
+exact expected match count before substituting - the very first real run with
+`IOS_PROVISIONING_PROFILE_B64` configured would have failed with `stamp failed: ios
+profile uuid matched 0 line(s), expected 1`, well into the job, after certificate/profile
+import. Fixed by adding the key empty. **Verified the fix in isolation** (a disposable
+temp-fixture copy of `export_presets.cfg`/`project.godot`/`stamp_version.sh`, run with a
+dummy team id and a dummy UUID, all substitutions confirmed correct) - the real, tracked
+`export_presets.cfg` was never stamped with fake signing data and still carries the empty
+string, confirmed by re-grep after the isolated test.
+
+**AuthenticationServices CI verification added**: the workflow already vendors
+`GodotApplePluginsAuthenticationServices` (section 18), but only Game Center's own
+registration was checked after import. Added a fail-fast step that globs for the
+installed module's `.gdextension` file and confirms it appears in
+`.godot/extension_list.cfg` - a hardcoded filename was deliberately avoided since this
+pass had no way to independently re-download and inspect the pinned release zip to
+confirm the exact name.
+
+**Static review of the uncommitted iOS auth implementation**: re-read
+`firebase_auth.gd`'s Apple methods, `account_screen.gd`'s Apple/Google/platform-branching
+sections, and every `print()` statement in both files. **No defect found requiring a code
+change** - the Apple pair correctly mirrors the verified Google pair structurally, platform
+branching correctly excludes desktop and routes Android/iOS through their respective
+native paths, and no token/password/Authorization-header content is ever logged. This is
+independent re-confirmation of section 18's own claims, not new code.
+
+**URL scheme decision**: did NOT add a `CFBundleURLTypes` Info.plist entry for the Google
+OAuth callback. `ASWebAuthenticationSession` is documented by Apple to intercept its own
+callback via the `callback_scheme` parameter without app-side URL scheme registration -
+but this remains explicitly unconfirmed on a real device (`tools/ios_plugin_src/README.md`
+item 5). Adding the entry speculatively risks a config change with no evidence it's
+needed; if a real-device test shows the callback failing to return to the app, the fix is
+documented (add `CFBundleURLTypes`/`CFBundleURLSchemes` with
+`FirebaseConfig.GOOGLE_IOS_REVERSED_CLIENT_ID` to `additional_plist_content`), not a
+redesign.
+
+**`references/ci-cd.md` created** - the workflow's own header comment already referenced
+it ("Secrets are listed in references/ci-cd.md") but the file did not exist. Covers
+overview, trigger architecture, the macOS runner pin, the full export flow, Apple
+signing/provisioning-profile architecture (including this pass's fix), the
+AuthenticationServices requirement, the entitlement requirement, first-signed-build and
+TestFlight procedures, the physical-iPhone QA requirement, troubleshooting, and
+secret-handling rules (names only).
+
+**Exact steps requiring boss/owner approval, in order:**
+1. Create the Apple signing resources (Distribution certificate + `.p12`, App Store
+   provisioning profile for `com.foursagez.beamshift` with Sign in with Apple enabled,
+   App Store Connect API key) - see `references/ci-cd.md` section 6/14 and
+   `STORE_RELEASE.md` Batch D above for where each comes from.
+2. Add the signing-only secrets to GitHub Actions (`APPLE_TEAM_ID`, `IOS_DIST_CERT_B64`,
+   `IOS_DIST_CERT_PASSWORD`, `IOS_PROVISIONING_PROFILE_B64`) - deliberately WITHOUT the
+   ASC upload secrets yet, so the first run cannot upload to TestFlight even if it
+   succeeds.
+3. Push the approved source to `dev_abhilas`/`main` (owner/team action, not this pass).
+4. Manually run the workflow (`Actions -> Release CD -> Run workflow`, `lanes: ios`).
+5. Confirm a signed `.ipa` artifact is produced; download and inspect it
+   (`codesign -dv --verbose=4`, `unzip -l`) before trusting it further.
+6. Only after a repeatable signed-IPA-only run, add the ASC upload secrets
+   (`ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_API_PRIVATE_KEY`) and re-run to exercise the
+   TestFlight upload as a separate, explicitly approved step.
+
+**Exact next step after boss approval**: step 1 above (Apple signing resources) - nothing
+in this codebase blocks it further; the CI-side blocker this pass existed to fix is
+resolved.
+
+**Remaining iPhone-only QA**: everything in section 18's Tests A-I, unchanged by this
+pass - a signed IPA from CI is a precondition for running them, not a substitute.
+
+**This pass touched**: `export_presets.cfg` (one new empty key),
+`.github/workflows/release.yml` (one new verification step), `references/ci-cd.md` (new
+file), plus documentation (`CLAUDE.md`, `DECISIONS.md`, `STORE_RELEASE.md` - this
+section - and others per the owner's Phase 11 request). **No git add/commit/push/branch/
+tag/PR. No GitHub secret created or modified. No `workflow_dispatch` triggered. No Apple
+certificate/profile/API key created. No signed IPA built (no macOS runner in this
+environment). No TestFlight upload. No App Store submission. No Firebase security rule
+change. No Android file touched.**
+
+**READY FOR OWNER/BOSS REVIEW: YES** (local preparation only - see the approval sequence
+above before any remote/publishing action).
+
+## 20. Android IAP device test preparation (2026-09-29) - documentation + UI fix only, no build/commit
+
+Owner reported the real Google Play product is live and a real Android device successfully
+retrieved its localized price; a text-overflow bug in the price label was found and fixed
+(section 19b below). This pass documents the confirmed state precisely, prepares a manual
+device-QA checklist for the purchase itself, and does not touch any IAP/store logic.
+
+**Confirmed state (owner-reported, not independently re-checked against Play Console by
+this pass - no console access exists here):**
+
+| Item | Value |
+|---|---|
+| Google Play product id | `beamshift_no_forced_ads` (`StoreConfig.NO_FORCED_ADS`) |
+| Purchase option | `no-forced-ads-lifetime` |
+| Product status | **ACTIVE** in Play Console |
+| Base price | USD $3.99 |
+| India localized price | **INR ₹450.00** - confirmed loaded live on a real Android device via the Internal Testing build (versionCode 10001) |
+| Android real-device product/price query | **SUCCEEDED** - `StoreManager.price_text()` returned the live Play-quoted price, not a fallback/placeholder |
+| Price label UI overflow | **FOUND AND FIXED** (section 19b) |
+| Purchase (BUY -> Play payment sheet -> owned state) | **NOT YET DEVICE-VERIFIED** |
+| Restore Purchases | **NOT YET DEVICE-VERIFIED** |
+| Reinstall entitlement recovery | **NOT YET DEVICE-VERIFIED** |
+| Refund/revocation behavior | **NOT YET DEVICE-VERIFIED** (see checklist item F - documented expected behavior only, no refund performed) |
+
+**Do not describe Android IAP as COMPLETE or device-verified until checklist items A-E below
+have actually been run on a real device and reported back.** Section 197's checkbox ("IAP
+product created in Play Console") is now checked below to reflect the confirmed ACTIVE
+status - this is a documentation update only, not a claim that purchase flow works.
+
+### 19b. Price label overflow fix (2026-09-29) - UI only, no store logic touched
+
+**Root cause**: `scenes/ui/settings_menu.tscn`'s `BuyNoForcedAdsButton` was a fixed
+`460x147` px button with a static `font_size=24`. `settings_menu.gd:_refresh_store()` sets
+its text to `"NO FORCED ADS - %s" % StoreManager.price_text()` - with a real localized
+price like `₹450.00`, the rendered string exceeded the button's usable content width (the
+sci-fi button art's `StyleBoxTexture` eats ~140px in left/right texture margins), causing
+visible overflow past the button frame.
+
+**Fix**: widened `BuyNoForcedAdsButton` to `640x147` (still `SIZE_SHRINK_CENTER`, still well
+inside the 928px-wide Settings panel content area; every other Settings button - Restore
+Purchases, Sign In/Account, Sync Now, Back - is untouched at its original `460x147`). Added
+a small last-resort text-fit helper (`_set_buy_button_label()` in `scripts/ui/settings_menu.gd`)
+that measures the actual label string against the button's real content width at the default
+24pt and steps the font size down (floor 15pt) only as far as needed - it never truncates the
+price and never affects any other button's font size. This means unusually long localized
+strings (e.g. `NO FORCED ADS - US$3.99`) degrade gracefully instead of overflowing.
+
+**Verified**: Godot 4.7.1 headless run with `run/main_scene` temporarily pointed at
+`settings_menu.tscn` (the project's own documented temporary-main-scene technique, CLAUDE.md
+testing expectations) completed cleanly with zero parse/script/resource errors; `run/main_scene`
+reverted immediately and confirmed back to `studio_splash.tscn` via `git diff`. No
+`StoreManager`/`StoreConfig`/purchase/acknowledgement/entitlement/Restore-Purchases code was
+touched - this is a `scenes/ui/settings_menu.tscn` + `scripts/ui/settings_menu.gd` layout/font
+change only. **Not yet confirmed on a real device** - the original overflow report came from a
+real device; the fix itself has only been headless-parse-checked, not re-screenshotted on
+hardware (see checklist item A below, "confirm localized price" step, for where to verify it).
+
+### Manual Android IAP device-QA checklist (owner's device only - not run by this pass)
+
+**A. Initial purchase**
+1. Open BeamShift from Google Play Internal Testing (not sideloaded) on a licensed tester account.
+2. Go to Settings.
+3. Confirm the localized price shows correctly and fits cleanly inside the No Forced Ads
+   button (the overflow fix above - re-verify visually now that it's fixed).
+4. Tap "NO FORCED ADS - [price]".
+5. Confirm the Google Play payment sheet appears and shows a **TEST payment method**
+   (license tester accounts never get charged real money).
+6. Complete the purchase.
+7. Confirm the button switches to "NO FORCED ADS - OWNED" and stays disabled.
+
+**B. Ad behavior**
+1. Confirm forced/interstitial ads no longer appear after 4 procedural-level completions
+   (the pre-purchase trigger condition, `ADS_MONETIZATION.md`).
+2. Confirm the rewarded Hint video still works normally for an owner (owning No Forced Ads
+   only removes interstitials - the rewarded hint stays by design, never call it "Remove Ads").
+
+**C. Restart**
+1. Force-close the app (not just background it).
+2. Relaunch from the home screen/app drawer.
+3. Confirm the owned entitlement is still present (button still reads OWNED, no ads).
+
+**D. Restore**
+1. From a state where the owned entitlement might be in doubt (or on a second device signed
+   into the same Play account), tap Restore Purchases.
+2. Confirm ownership is correctly restored/confirmed with no duplicate charge.
+
+**E. Reinstall**
+1. Uninstall BeamShift completely.
+2. Reinstall from Google Play Internal Testing.
+3. On first launch (or via Restore Purchases if it doesn't auto-query), confirm the store
+   is queried for existing entitlements.
+4. Confirm "No Forced Ads" ownership returns without a second purchase.
+
+**F. Refund/revocation - DOCUMENT ONLY, do not perform any refund in this pass**
+Expected behavior once a test order is refunded or revoked in Play Console (per Google Play
+Billing's standard entitlement-revocation model, which `StoreManager`'s existing
+full-query-based entitlement check already relies on - see CLAUDE.md's Store release rules,
+"only a completed full query revokes; entitlements never travel with a cloud profile"):
+1. The purchase is voided server-side by Google.
+2. The next time `StoreManager` runs its entitlement query (app launch, or an explicit
+   Restore Purchases), the revoked purchase should no longer appear in the owned-purchases
+   list, and `SaveManager.entitlements` should be updated to reflect no ownership.
+3. The No Forced Ads button should return to its purchasable state ("NO FORCED ADS - [price]"),
+   and interstitials should resume under the normal cadence rule.
+4. This expected behavior has **not been exercised on a real refunded order** - do this as a
+   deliberate, separate future test only when the owner explicitly wants to spend a real test
+   refund, since Play Console refund/revocation actions are themselves a real remote action
+   outside this pass's scope.
+
+**This pass touched**: `scenes/ui/settings_menu.tscn`, `scripts/ui/settings_menu.gd` (the
+price-label overflow fix, already applied before this documentation pass), plus this section
+and the status-line/checklist updates listed in the report below. **No StoreManager/
+StoreConfig/purchase/acknowledgement/entitlement/AdManager/Firebase/CloudSave code was
+changed. No Play Console, Firebase, AdMob, or Google Cloud console action was performed. No
+build. No commit/push/merge.**
+
+## Android RC3 validation + final Internal Testing AAB 10004 (2026-09-30, uncommitted, not uploaded)
+
+**Android RC3 physical-device validation PASSED + final Internal Testing AAB built (2026-09-30, uncommitted, LOCAL ONLY - NOT uploaded).** Approved source state = `builds/android/beamshift-android-admob-googleauth-rc3.apk` (`com.foursagez.beamshift`, versionCode 10004, versionName 1.0.1). Owner-confirmed on a physical phone: Google Sign-In + Firebase auth, AdMob (test-device config verified), rewarded Hint, interstitial, normal production progression, About Us, Tutorial scrolling, latest UI fixes; no QA/debug controls visible. **Google Sign-In root cause = the upload-key SHA-1 (`A4:82:77:...:60:5A`) was not registered in Firebase** (GMS logged `status=UNREGISTERED_ON_API_CONSOLE`; the plugin surfaced it as a silent "cancelled"); the owner registered it in Firebase Console - **no Google Sign-In code change was required**. The Play App Signing SHA-1 registration is unchanged. Final AAB: `builds/android/beamshift-1.0.1-10004-internal.aab` (123,770,050 B), release-signed with the upload key, targetSdk 36, arm64-v8a + armeabi-v7a, BILLING/INTERNET/ACCESS_NETWORK_STATE present, production AdMob app id (no Google sample ids), config packaged = `ad_ids.local.json` + `firebase_config.local.json` only - the personal `config/ad_test_devices.local.json` was moved out for the export and restored (local, gitignored, never packaged in the AAB). `project.godot` [admob] stamp reverted after export. No APK built for this step. **Still PENDING after upload: real license-test verification of `beamshift_no_forced_ads` (purchase, interstitials stop, rewarded Hint stays, persists after restart, Restore Purchases, reinstall restore, refund/revocation), Play-installed Google Sign-In, Play Games Game ID (still empty).** Before uploading: confirm in Play Console that versionCode 10004 was not already uploaded (not checkable locally).
+
+## Android Internal Testing 10002 final release AAB (2026-09-30, uncommitted, not uploaded)
+**Android Internal Testing 10002 final release AAB (2026-09-30, uncommitted, LOCAL ONLY - NOT uploaded).** Built `builds/android/beamshift-internal-10002.aab` (signed release AAB, 123,769,461 bytes), versionCode **10002** / versionName **1.0.1**, package `com.foursagez.beamshift`, both Android presets aligned (the "Android Debug" preset's stale `10003 / 1.0.0-ABOUT-SCROLL-QA` was reset to 10002 / 1.0.1). Cleanup: QA/test UI audit found NOTHING to delete - every QA control (Level Select QA, V3/FUSION/SELECTOR/V5 TEST, QA +50, tutorial debug overlay, unlock-all flags) is already gated behind `BuildConfig.QA_TOOLS`, and the committed `BUILD_MODE` is `MODE_PRODUCTION`; a rendered-node scan of Account/Settings/Main Menu/Level Select/Tutorial Select/About/Game found zero visible QA nodes. Export filters already exclude `scripts/tools/**`, `tools/**`, `_qa_tmp/**`; AAB inspected: none of those, no keystore/password files. Verified in the real AAB: upload-key SHA-1 `A4:82:77:62:47:1D:00:AE:09:CA:AA:FB:34:20:5B:24:1B:1E:60:5A` (matches), plugin-v2 registrations for GodotGoogleSignIn (release AAR, androidx.credentials + googleid classes in dex), GodotGooglePlayBilling (`com.android.vending.BILLING`), GodotPlayGameServices, AdMob; account/settings/splash/tutorial_panel/firebase/cloud scenes+scripts packaged. **AdMob: ads OFF** (no `config/ad_ids.local.json`; production mode => `ads_active()` false; manifest carries only the inert Google sample APPLICATION_ID, as in 10001; hints stay free). **Play Games: `game_id` still empty** (export succeeded; PGS features unverified/unavailable). `config/firebase_config.local.json` (Firebase Web API key, a public client identifier) is packaged on purpose - Firebase Auth needs it. **Not device-tested for this AAB**: everything below. **IAP purchase QA**: not claimed complete for 10002 (no purchase flow code was changed). No commit/push/upload/Play action taken. Remaining manual QA: install from Play Internal Testing, Google Sign-In (Play-signed cert), cloud restore, No Forced Ads purchase + Restore Purchases, Settings button fit with localized price, tutorial UI, Level Select scroll.

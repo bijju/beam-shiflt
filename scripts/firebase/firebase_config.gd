@@ -34,6 +34,22 @@ const CONFIG_FILE := "res://config/firebase_config.local.json"
 ## matching StoreConfig.NO_FORCED_ADS's precedent for non-secret identifiers.
 const GOOGLE_WEB_CLIENT_ID := "516411257761-3ufb515qh3tknvkbad1qvt5kqeoafpit.apps.googleusercontent.com"
 
+## Google Auth Platform's iOS OAuth client id (iOS Google Sign-In bridge, Phase iOS-1).
+## Android's Credential Manager flow needs the WEB client id (see GOOGLE_WEB_CLIENT_ID's
+## own comment) because it constructs the token server-side; the iOS bridge instead opens
+## Google's OAuth endpoint directly (ASWebAuthenticationSession, no vendored Google SDK -
+## see tools/ios_plugin_src/google_signin_ios/), so it authenticates AS the iOS client and
+## must use the iOS client id here, never the web or Android client id. Both are
+## registered under the same Firebase project ("beamshift-game"), so Firebase's
+## accounts:signInWithIdp still accepts the resulting ID token's audience.
+const GOOGLE_IOS_CLIENT_ID := "516411257761-sv11p2kflgi617bcr1po4jqn4tc0d5ai.apps.googleusercontent.com"
+
+## The iOS OAuth client's reversed-DNS form, required as the custom URL scheme
+## ASWebAuthenticationSession's callback redirects to (Google's iOS OAuth convention -
+## there is no Android equivalent, Android's flow never leaves the app). Not a secret -
+## same visibility as GOOGLE_IOS_CLIENT_ID.
+const GOOGLE_IOS_REVERSED_CLIENT_ID := "com.googleusercontent.apps.516411257761-sv11p2kflgi617bcr1po4jqn4tc0d5ai"
+
 static var _cache: Dictionary = {}
 
 

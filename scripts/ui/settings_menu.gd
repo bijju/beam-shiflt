@@ -27,6 +27,18 @@ const TEXTURE_TOGGLE_OFF := preload("res://assets/ui/settings/bs_ui_toggle_off_r
 
 const MESSAGE_SECONDS := 4.0
 
+# The buy button's label is dynamic (a live, localized Play Store price string -
+# see StoreManager.price_text()) so its width can't be guaranteed at authoring time.
+# Widening the button (scenes/ui/settings_menu.tscn) covers most locales; this is a
+# last-resort shrink so an unusually long localized price never overflows/clips the
+# button art instead of being truncated.
+const BUY_BUTTON_DEFAULT_FONT_SIZE := 24
+const BUY_BUTTON_MIN_FONT_SIZE := 15
+# The button's StyleBoxTexture has a 70px left/right texture_margin (its content
+# margin, per CLAUDE.md's content_margin note) plus a little breathing room so text
+# never touches the metallic end caps.
+const BUY_BUTTON_TEXT_SIDE_INSET := 90.0
+
 var _cloud_failed := false
 
 
@@ -66,21 +78,31 @@ func _ready_store_rows() -> void:
 func _refresh_store() -> void:
 	_store_status.visible = false
 	if StoreManager.owns_no_forced_ads():
-		_buy_button.text = "NO FORCED ADS - OWNED"
+		_set_buy_button_label("NO FORCED ADS - OWNED")
 		_buy_button.disabled = true
 	elif StoreManager.is_busy():
-		_buy_button.text = "WORKING..."
+		_set_buy_button_label("WORKING...")
 		_buy_button.disabled = true
 	elif StoreManager.can_purchase():
-		_buy_button.text = "NO FORCED ADS - %s" % StoreManager.price_text()
+		_set_buy_button_label("NO FORCED ADS - %s" % StoreManager.price_text())
 		_buy_button.disabled = false
 	else:
 		# Never a dead-looking BUY button: say why it can't be pressed, on a plain line under the art.
 		_store_status.text = "Store unavailable right now."
 		_store_status.visible = true
-		_buy_button.text = "NO FORCED ADS"
+		_set_buy_button_label("NO FORCED ADS")
 		_buy_button.disabled = true
 	_restore_button.disabled = StoreManager.is_busy()
+
+
+func _set_buy_button_label(label: String) -> void:
+	_buy_button.text = label
+	var font: Font = _buy_button.get_theme_font("font")
+	var max_width: float = _buy_button.custom_minimum_size.x - BUY_BUTTON_TEXT_SIDE_INSET
+	var size := BUY_BUTTON_DEFAULT_FONT_SIZE
+	while size > BUY_BUTTON_MIN_FONT_SIZE and font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > max_width:
+		size -= 1
+	_buy_button.add_theme_font_size_override("font_size", size)
 
 
 func _on_buy_pressed() -> void:

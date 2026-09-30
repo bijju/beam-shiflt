@@ -56,6 +56,7 @@ const BOTTOM_BREATHING := 28.0
 ## reference works regardless of which control type the scene uses.
 @onready var _settings_button: BaseButton = %SettingsButton
 @onready var _quit_button: Button = %QuitButton
+@onready var _about_button: Button = %AboutButton
 @onready var _qa_spacer: Control = %QASpacer
 ## QA/dev-only - see DECISIONS.md D85. Not part of the normal player-
 ## facing flow; visibility is gated in _ready() below.
@@ -68,12 +69,13 @@ func _ready() -> void:
 	_tutorial_button.pressed.connect(func() -> void: GameManager.go_to_tutorial_select())
 	_settings_button.pressed.connect(func() -> void: GameManager.go_to_settings())
 	_quit_button.pressed.connect(func() -> void: GameManager.quit_game())
+	_about_button.pressed.connect(func() -> void: GameManager.go_to_about())
 	_qa_level_select_button.pressed.connect(func() -> void: GameManager.go_to_level_select())
 
 	# Centralized UI SFX (see AUDIO_SYSTEM.md): one extra signal connection
 	# per button, calling AudioManager directly - never a second navigation
 	# path, never a duplicated AudioStreamPlayer.
-	for button in [_play_button, _continue_button, _tutorial_button, _settings_button, _quit_button, _qa_level_select_button]:
+	for button in [_play_button, _continue_button, _tutorial_button, _settings_button, _about_button, _quit_button, _qa_level_select_button]:
 		button.pressed.connect(AudioManager.play_ui_button_press)
 
 	# Phase 3 (Procedural Generator V1, see PROCEDURAL_GENERATION.md):
