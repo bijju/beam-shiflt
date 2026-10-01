@@ -7010,3 +7010,24 @@ IAP-specific detail.
 
 ## Android Internal Testing 10002 release AAB checks (2026-09-30)
 AUTOMATED: import clean, headless boot clean, 7 scenes instantiated with zero visible QA nodes, real AAB inspected (version/package/signature/plugins/leak scan). MANUAL TEST REQUIRED: all on-device behavior (Play install, Google Sign-In, cloud restore, IAP purchase/restore, Settings fit, tutorial UI, Level Select scroll).
+
+## Automated test suite and statement coverage (2026-10-01)
+
+AUTOMATED (`tools/tests/`, dev-only - see `tools/tests/README.md`). Run
+`powershell -ExecutionPolicy Bypass -File tools/tests/run_coverage.ps1` (about 17 min; add
+`-Filter <name>` for one file, `-SkipQa` to skip the second pass). It tests a copy of the
+project with an isolated `user://`, never the working tree.
+
+- 141 test functions, 3,165 assertions, all passing (production pass). A second pass
+  re-runs the QA-reaching tests with `BuildConfig` flipped to internal-QA and merges its
+  counts; production-only assertions may fail there and are warnings.
+- Statement coverage of `scripts/**` + `levels/**` (12,347 statements): **92.5% overall**,
+  **95.3% excluding `scripts/tools/**`** (the dev-only solver/audit tools, 77% on their own).
+  `levels/**` 100%, `scripts/gameplay` 97%, `scripts/managers` 95%, `scripts/procedural` 93%,
+  `scripts/ui` 93%.
+- Not 100%, by design: device-only branches (`OS.get_name()` == Android/iOS, native plugin
+  singletons, safe-area insets), Quit paths (they would end the run), generator fallback/
+  rejection branches that need a rare random draw, and constants-gated dead code. The full
+  per-file uncovered line list is in `tools/tests/coverage_report.txt` (generated, git-ignored).
+- This is statement coverage only (no branch coverage) and measures what the tests EXECUTE,
+  not what they prove. Real touch/pixel behaviour remains MANUAL TEST REQUIRED.

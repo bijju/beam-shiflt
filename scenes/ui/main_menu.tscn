@@ -8,7 +8,6 @@
 [ext_resource type="Script" path="res://scripts/ui/menu_particles.gd" id="5"]
 [ext_resource type="PackedScene" path="res://scenes/ui/menu_gameplay_preview.tscn" id="6"]
 [ext_resource type="Texture2D" path="res://assets/ui/icons/bs_ui_icon_settings.png" id="7"]
-[ext_resource type="Script" path="res://scripts/ui/aspect_art_button.gd" id="8"]
 
 [sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_add"]
 blend_mode = 1
@@ -149,25 +148,33 @@ alignment = 1
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 4
-custom_minimum_size = Vector2(560, 132)
-theme_override_font_sizes/font_size = 26
+custom_minimum_size = Vector2(600, 146)
+theme_override_font_sizes/font_size = 30
 text = "CONTINUE"
 
 [node name="PlayButton" type="Button" parent="SafeMargin/Root/ButtonGroup"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 4
-custom_minimum_size = Vector2(640, 156)
-theme_override_font_sizes/font_size = 34
+custom_minimum_size = Vector2(600, 146)
+theme_override_font_sizes/font_size = 30
 text = "NEW GAME"
 
 [node name="TutorialButton" type="Button" parent="SafeMargin/Root/ButtonGroup"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 4
-custom_minimum_size = Vector2(560, 132)
-theme_override_font_sizes/font_size = 26
+custom_minimum_size = Vector2(600, 146)
+theme_override_font_sizes/font_size = 30
 text = "TUTORIALS"
+
+[node name="AboutButton" type="Button" parent="SafeMargin/Root/ButtonGroup"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+custom_minimum_size = Vector2(600, 146)
+theme_override_font_sizes/font_size = 30
+text = "ABOUT US"
 
 [node name="QuitSpacer" type="Control" parent="SafeMargin/Root/ButtonGroup"]
 layout_mode = 2
@@ -215,22 +222,3 @@ grow_vertical = 0
 texture_normal = ExtResource("7")
 ignore_texture_size = true
 stretch_mode = 5
-
-[node name="AboutButton" type="Button" parent="SafeMargin/CornerLayer"]
-unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 3
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -241.0
-offset_top = -120.0
-offset_right = -16.0
-offset_bottom = -48.0
-grow_horizontal = 0
-grow_vertical = 0
-theme_override_font_sizes/font_size = 22
-text = "ABOUT US"
-script = ExtResource("8")
-button_height = 72.0

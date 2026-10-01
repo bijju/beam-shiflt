@@ -1387,6 +1387,17 @@ standing rules.
 
 ## Testing expectations
 
+
+- **Automated suite + coverage live in `tools/tests/`** (dev-only, export-excluded;
+  read `tools/tests/README.md`). `powershell -ExecutionPolicy Bypass -File
+  tools/tests/run_coverage.ps1` runs ~140 test functions against a COPY of the project
+  (never the working tree, with an isolated `user://`) and writes
+  `tools/tests/coverage_report.txt`. Godot has no GDScript coverage tool, so the runner
+  instruments the copy (statement coverage of `scripts/**` + `levels/**`). Run it after any
+  change under `scripts/`; a GDScript runtime error aborts a test silently, so the script
+  treats any `SCRIPT ERROR` as a failure. New logic needs a test in `tools/tests/cases/`;
+  use the fakes in `tools/tests/fakes/` instead of real network/SDK calls. The suite does
+  not replace the manual/device checks above (rule 12a).
 - Any change to `laser_system.gd` or the reflection rules must be
   re-verified against **all 15** test levels in `levels/` — their
   documented `optimal_moves` and solvability are load-bearing (see

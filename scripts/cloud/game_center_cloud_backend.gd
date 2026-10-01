@@ -190,7 +190,7 @@ func _fail(reason: String) -> void:
 ## code reads as failure -- worth knowing rather than guessing.
 func _error_text(error: Variant) -> String:
 	if typeof(error) != TYPE_OBJECT or error == null:
-		return "unexpected error value (type %d): %s" % [typeof(error), String(error)]
+		return "unexpected error value (type %d): %s" % [typeof(error), str(error)]
 	var code := int(error.get("code"))
 	var named := "unmapped"
 	if code >= 0 and code < ERROR_CODES.size():

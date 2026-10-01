@@ -40,6 +40,12 @@ const PREVIEW_WIDTH_FRACTION_MIN := 0.55
 ## Matches Root's own theme_override_constants/separation in main_menu.tscn
 ## (the gap the removed flex Spacer used to paper over) and a small reserve
 ## for the breathing room below ButtonGroup, above the corner Settings icon.
+const PREVIEW_WIDTH_FRACTION_PREFERRED := 0.62
+const MAIN_BUTTON_MIN_H := 146.0
+const MAIN_BUTTON_MAX_H := 200.0
+const MAIN_BUTTON_ASPECT := 4.1
+## Settings icon: 16px inset + 112px wide, plus a gap.
+const SETTINGS_COLUMN := 144.0
 const HERO_GAP := 20.0
 const BOTTOM_BREATHING := 28.0
 
@@ -169,6 +175,8 @@ func _layout_hero_elements() -> void:
 	var logo_h := logo_w / LOGO_ASPECT
 	_logo.custom_minimum_size = Vector2(logo_w, logo_h)
 
+	_size_main_buttons(safe_w, safe_h, logo_h)
+
 	var button_h := _button_group.get_combined_minimum_size().y
 	var available_for_preview_h := maxf(
 		safe_h - logo_h - button_h - HERO_GAP * 2.0 - BOTTOM_BREATHING,
@@ -181,6 +189,20 @@ func _layout_hero_elements() -> void:
 	preview_w = minf(preview_w, safe_w)
 	var preview_h := preview_w / PREVIEW_BOARD_ASPECT
 	_preview_frame.custom_minimum_size = Vector2(preview_w, preview_h)
+
+
+## The four main buttons share one size. Height grows with the vertical room
+## left after the logo and a preview of its preferred size (floor
+## MAIN_BUTTON_MIN_H, cap MAIN_BUTTON_MAX_H); width is capped so the stack
+## never reaches the bottom-left Settings icon column.
+func _size_main_buttons(safe_w: float, safe_h: float, logo_h: float) -> void:
+	var preview_h := safe_w * PREVIEW_WIDTH_FRACTION_PREFERRED / PREVIEW_BOARD_ASPECT
+	var sep := float(_button_group.get_theme_constant("separation"))
+	var left := safe_h - logo_h - preview_h - HERO_GAP * 2.0 - BOTTOM_BREATHING
+	var h := clampf((left - sep * 3.0) / 4.0, MAIN_BUTTON_MIN_H, MAIN_BUTTON_MAX_H)
+	var w := minf(h * MAIN_BUTTON_ASPECT, safe_w - SETTINGS_COLUMN * 2.0)
+	for b: Button in [_continue_button, _play_button, _tutorial_button, _about_button]:
+		b.custom_minimum_size = Vector2(w, h)
 
 
 ## Phase 4 (D102): a one-time, non-blocking "NEW TUTORIAL: FUSION" note the first time the Fusion tutorial pack is
