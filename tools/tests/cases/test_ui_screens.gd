@@ -262,29 +262,3 @@ func test_splash_goes_straight_to_main_menu() -> void:
 		await frames(1)
 	Engine.time_scale = 1.0
 	sp.queue_free()
-
-
-func test_internet_manager_is_passive() -> void:
-	var lost := watch(InternetManager.internet_lost)
-	var back := watch(InternetManager.internet_restored)
-	InternetManager._resolve_check(false)
-	ok(not runner.get_tree().paused, "losing the connection never pauses play")
-	InternetManager._resolve_check(false)
-	InternetManager._resolve_check(true)
-	ok(not runner.get_tree().paused)
-	eq([lost.size(), back.size()], [1, 1])
-	InternetManager._on_request_completed(HTTPRequest.RESULT_SUCCESS, 204, PackedStringArray(), PackedByteArray())
-	InternetManager.check_in_progress = true
-	InternetManager._on_request_completed(HTTPRequest.RESULT_SUCCESS, 204, PackedStringArray(), PackedByteArray())
-	ok(InternetManager.is_online)
-	InternetManager.check_in_progress = true
-	InternetManager._on_check_timeout()
-	InternetManager.is_online = true
-	InternetManager._on_check_timeout()
-	InternetManager._on_periodic_timer_timeout()
-	InternetManager._http_request.cancel_request()
-	InternetManager.check_in_progress = false
-	InternetManager._notification(Node.NOTIFICATION_APPLICATION_RESUMED)
-	InternetManager._http_request.cancel_request()
-	InternetManager.check_in_progress = false
-	InternetManager.is_online = true

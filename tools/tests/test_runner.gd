@@ -16,10 +16,11 @@ func _ready() -> void:
 	get_tree().root.add_child.call_deferred(placeholder)
 	await get_tree().process_frame
 	get_tree().current_scene = placeholder
+	InternetManager.network_probe_enabled = false  # focus events must not start real probes either
 	InternetManager._periodic_timer.stop()  # no real network checks mid-test
 	InternetManager._http_request.cancel_request()
 	InternetManager.check_in_progress = false
-	InternetManager.is_online = true
+	InternetManager._resolve_check(true)  # open the internet gate (also unpauses the tree)
 	var filter := ""
 	var report := ""
 	var merge := ""

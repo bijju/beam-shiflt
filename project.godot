@@ -31,6 +31,7 @@ AdManager="*res://scripts/managers/ad_manager.gd"
 StoreManager="*res://scripts/managers/store_manager.gd"
 GodotPlayGameServices="*uid://bsds5unhjravp"
 InternetManager="*res://scripts/managers/internet_manager.gd"
+InternetBlocker="*res://scripts/managers/internet_blocker.gd"
 PlatformAccount="*res://scripts/managers/platform_account.gd"
 
 [display]

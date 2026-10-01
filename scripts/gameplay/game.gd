@@ -172,7 +172,7 @@ func _process(delta: float) -> void:
 
 
 func _notification(what: int) -> void:
-	if what != NOTIFICATION_WM_GO_BACK_REQUEST:
+	if what != NOTIFICATION_WM_GO_BACK_REQUEST or InternetManager.is_blocking():
 		return
 	if _complete_popup.visible or _tutorial_complete_popup.visible:
 		return

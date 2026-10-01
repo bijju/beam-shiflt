@@ -94,8 +94,7 @@ combining mechanics, not by inflating grid size.
    `LevelManager`, `GameManager`, plus `AudioManager`, `AdManager`
    and `StoreManager` (which each earned it - see the
    Audio/Advertising/Store rules), plus the GodotPlayGameServices plugin's
-   own `GodotPlayGameServices` autoload, plus `InternetManager` (a passive
-   connectivity monitor) and `PlatformAccount` (optional Play Games / Apple
+   own `GodotPlayGameServices` autoload, plus `InternetManager` (connectivity state), `InternetBlocker` (the global mandatory-internet gate) and `PlatformAccount` (optional Play Games / Apple
    identity), are autoloads (`project.godot` is authoritative). Don't add a new
    autoload unless something genuinely needs global/persistent access
    from more than one unrelated scene. `TutorialManager` (Guided
@@ -1494,8 +1493,12 @@ reintroduce any of it without an explicit owner decision.
   `user://platform_account.json`, tokens never read/stored/logged; Apple has no sign-out API so "sign out" only
   forgets the local flag); desktop/editor = none (local profile). Sign-in is always optional: failure, cancel or a
   missing plugin sets `last_message` and never blocks play. `account_screen.gd` and Settings talk only to it.
-- **`InternetManager` is a passive monitor** (`is_online` for ads/purchases/sign-in). There is no startup
-  internet gate and no pause overlay: the game must launch and play fully offline. Do not add one back.
+- **Internet is MANDATORY (restored 2026-10-01, still no Firebase/cloud).** `InternetManager` owns the state (real HTTPS probe of
+  `generate_204`, not Wi-Fi state; startup: 1 failure = offline; runtime: 2 consecutive failures; app resume / RETRY: 1 strict
+  failure; 8 s probe while healthy, 2 s while unsettled). `InternetBlocker` (autoload, CanvasLayer 128) is the ONE gate: it pauses
+  the SceneTree while `InternetManager.is_blocking()`, restores the prior pause state on reconnect (scene never reloaded) and shows the
+  INTERNET CONNECTION REQUIRED/LOST panel with RETRY (QUIT on desktop only). Never add per-scene offline code. Play Games / Apple
+  sign-in failure is NOT an internet failure and never blocks. Tests: `tools/tests/cases/test_internet_required.gd`.
 - iOS keeps the `com.apple.developer.applesignin` entitlement; Game Center and iCloud stay disabled. Do not claim
   Sign in with Apple or Play Games as DEVICE VERIFIED without a real device (cancel-message heuristic and the
   Play Games `game_id`, still empty in presets, are unconfirmed - see `tools/ios_plugin_src/README.md`).
