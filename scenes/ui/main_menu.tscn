@@ -118,10 +118,12 @@ grow_vertical = 2
 script = ExtResource("2")
 horizontal_margin_override = 40.0
 vertical_margin_override = 32.0
+top_margin_extra = -8.0
+bottom_margin_extra = 42.0
 
 [node name="Root" type="VBoxContainer" parent="SafeMargin"]
 layout_mode = 2
-theme_override_constants/separation = 20
+theme_override_constants/separation = 14
 
 [node name="Logo" type="TextureRect" parent="SafeMargin/Root"]
 unique_name_in_owner = true
@@ -143,7 +145,7 @@ custom_minimum_size = Vector2(300, 360)
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 0
-theme_override_constants/separation = 18
+theme_override_constants/separation = 14
 alignment = 1
 
 [node name="ContinueButton" type="Button" parent="SafeMargin/Root/ButtonGroup"]

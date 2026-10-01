@@ -89,8 +89,8 @@ var _procedural_generator_version: int = ProceduralLevelGenerator.GENERATOR_VERS
 const DEFAULT_GAMEPLAY_BACKGROUND := preload("res://assets/backgrounds/gameplay/bs_bg_gameplay.png")
 const DEFAULT_HUD_TOP := preload("res://assets/ui/hud/bs_hud_top_portrait.png")
 const DEFAULT_HUD_BOTTOM := preload("res://assets/ui/hud/bs_hud_bottom_portrait.png")
-const DEFAULT_TOP_BAR_ASPECT := 6.4
-const DEFAULT_BOTTOM_BAR_ASPECT := 5.6
+const DEFAULT_TOP_BAR_ASPECT := 6.0
+const DEFAULT_BOTTOM_BAR_ASPECT := 5.2
 
 
 func _ready() -> void:

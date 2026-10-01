@@ -30,6 +30,7 @@ const LOGO_ASPECT := LOGO_CROP_SIZE.x / LOGO_CROP_SIZE.y
 const LOGO_WIDTH_FRACTION := 0.96
 const LOGO_HEIGHT_FRACTION := 0.27
 const MENU_SIDE_MARGIN := 40.0
+## Nominal margin the logo/button sizes are derived from (kept so those sizes never change with the lift).
 const MENU_VERTICAL_MARGIN := 32.0
 const MAIN_BUTTON_HEIGHT_FRACTION := 0.078
 const MAIN_BUTTON_WIDTH_FRACTION := 0.86
@@ -42,6 +43,7 @@ const MAIN_BUTTON_MAX_H := 170.0
 const HERO_GAP := 20.0
 const BOTTOM_BREATHING := 28.0
 
+@onready var _safe_margin: MarginContainer = $SafeMargin
 @onready var _logo: TextureRect = %Logo
 @onready var _preview_frame: Control = %PreviewFrame
 @onready var _button_group: VBoxContainer = %ButtonGroup
@@ -180,7 +182,10 @@ func _layout_hero_elements() -> void:
 
 	var bottom_h := _bottom_row.get_combined_minimum_size().y
 	var gaps := root_sep * 3.0 + sep
-	var preview_h := maxf(safe_h - logo_h - group_h - bottom_h - gaps, safe_h * 0.2)
+	# Preview height is the flexible element: it gets whatever the REAL safe margins (incl. Android insets) leave,
+	# so the stack can never overflow the bottom edge. All other sizes derive from the nominal safe_h above.
+	var avail_h := viewport_size.y - float(_safe_margin.get_theme_constant("margin_top") + _safe_margin.get_theme_constant("margin_bottom"))
+	var preview_h := maxf(avail_h - logo_h - group_h - bottom_h - gaps, safe_h * 0.2)
 	# The frame is exactly as wide as the primary buttons so both form one aligned column. The 5:6 board is never
 	# stretched: PreviewViewportContainer resizes its viewport to the frame and GridManager fits square cells,
 	# centring the board (side bands when the frame is wider than 5:6, top/bottom bands when taller).

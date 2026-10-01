@@ -21,6 +21,11 @@ extends MarginContainer
 ## real notch/cutout.
 @export var horizontal_margin_override: float = -1.0
 @export var vertical_margin_override: float = -1.0
+## Added to the vertical baseline of one edge (negative = closer to the edge) BEFORE the real Android inset is
+## applied with maxf(), so a lifted composition can never enter a reported notch/gesture area. Main Menu uses
+## these to lift its whole stack: smaller top gap, larger bottom gap.
+@export var top_margin_extra: float = 0.0
+@export var bottom_margin_extra: float = 0.0
 
 
 ## HUD edge mode (HUD Edge Spacing pass, D103): the gameplay HUD art carries ~20% transparent padding above/below its
@@ -57,8 +62,8 @@ func _update_margins() -> void:
 	var vertical := UIConstants.BASELINE_MARGIN if vertical_margin_override < 0.0 else vertical_margin_override
 	var left := horizontal
 	var right := horizontal
-	var top := vertical
-	var bottom := vertical
+	var top := maxf(vertical + top_margin_extra, 0.0)
+	var bottom := maxf(vertical + bottom_margin_extra, 0.0)
 
 	if OS.get_name() == "Android":
 		var insets := _get_android_safe_insets()
