@@ -5,15 +5,15 @@ name: Release CD
 # missing degrades rather than fails: Android is debug-signed, iOS ships the
 # unsigned Xcode project, and no store upload happens.
 #
-# EVERY MERGE TO MAIN: builds the Android AAB + APK and refreshes the
-# rolling "latest-main" pre-release on GitHub. iOS does not run here.
+# EVERY MERGE TO MAIN: builds the Android AAB + APK as private Actions artifacts.
+# iOS does not run here.
 #
 # A manual run takes a `lanes` choice -- both, ios or android -- so a fix that
 # only touches one store does not build the other. Tags and merges always run
 # what they always ran.
 #
 # VERSION TAGS (git tag v1.0.6 && git push origin v1.0.6): Android plus the
-# iOS lane, attached to a real GitHub Release. MANUAL RUNS (Actions -> Release
+# iOS lane. MANUAL RUNS (Actions -> Release
 # CD -> Run workflow) do the same from any branch with a typed version, so the
 # lanes can be proven from a work branch before anything reaches main.
 #
@@ -23,6 +23,10 @@ name: Release CD
 #            uploads the AAB to Internal Testing by hand.
 #   IOS:     builds + validates the signed IPA, then uploads it to TestFlight through the
 #            App Store Connect API key (tags always; manual runs when testflight_upload).
+#   GITHUB RELEASES: NOT USED. The repository is public, so this workflow never publishes a
+#            release or attaches any binary (AAB/APK/IPA/Xcode archive). Packages exist only as
+#            private Actions artifacts (BeamShift-<version>-android / -ios); the read-only
+#            `permissions` block below also stops the token from writing releases.
 
 on:
   push:
@@ -42,6 +46,9 @@ on:
         description: "iOS: also upload the signed IPA to TestFlight (manual runs only; tags always do when the ASC key exists). Android is never uploaded."
         type: boolean
         default: false
+
+permissions:
+  contents: read
 
 env:
   GODOT_VERSION: 4.7.1-stable
@@ -645,30 +652,3 @@ jobs:
             rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/${IOS_PROFILE_UUID}.mobileprovision" || true
           fi
           security delete-keychain signing_temp.keychain 2>/dev/null || true
-
-  # Publishes the packages: a real GitHub Release for version tags, a
-  # rolling "latest-main" pre-release refreshed on every merge to main.
-  github-release:
-    if: always() && github.event_name == 'push' && needs.android-play.result == 'success'
-    needs: [guard, android-play, ios-appstore]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          merge-multiple: true
-      - name: List packages
-        run: ls -la
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest-main' }}
-          name: ${{ startsWith(github.ref, 'refs/tags/') && format('BeamShift v{0}', needs.guard.outputs.version) || format('Latest main build (v{0} base)', needs.guard.outputs.version) }}
-          prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
-          files: |
-            BeamShift.aab
-            BeamShift.apk
-            BeamShift.ipa
-            BeamShift-*-ios-xcode.zip
-          fail_on_unmatched_files: false
-          generate_release_notes: ${{ startsWith(github.ref, 'refs/tags/') }}

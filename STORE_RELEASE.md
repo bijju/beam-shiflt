@@ -16,6 +16,11 @@
 > - **`StoreConfig.PRIVACY_POLICY_URL` is still empty** - no real URL exists in the repo; it must be supplied by the owner (store-listing blocker).
 > - `AD_ID` permission is merged in by the Google Mobile Ads SDK, not by project code. Stripping it is a Play Families policy decision, not a code fix.
 > - CI (`release.yml`) runs only on pushes to `main`, `v*` tags (must point at `main`) and manual dispatch.
+> - **Distribution policy (2026-10-02):** Android = Actions builds the signed AAB (private artifact `BeamShift-<version>-android`); download it
+>   from the run page and upload it to Play Console Internal Testing BY HAND (no Play upload, no `PLAY_SERVICE_ACCOUNT_JSON`). iOS = Actions builds the
+>   signed IPA (private artifact `BeamShift-<version>-ios`), validates it and uploads it to TestFlight automatically (tags, or a manual run with
+>   `testflight_upload` checked). **GitHub Releases are NOT used for BeamShift binaries:** the repository is public, so `release.yml` has no release job
+>   and its token is read-only; no AAB/APK/IPA/Xcode archive is ever published. Merges to `main` only produce private 7-day artifacts.
 
 
 
