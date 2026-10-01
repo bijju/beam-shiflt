@@ -500,10 +500,8 @@ jobs:
           rm -rf addons/godot_store_kit/bindings  # C# helpers; this project is GDScript
           ls -la addons/godot_store_kit addons/godot_store_kit/bin/ios
 
-      # AuthenticationServices (Sign in with
-      # Apple, and the ASWebAuthenticationSession bridge the iOS Google Sign-In flow
-      # reuses - see scripts/ui/account_screen.gd's iOS Apple/Google sections and
-      # tools/ios_plugin_src/README.md). Not vendored in-repo: its
+      # AuthenticationServices (Sign in with Apple - see
+      # scripts/managers/platform_account.gd and tools/ios_plugin_src/README.md). Not vendored in-repo: its
       # xcframework is large and only this job ever needs it, so the pinned
       # release is fetched here instead. It needs the shared SwiftGodot runtime
       # beside them.
@@ -529,8 +527,8 @@ jobs:
       - name: Verify the StoreKit extension registered
         run: grep -q 'godot_store_kit.gdextension' .godot/extension_list.cfg && cat .godot/extension_list.cfg
 
-      # AuthenticationServices (Sign in with Apple + the iOS Google Sign-In bridge, see
-      # scripts/ui/account_screen.gd) is fetched by the step above but
+      # AuthenticationServices (Sign in with Apple, see
+      # scripts/managers/platform_account.gd) is fetched by the step above but
       # was never independently checked - a silently-missing/renamed .gdextension inside
       # the pinned GodotApplePlugins release would otherwise only surface as a confusing
       # runtime null from ClassDB.instantiate() on a real device, long after this job
@@ -544,7 +542,7 @@ jobs:
           fi
           name=$(basename "$gdext")
           if ! grep -q "$name" .godot/extension_list.cfg; then
-            echo "::error::$name is present on disk but Godot did not register it in .godot/extension_list.cfg - Sign in with Apple / iOS Google Sign-In would silently no-op on device"
+            echo "::error::$name is present on disk but Godot did not register it in .godot/extension_list.cfg - Sign in with Apple would silently no-op on device"
             exit 1
           fi
           echo "AuthenticationServices extension registered: $name"

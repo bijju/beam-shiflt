@@ -1,12 +1,12 @@
 extends Control
 ## Startup studio splash (Studio Splash pass). Set as project.godot's
-## run/main_scene - runs BEFORE the Internet Gate. Plays the MaclePro logo
+## run/main_scene. Plays the MaclePro logo
 ## then the 4Sagez logo, each fading in/hold/fading out, then hands off to
-## the existing internet_gate.tscn flow unchanged. Branding only - owns no
+## Main Menu. Branding only - owns no
 ## gameplay/menu state and is never navigated back to once left (nothing
 ## else in the project references this scene's path).
 
-const NEXT_SCENE_PATH := "res://scenes/ui/internet_gate.tscn"
+const NEXT_SCENE_PATH := "res://scenes/ui/main_menu.tscn"
 
 const FADE_DURATION := 0.35
 const HOLD_DURATION := 1.4
@@ -52,7 +52,7 @@ func _show_logo(logo: TextureRect) -> void:
 	await tween_out.finished
 
 
-## project.godot sets quit_on_go_back=false project-wide (see internet_gate.gd/
+## project.godot sets quit_on_go_back=false project-wide (see
 ## game.gd/main_menu.gd's own identical handler) - without this override,
 ## Back would silently do nothing here, leaving the player stuck on a screen
 ## with no way to interact with or exit it.

@@ -1,5 +1,8 @@
 # iOS Authentication Bridge — SOURCE-LEVEL DECISION RECORD, NOT A BUILDABLE PLUGIN FOLDER
 
+> **2026-10-01:** Firebase was removed. Only Sign in with Apple (`scripts/managers/platform_account.gd`) uses the
+> AuthenticationServices module now; the iOS Google OAuth bridge and every Firebase token exchange described below are gone.
+
 Written during the iOS Authentication + Cross-Platform Cloud Save pass (2026-09-29).
 Unlike `tools/android_plugin_src/google_signin/` (an uncompiled Kotlin *source* module
 you build yourself), this folder holds no native source at all — because none was

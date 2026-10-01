@@ -20,7 +20,6 @@ const TEXTURE_TOGGLE_OFF := preload("res://assets/ui/settings/bs_ui_toggle_off_r
 @onready var _cloud_section: Control = %CloudSection
 @onready var _cloud_status: Label = %CloudStatusLabel
 @onready var _cloud_sign_in: Button = %CloudSignInButton
-@onready var _cloud_sync: Button = %CloudSyncButton
 @onready var _privacy_options: Button = %PrivacyOptionsButton
 @onready var _privacy_policy: Button = %PrivacyPolicyButton
 @onready var _about: Button = %AboutButton
@@ -41,7 +40,6 @@ const BUY_BUTTON_MIN_FONT_SIZE := 26
 # never touches the metallic end caps.
 const BUY_BUTTON_TEXT_SIDE_INSET := 90.0
 
-var _cloud_failed := false
 
 
 func _ready() -> void:
@@ -59,16 +57,8 @@ func _ready_store_rows() -> void:
 	StoreManager.purchase_finished.connect(_on_purchase_finished)
 	_refresh_store()
 
-	# Firebase Account UI Phase 3: the account entry is always offered (a BeamShift
-	# account works regardless of OS platform), separate from whether a native
-	# platform backend happens to exist - unlike the pre-Phase-3 gate on
-	# CloudSave.is_available(), which would hide this on desktop/no-native-backend.
-	_cloud_section.visible = true
 	_cloud_sign_in.pressed.connect(func() -> void: GameManager.go_to_account())
-	_cloud_sync.pressed.connect(CloudSave.sync_now)
-	CloudSave.signed_in_changed.connect(_on_cloud_signed_in_changed)
-	CloudSave.synced.connect(_on_cloud_synced)
-	FirebaseAuth.auth_state_changed.connect(_on_firebase_auth_state_changed)
+	PlatformAccount.changed.connect(_refresh_cloud)
 	_refresh_cloud()
 
 	_privacy_options.visible = AdManager.is_privacy_options_required()
@@ -133,34 +123,14 @@ func _hide_message(shown: String) -> void:
 
 
 func _refresh_cloud() -> void:
-	var service := CloudSave.service_name()
-	if not CloudSave.is_signed_in:
-		_cloud_status.text = "Cloud save: not signed in. Progress is saved on this device."
-	elif _cloud_failed:
-		var reason := CloudSave.last_error()
-		_cloud_status.text = "Cloud save: the last sync failed. Your progress is safe on this device." + ("\n" + reason if reason != "" else "")
-	elif CloudSave.last_synced_at != "":
-		_cloud_status.text = "Cloud save: synced with %s at %s." % [service, CloudSave.last_synced_at.substr(11, 5)]
+	if not PlatformAccount.is_supported():
+		_cloud_status.text = "Game progress is stored locally on this device."
+	elif PlatformAccount.connected:
+		var who := PlatformAccount.display_name
+		var suffix := " as " + who if who != "" else ""
+		_cloud_status.text = "%s: connected%s.\nGame progress is stored on this device." % [PlatformAccount.service_name(), suffix]
 	else:
-		_cloud_status.text = "Cloud save: signed in to %s." % service
-	# Firebase Account UI Phase 3: this button always opens the Account screen now
-	# (never a direct CloudSave.sign_in() call) - its label reflects whether a
-	# BeamShift account is already signed in.
-	_cloud_sign_in.text = "ACCOUNT" if FirebaseAuth.is_signed_in() else "SIGN IN"
-	_cloud_sync.visible = CloudSave.is_signed_in
-
-
-func _on_cloud_signed_in_changed(_signed_in: bool) -> void:
-	_refresh_cloud()
-
-
-func _on_firebase_auth_state_changed(_signed_in: bool) -> void:
-	_refresh_cloud()
-
-
-func _on_cloud_synced(ok: bool) -> void:
-	_cloud_failed = not ok
-	_refresh_cloud()
+		_cloud_status.text = "%s: not connected.\nGame progress is stored on this device." % PlatformAccount.service_name()
 
 
 func _on_privacy_options_pressed() -> void:

@@ -115,16 +115,14 @@ var ad_last_interstitial_unix: int = 0
 var ad_last_counted_level: int = 0
 
 ## Store release (STORE_RELEASE.md): owned store products, product_id -> true. The store is
-## the authority - StoreManager re-checks at every launch - and entitlements NEVER travel
-## with a cloud profile (adopt_cloud_data keeps the local ones).
+## the authority - StoreManager re-checks at every launch.
 var entitlements: Dictionary = {}
-## Seconds of real gameplay (a level on screen, not paused). The cloud-save merge rule and
-## its fresh-install guard read this, so menu time must never count.
+## Seconds of real gameplay (a level on screen, not paused); menu time never counts.
 var play_time_seconds: float = 0.0
-## ISO-8601 UTC stamp of the last write - the cloud merge tie-breaker.
+## ISO-8601 UTC stamp of the last write.
 var saved_at: String = ""
 
-## Emitted after every successful write (CloudSave queues a throttled push from it).
+## Emitted after every successful write.
 signal saved
 
 
@@ -248,7 +246,7 @@ func save_game() -> bool:
 	return true
 
 
-## The whole profile as plain data - what save_game() writes and CloudSave pushes.
+## The whole profile as plain data - what save_game() writes.
 func to_dict() -> Dictionary:
 	return {
 		"version": SAVE_VERSION,
@@ -305,18 +303,6 @@ func set_entitlement(product_id: String, owned: bool) -> bool:
 ## Accumulated in memory; persisted by the next save (every accepted move saves).
 func add_play_time(seconds: float) -> void:
 	play_time_seconds += seconds
-
-
-## Replaces the profile with a cloud copy and saves. Kept LOCAL, never taken from the
-## cloud: entitlements (per store account), sound/music (per device), and the
-## interstitial cadence (so switching devices can't dodge or double ads).
-func adopt_cloud_data(cloud: Dictionary) -> void:
-	var data := cloud.duplicate(true)
-	var local := to_dict()
-	for key in ["entitlements", "sound_enabled", "music_enabled", "ad_completions_since_interstitial", "ad_last_interstitial_unix", "ad_last_counted_level"]:
-		data[key] = local[key]
-	_apply_data(data)
-	save_game()
 
 
 func is_level_completed(level_id: int) -> bool:

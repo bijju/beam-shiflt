@@ -17,8 +17,6 @@ func before_each() -> void:
 func after_each() -> void:
 	InternetManager.is_online = _online
 	Engine.time_scale = 1.0
-	CloudSave.pending_cloud = {}
-	CloudSave.pending_local = {}
 	reset_scene()
 
 
@@ -78,28 +76,6 @@ func test_main_menu_new_game_confirmation() -> void:
 	m.queue_free()
 
 
-func test_main_menu_cloud_chooser() -> void:
-	var m := await _scene("res://scenes/ui/main_menu.tscn")
-	m._show_cloud_chooser()  # nothing pending: ignored
-	CloudSave.pending_cloud = {"play_time_seconds": 7200.0, "procedural_current_level": 40}
-	CloudSave.pending_local = {"play_time_seconds": 60.0, "procedural_current_level": 2}
-	m._show_cloud_chooser()
-	ok(m._cloud_layer != null)
-	m._show_cloud_chooser()
-	eq(m._progress_text(CloudSave.pending_cloud), "LEVEL 40, 2h 00m")
-	m._notification(Node.NOTIFICATION_WM_GO_BACK_REQUEST)
-	ok(m._cloud_layer == null)
-	m._show_cloud_chooser()
-	m._on_keep_local()
-	await frames(2)
-	CloudSave.pending_cloud = {"play_time_seconds": 7200.0}
-	CloudSave.pending_local = {"play_time_seconds": 60.0}
-	m._show_cloud_chooser()
-	m._on_take_cloud()
-	await frames(2)
-	m.queue_free()
-
-
 func test_main_menu_fusion_nudge() -> void:
 	SaveManager.fusion_tutorial_nudge_seen = false
 	var m := await _scene("res://scenes/ui/main_menu.tscn")
@@ -122,18 +98,13 @@ func test_settings_menu() -> void:
 	ok(not SaveManager.sound_enabled)
 	s._sound_toggle.button_pressed = true
 	s._music_toggle.button_pressed = true
-	# cloud text variants
-	for case in [[false, false, ""], [true, true, ""], [true, false, "2026-01-01T10:20:30"], [true, false, ""]]:
-		CloudSave.is_signed_in = case[0]
-		s._cloud_failed = case[1]
-		CloudSave.last_synced_at = case[2]
-		s._refresh_cloud()
-	CloudSave.is_signed_in = false
-	CloudSave.last_synced_at = ""
-	s._on_cloud_signed_in_changed(true)
-	s._on_firebase_auth_state_changed(true)
-	s._on_cloud_synced(false)
-	s._on_cloud_synced(true)
+	PlatformAccount.connected = false
+	s._refresh_cloud()
+	PlatformAccount.connected = true
+	PlatformAccount.display_name = "Pat"
+	s._refresh_cloud()
+	PlatformAccount.connected = false
+	PlatformAccount.display_name = ""
 	# store variants through the real StoreManager with a scripted backend
 	var fake := FakeStore.new()
 	StoreManager.add_child(fake)
@@ -159,7 +130,6 @@ func test_settings_menu() -> void:
 	s._on_privacy_options_closed()
 	StoreManager._backend = old_backend
 	fake.queue_free()
-	s._cloud_sync.pressed.emit()
 	s._cloud_sign_in.pressed.emit()
 	await frames(3)
 	reset_scene()
@@ -283,59 +253,26 @@ func test_pause_menu_and_hud_bits() -> void:
 		Engine.time_scale = 1.0
 
 
-func test_internet_gate_and_splash() -> void:
-	InternetManager.check_in_progress = true  # no real network probe
-	var g := await _scene("res://scenes/ui/internet_gate.tscn")
-	g._on_check_completed(false)
-	ok(g._screen.panel.visible)
-	g._on_retry_pressed()
-	ok(g._screen.retry_button.disabled)
-	InternetManager.check_in_progress = true
-	g._on_check_completed(true)  # online -> main menu
-	await frames(3)
-	reset_scene()
-	g.queue_free()
-	InternetManager.check_in_progress = false
+func test_splash_goes_straight_to_main_menu() -> void:
 	Engine.time_scale = 40.0
 	var sp := await _scene("res://scenes/ui/studio_splash.tscn")
 	sp._on_logo_resized(sp.maclepro_logo)
-	InternetManager.check_in_progress = true
 	var t0 := Time.get_ticks_msec()
 	while Time.get_ticks_msec() - t0 < 6000:
 		await frames(1)
 	Engine.time_scale = 1.0
-	InternetManager.check_in_progress = false
 	sp.queue_free()
 
 
-func test_internet_manager_states() -> void:
+func test_internet_manager_is_passive() -> void:
 	var lost := watch(InternetManager.internet_lost)
 	var back := watch(InternetManager.internet_restored)
-	var dummy := Node.new()
-	dummy.scene_file_path = "res://scenes/ui/main_menu.tscn"
-	runner.get_tree().root.add_child(dummy)
-	runner.get_tree().current_scene = dummy
 	InternetManager._resolve_check(false)
-	ok(runner.get_tree().paused)
+	ok(not runner.get_tree().paused, "losing the connection never pauses play")
 	InternetManager._resolve_check(false)
 	InternetManager._resolve_check(true)
 	ok(not runner.get_tree().paused)
 	eq([lost.size(), back.size()], [1, 1])
-	runner.get_tree().paused = true  # already paused by the player: left alone
-	InternetManager._resolve_check(false)
-	InternetManager._resolve_check(true)
-	runner.get_tree().paused = false
-	dummy.scene_file_path = InternetManager.GATE_SCENE_PATH
-	InternetManager._resolve_check(false)
-	ok(not runner.get_tree().paused, "gate scene shows no overlay")
-	InternetManager._resolve_check(true)
-	runner.get_tree().current_scene = null
-	ok(not InternetManager._should_show_overlay())
-	var ph := Node.new()
-	runner.get_tree().root.add_child(ph)
-	runner.get_tree().current_scene = ph
-	InternetManager._on_overlay_retry_pressed()
-	InternetManager._on_check_completed_reset_retry_ui(true)
 	InternetManager._on_request_completed(HTTPRequest.RESULT_SUCCESS, 204, PackedStringArray(), PackedByteArray())
 	InternetManager.check_in_progress = true
 	InternetManager._on_request_completed(HTTPRequest.RESULT_SUCCESS, 204, PackedStringArray(), PackedByteArray())
@@ -351,5 +288,3 @@ func test_internet_manager_states() -> void:
 	InternetManager._http_request.cancel_request()
 	InternetManager.check_in_progress = false
 	InternetManager.is_online = true
-	dummy.queue_free()
-	ph.queue_free()

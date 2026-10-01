@@ -30,9 +30,8 @@ AudioManager="*res://scripts/managers/audio_manager.gd"
 AdManager="*res://scripts/managers/ad_manager.gd"
 StoreManager="*res://scripts/managers/store_manager.gd"
 GodotPlayGameServices="*uid://bsds5unhjravp"
-CloudSave="*res://scripts/managers/cloud_save.gd"
 InternetManager="*res://scripts/managers/internet_manager.gd"
-FirebaseAuth="*res://scripts/managers/firebase_auth.gd"
+PlatformAccount="*res://scripts/managers/platform_account.gd"
 
 [display]
 
@@ -44,7 +43,7 @@ window/handheld/orientation=1
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/admob/plugin.cfg", "res://addons/GodotGooglePlayBilling/plugin.cfg", "res://addons/GodotPlayGameServices/plugin.cfg", "res://addons/GodotGoogleSignIn/plugin.cfg")
+enabled=PackedStringArray("res://addons/admob/plugin.cfg", "res://addons/GodotGooglePlayBilling/plugin.cfg", "res://addons/GodotPlayGameServices/plugin.cfg")
 
 [gui]
 

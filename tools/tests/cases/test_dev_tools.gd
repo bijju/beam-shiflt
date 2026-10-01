@@ -79,15 +79,6 @@ func test_procedural_audit_static_api() -> void:
 	ok(ProceduralAudit.difficulty_distribution_report(1, 20, 2) is Dictionary)
 
 
-func test_live_harness_offline_actions() -> void:
-	# Only the actions that never reach the network (no session exists in the isolated user dir).
-	for action in ["status", "sign_out", "restore"]:
-		_run_tool("res://scripts/tools/firebase_auth_test.tscn", ["action=" + action])
-	_run_tool("res://scripts/tools/firebase_firestore_test.tscn", ["action=status"])
-	for action in ["status", "summary", "payload_size", "signals"]:
-		_run_tool("res://scripts/tools/cloud_save_test.tscn", ["action=" + action])
-
-
 func test_tool_option_branches() -> void:
 	var fps := "res://scripts/tools/fusion_progression_sample.tscn"
 	_run_tool(fps, ["levels=401", "ascii=1", "quiet=1"])

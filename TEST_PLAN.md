@@ -1,5 +1,16 @@
 # TEST_PLAN.md
 
+> **2026-10-01 - Firebase removed.** The Firebase/Firestore/CloudSave/Google Sign-In test sections below are HISTORICAL.
+> Current automated coverage: `tools/tests/cases/test_ui_account.gd` (PlatformAccount: desktop local profile, Android
+> Play Games available/unavailable/failed, iOS Apple unavailable/cancel/failure/success/persistence/sign-out, offline
+> sign-in, no Firebase autoloads/files), `test_ui_screens.gd` (splash straight to Main Menu, passive InternetManager,
+> Settings account section). Result after removal: production pass 107 tests / 0 failed; internal-QA pass 35 tests /
+> 1 failed (`test_managers.gd::test_level_manager_gating`, era-2 tutorial unlock in QA mode; warning-only pass, not
+> touched by this change). MANUAL TEST REQUIRED on a real Android device: launch offline, Play Games connect/retry/
+> cancel (needs the Play Games Game ID), Account + Settings text, local save persistence across restart, ads/IAP
+> unaffected. MANUAL TEST REQUIRED on a real iPhone: Sign in with Apple sign-in/cancel/sign-out, local save.
+
+
 ## Phase 4B - existing-account linking QA + Android keyboard/IME fix (2026-09-28)
 
 Supersedes nothing below - additive to the Google Sign-In plugin fix above (now

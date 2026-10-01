@@ -1,23 +1,8 @@
 extends Node
-## Autoload: InternetManager (Runtime Internet Loss Blocking pass).
-## THE one place that performs BeamShift's real internet-reachability
-## check and THE one place that shows the global "INTERNET CONNECTION
-## LOST" overlay + pauses the SceneTree when connectivity drops during
-## normal play. Scripts must never duplicate this check or build a
-## second offline overlay - request_check()/is_online/the signals below
-## are the whole surface.
-##
-## The startup gate (internet_gate.gd, earlier pass) still owns its own
-## "INTERNET CONNECTION REQUIRED" full-scene UI for the pre-Main-Menu
-## case, but now delegates the actual network check to this autoload
-## instead of owning its own HTTPRequest - see request_check()/
-## check_completed. GATE_SCENE_PATH is how this manager avoids ever
-## stacking its own runtime overlay on top of that screen.
-##
-## process_mode = ALWAYS (same pattern as CloudSave/StoreManager/their
-## backends) so this autoload - and the overlay/timers it owns - keep
-## working while get_tree().paused is true; that is the entire mechanism
-## the overlay relies on to detect a restored connection and un-pause.
+## Autoload: InternetManager - a PASSIVE connectivity monitor. Gameplay and local saves
+## never need the internet, so this never blocks or pauses anything; it only exposes
+## is_online (ads, purchases and sign-in check it before trying the network).
+## process_mode = ALWAYS so its timers keep running while the tree is paused.
 
 signal check_completed(is_online: bool)
 signal internet_lost
@@ -30,26 +15,14 @@ const CHECK_URL := "https://www.gstatic.com/generate_204"
 const CHECK_TIMEOUT_SECONDS := 6.0
 const PERIODIC_CHECK_INTERVAL_SECONDS := 4.0
 
-const GATE_SCENE_PATH := "res://scenes/ui/internet_gate.tscn"
-
-## Studio Splash pass: run/main_scene now boots into studio_splash.tscn
-## BEFORE this gate. The runtime overlay must not stack on top of the
-## company logo sequence any more than it already avoids stacking on the
-## gate itself - see _should_show_overlay().
-const STUDIO_SPLASH_SCENE_PATH := "res://scenes/ui/studio_splash.tscn"
-
 var is_online: bool = true
 var check_in_progress: bool = false
 
 var _has_checked_once := false
-var _paused_by_connectivity_loss := false
 
 var _http_request: HTTPRequest
 var _timeout_timer: Timer
 var _periodic_timer: Timer
-
-var _overlay_layer: CanvasLayer
-var _overlay_screen: ConnectivityScreenBuilder.Screen
 
 
 func _ready() -> void:
@@ -71,14 +44,10 @@ func _ready() -> void:
 	add_child(_periodic_timer)
 	_periodic_timer.start()
 
-	_build_overlay()
-	check_completed.connect(_on_check_completed_reset_retry_ui)
-
 	request_check()
 
 
-## Guarded by check_in_progress so the periodic timer, a RETRY tap, and an
-## app-resume check landing close together collapse into the ONE
+## Guarded by check_in_progress so the periodic timer and an app-resume check landing close together collapse into the ONE
 ## in-flight request - never a second overlapping HTTPRequest. Callers
 ## (the startup gate, the overlay's own RETRY button) just call this and
 ## listen to check_completed/internet_lost/internet_restored.
@@ -131,73 +100,5 @@ func _resolve_check(online: bool) -> void:
 		return
 	if online:
 		internet_restored.emit()
-		_on_internet_restored()
 	else:
 		internet_lost.emit()
-		_on_internet_lost()
-
-
-func _on_internet_lost() -> void:
-	if not _should_show_overlay():
-		return
-	if get_tree().paused:
-		# Already paused for another reason (e.g. the player opened Pause
-		# themselves) - leave that state alone, see _on_internet_restored.
-		_paused_by_connectivity_loss = false
-	else:
-		get_tree().paused = true
-		_paused_by_connectivity_loss = true
-	_overlay_layer.visible = true
-
-
-func _on_internet_restored() -> void:
-	_overlay_layer.visible = false
-	if _paused_by_connectivity_loss:
-		get_tree().paused = false
-		_paused_by_connectivity_loss = false
-
-
-func _should_show_overlay() -> bool:
-	var scene := get_tree().current_scene
-	if scene == null:
-		return false
-	return scene.scene_file_path != GATE_SCENE_PATH and scene.scene_file_path != STUDIO_SPLASH_SCENE_PATH
-
-
-func _build_overlay() -> void:
-	_overlay_layer = CanvasLayer.new()
-	_overlay_layer.layer = 100
-	_overlay_layer.visible = false
-	_overlay_layer.process_mode = Node.PROCESS_MODE_ALWAYS
-	add_child(_overlay_layer)
-
-	var dim := Color(0.0, 0.02, 0.08, 0.92)
-	_overlay_screen = ConnectivityScreenBuilder.build(
-		_overlay_layer,
-		"INTERNET CONNECTION LOST",
-		"BeamShift requires an active internet connection to continue.",
-		dim
-	)
-	_overlay_screen.retry_button.pressed.connect(_on_overlay_retry_pressed)
-	_overlay_screen.exit_button.pressed.connect(_on_overlay_exit_pressed)
-	# The overlay has no "checking" state distinct from "offline" - it's
-	# always the full panel, never the startup gate's bare loading label.
-	_overlay_screen.loading_row.visible = false
-	_overlay_screen.panel.visible = true
-
-
-func _on_overlay_retry_pressed() -> void:
-	AudioManager.play_ui_button_press()
-	_overlay_screen.retry_button.disabled = true
-	_overlay_screen.retry_button.text = "CHECKING..."
-	request_check()
-
-
-func _on_overlay_exit_pressed() -> void:
-	AudioManager.play_ui_button_press()
-	GameManager.quit_game()
-
-
-func _on_check_completed_reset_retry_ui(_is_online: bool) -> void:
-	_overlay_screen.retry_button.disabled = false
-	_overlay_screen.retry_button.text = "RETRY"

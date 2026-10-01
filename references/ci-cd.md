@@ -26,8 +26,8 @@ The iOS lane produces one of two things depending on which secrets exist:
 
 This pipeline is specific to `bijju/beam-shiflt`, branch `dev_abhilas` (and `main` for
 tag-triggered releases). It does not touch, and must never be extended to touch, any other
-repository, organization secret, or shared Apple/Google/Firebase resource outside the
-`beamshift-game` Firebase project and the `com.foursagez.beamshift` bundle id.
+repository, organization secret, or shared Apple/Google resource outside the
+BeamShift stores and the `com.foursagez.beamshift` bundle id.
 
 ## 3. iOS workflow trigger architecture
 

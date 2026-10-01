@@ -32,21 +32,13 @@ func test_load_variants() -> void:
 	eq(SaveManager.highest_unlocked_level, 7)
 
 
-func test_roundtrip_and_adopt_cloud() -> void:
+func test_roundtrip() -> void:
 	SaveManager.record_level_result(2, 5, 3, 15)
 	ok(SaveManager.save_game())
 	var d := SaveManager.to_dict()
 	SaveManager.highest_unlocked_level = 1
 	SaveManager.load_game()
 	eq(SaveManager.to_dict()["highest_unlocked_level"], d["highest_unlocked_level"])
-	SaveManager.set_entitlement("x", true)
-	var cloud := d.duplicate(true)
-	cloud["highest_unlocked_level"] = 9
-	cloud["entitlements"] = {"hack": true}
-	SaveManager.adopt_cloud_data(cloud)
-	eq(SaveManager.highest_unlocked_level, 9)
-	ok(SaveManager.has_entitlement("x"), "entitlements stay local")
-	ok(not SaveManager.has_entitlement("hack"))
 
 
 func test_entitlements_and_playtime() -> void:

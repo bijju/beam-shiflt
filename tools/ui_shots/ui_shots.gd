@@ -55,7 +55,6 @@ func _shoot(name: String) -> void:
 			node = load("res://scenes/gameplay/game.tscn").instantiate()
 		"dialog_confirm":
 			node = load("res://scenes/ui/main_menu.tscn").instantiate()
-		"internet_gate": node = load("res://scenes/ui/internet_gate.tscn").instantiate()
 	add_child(node)
 	for i in 14:
 		await get_tree().process_frame
@@ -66,8 +65,6 @@ func _shoot(name: String) -> void:
 		"pause": node._on_pause_pressed()
 		"level_complete": node._complete_popup.show_result(7, 2, true, 5, false, false, true)
 		"tutorial_complete": node._tutorial_complete_popup.show_result(false)
-		"internet_gate":
-			node._on_check_completed(false)
 		"dialog_confirm":
 			SaveManager.procedural_current_level = 12
 			node._show_new_game_confirmation()

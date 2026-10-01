@@ -1,5 +1,15 @@
 # STORE_RELEASE.md — Google Play + App Store release (store-release pass, 2026-09-26)
 
+> **SUPERSEDED 2026-10-01 - Firebase removed.** BeamShift now uses Android = Google Play Games + local save,
+> iOS = Sign in with Apple + local save, desktop = local save. There is no Firebase, Firestore, cloud save,
+> cross-platform sync, CloudSave/FirebaseAuth autoload, Google Credential Manager plugin or startup internet gate.
+> Every section below that describes them (cloud save policy, sections 8-15, 17, 18) is HISTORICAL only. Current
+> architecture: `CLAUDE.md` "Account / platform identity rules"; code: `scripts/managers/platform_account.gd`.
+> Obsolete GitHub secrets: none were Firebase-specific (the workflow never referenced one). Console leftovers the
+> owner may clean up manually: the `beamshift-game` Firebase project (Auth/Firestore), the Web API key, and the
+> Firebase-registered Android SHA-1s. Play Games still needs its Game ID (`godot_play_game_services/game_id`).
+
+
 Built with the `godot-store-release` playbook. This file is the project's own reference for everything store-facing:
 decisions, architecture, what is done in code, and the console work that only the owner can do. Update it as batches
 complete — a stale checklist is worse than none.

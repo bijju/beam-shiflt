@@ -25,11 +25,11 @@ a test aborts (a GDScript runtime error after an `await` silently kills a test, 
   Class-level declarations (`const`, `var`, `signal`, `enum`), `else`/`elif`/`match` arm labels and lambdas'
   inner lines are not counted.
 * The copy uses its own user dir (`%APPDATA%\BeamShiftCoverageTmp`) so tests can never touch the real save,
-  Firebase session or cloud profile. The runner resets `SaveManager` to a fresh profile before every test and
+  platform account file. The runner resets `SaveManager` to a fresh profile before every test and
   stops `InternetManager`'s background probe (no real network traffic from tests).
 * Tests live in `tools/tests/cases/test_*.gd` (`extends TestCase`, methods named `test_*`, `await` allowed).
-  Test doubles are in `tools/tests/fakes/`: scripted HTTP for `FirebaseAuth`, scripted/local-server HTTP for
-  the Firestore wrapper, fake ad / store / cloud / Game Center backends.
+  Test doubles are in `tools/tests/fakes/`: fake ad / store backends (PlatformAccount is driven
+  directly through its callbacks).
 * Dev tools that end with `get_tree().quit()` run as child Godot processes (`test_dev_tools.gd`); their counts
   are merged back through `Cov`'s `cov_dump=` file.
 
@@ -39,6 +39,6 @@ a test aborts (a GDScript runtime error after an `await` silently kills a test, 
   backend selection, Android safe-area branches of `SafeAreaMargin`, `AdBackendAdMob` plugin calls) is exercised
   through fakes where possible; the OS-gated lines themselves cannot execute on desktop.
 * Unreachable code behind constants (e.g. the `match` in `EraTheme.for_era` after `UNIFIED_BLUE_THEME_ONLY`).
-* Live-network dev harnesses (`cloud_save_test`, `firebase_*_test`) and the one-off `make_ios_icon` tool.
+* The one-off `make_ios_icon` tool.
 * `tools/level_editor/**`, `tools/ci/**` and scene/`.tscn` wiring are outside the instrumented roots.
 * Pixel-level / real-touch behaviour: still MANUAL (see `TEST_PLAN.md`).

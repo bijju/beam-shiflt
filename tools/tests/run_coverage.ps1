@@ -37,7 +37,7 @@ function Build-Copy([string]$Name, [bool]$Qa) {
 	if ($ip.ExitCode -ne 0) { throw "instrument failed" }
 
 	# Register Cov as the FIRST autoload of the copy only, and isolate user:// so tests can never
-	# touch the real save, Firebase session or cloud profile.
+	# touch the real save or platform account.
 	$pg = Join-Path $dst "project.godot"
 	$txt = Get-Content $pg -Raw
 	$txt = $txt.Replace("[autoload]`r`n", "[autoload]`r`n`r`nCov=`"*res://tools/tests/cov.gd`"`r`n").Replace("[autoload]`n", "[autoload]`n`nCov=`"*res://tools/tests/cov.gd`"`n")

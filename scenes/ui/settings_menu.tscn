@@ -187,7 +187,7 @@ theme_override_constants/separation = 12
 [node name="AccountHeading" type="Label" parent="SafeMargin/Layout/Scroll/Sections/CloudSection/Box"]
 layout_mode = 2
 theme_type_variation = &"SectionLabel"
-text = "ACCOUNT & CLOUD SAVE"
+text = "ACCOUNT"
 
 [node name="Body" type="VBoxContainer" parent="SafeMargin/Layout/Scroll/Sections/CloudSection/Box"]
 layout_mode = 2
@@ -206,15 +206,7 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 136)
 layout_mode = 2
 theme_override_font_sizes/font_size = 40
-text = "SIGN IN"
-
-[node name="CloudSyncButton" type="Button" parent="SafeMargin/Layout/Scroll/Sections/CloudSection/Box/Body"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 116)
-layout_mode = 2
-theme_type_variation = &"SecondaryButton"
-theme_override_font_sizes/font_size = 36
-text = "SYNC NOW"
+text = "ACCOUNT"
 
 [node name="StoreSection" type="PanelContainer" parent="SafeMargin/Layout/Scroll/Sections"]
 unique_name_in_owner = true

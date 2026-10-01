@@ -126,7 +126,7 @@ func go_to_settings() -> void:
 	get_tree().change_scene_to_file(SETTINGS_SCENE)
 
 
-## Firebase Account UI Phase 3: the player-facing BeamShift Account screen, reached
+## The player-facing Account screen (PlatformAccount identity), reached
 ## only from Settings. Its own Back returns here (go_to_settings()), not Main Menu.
 func go_to_account() -> void:
 	get_tree().change_scene_to_file(ACCOUNT_SCENE)
