@@ -12,7 +12,7 @@
 > **CURRENT RELEASE STATE (2026-10-02, release-blocker cleanup pass, branch dev_abhilas, nothing committed):**
 > - GitHub Actions secrets present (names only): `ADMOB_IOS_APP_ID/REWARDED_ID/INTERSTITIAL_ID`, `APPLE_TEAM_ID`, `ASC_API_PRIVATE_KEY/KEY_ID/ISSUER_ID`,
 >   `IOS_DIST_CERT_B64/PASSWORD`, `IOS_PROVISIONING_PROFILE_B64`. **MISSING (Android lane cannot pass without them):** `PLAY_GAMES_GAME_ID`,
->   `ANDROID_KEYSTORE_B64/USER/PASSWORD`, `ADMOB_ANDROID_APP_ID/REWARDED_ID/INTERSTITIAL_ID`, and `PLAY_SERVICE_ACCOUNT_JSON` (only for auto-upload).
+>   `ANDROID_KEYSTORE_B64/USER/PASSWORD`, `ADMOB_ANDROID_APP_ID/REWARDED_ID/INTERSTITIAL_ID`, (`PLAY_SERVICE_ACCOUNT_JSON` is NOT used: CI never uploads to Play).
 > - **`StoreConfig.PRIVACY_POLICY_URL` is still empty** - no real URL exists in the repo; it must be supplied by the owner (store-listing blocker).
 > - `AD_ID` permission is merged in by the Google Mobile Ads SDK, not by project code. Stripping it is a Play Families policy decision, not a code fix.
 > - CI (`release.yml`) runs only on pushes to `main`, `v*` tags (must point at `main`) and manual dispatch.
@@ -215,7 +215,7 @@ added via **"Draft Submission (N)"** (never "Create New Submission"). Before Pla
 - [x] IAP product `beamshift_no_forced_ads` created in Play Console (same id on both stores - `StoreConfig.NO_FORCED_ADS`), purchase option `no-forced-ads-lifetime`, status **ACTIVE**; Android device confirmed live localized price retrieval (INR ₹450.00) 2026-09-29 - see section 20. **Purchase/restore/reinstall/refund still NOT device-verified** - see section 20's manual QA checklist.
 - [ ] upload keystore -> secrets `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_USER`, `ANDROID_KEYSTORE_PASSWORD`
 - [x] cloud save: REMOVED 2026-10-01 - nothing to configure (Play Games is sign-in only)
-- [ ] signed AAB (`Release CD`), uploaded via `PLAY_SERVICE_ACCOUNT_JSON` or by hand
+- [ ] signed AAB (`Release CD`), built by `Release CD` as a downloadable artifact (`BeamShift-<version>-android`), uploaded to Play Internal Testing BY HAND (CI never uploads Android)
 - [ ] Play Console: listing, privacy policy URL (`StoreConfig.PRIVACY_POLICY_URL`, empty = BLOCKER), Data safety, IARC, Families/target audience, Advertising-ID declaration + AD_ID permission decision (item 4 above)
 
 **IOS** (final archive/sign/upload needs macOS: the `ios-appstore` job on `macos-26`)
@@ -228,7 +228,7 @@ added via **"Draft Submission (N)"** (never "Create New Submission"). Before Pla
 - [ ] icon: only the 1024x1024 RGB (no alpha) `bs_app_icon_ios_1024.png` exists - valid single-size AppIcon; launch screen = Godot default (no custom art; do not generate)
 - [ ] Xcode archive -> App Store Connect key (`ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_API_PRIVATE_KEY`) -> TestFlight test
 
-**All GitHub secrets the workflow reads**: `ANDROID_KEYSTORE_B64/USER/PASSWORD`, `PLAY_SERVICE_ACCOUNT_JSON`, `PLAY_GAMES_GAME_ID`, `ADMOB_ANDROID_{APP,REWARDED,INTERSTITIAL}_ID`, `ADMOB_IOS_{APP,REWARDED,INTERSTITIAL}_ID`, `APPLE_TEAM_ID`, `IOS_DIST_CERT_B64`, `IOS_DIST_CERT_PASSWORD`, `IOS_PROVISIONING_PROFILE_B64`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_API_PRIVATE_KEY`.
+**All GitHub secrets the workflow reads**: `ANDROID_KEYSTORE_B64/USER/PASSWORD`, `PLAY_GAMES_GAME_ID`, `ADMOB_ANDROID_{APP,REWARDED,INTERSTITIAL}_ID`, `ADMOB_IOS_{APP,REWARDED,INTERSTITIAL}_ID`, `APPLE_TEAM_ID`, `IOS_DIST_CERT_B64`, `IOS_DIST_CERT_PASSWORD`, `IOS_PROVISIONING_PROFILE_B64`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_API_PRIVATE_KEY`.
 
 **Audit facts (source, not docs)**: consent = UMP every launch + Privacy Options in Settings when required; every request child-directed (TFCD/TFUA, rating G); rewarded hint survives the IAP by design; tutorials/T-packs/V*-TEST never show ads; purchase restore exists (Settings); cloud = Play Games Saved Games (Android) / Game Center saved games in iCloud (iOS), rule "more play time wins", chooser past 1 h gap, fresh install adopts cloud, offline = local file keeps working and the next local save re-queues the push (no dedicated retry timer). None of the cloud/IAP/consent paths has been run on a device. The iOS lane and `release.yml` YAML are UNVERIFIED (never run).
 

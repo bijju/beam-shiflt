@@ -13,11 +13,16 @@ name: Release CD
 # what they always ran.
 #
 # VERSION TAGS (git tag v1.0.6 && git push origin v1.0.6): Android plus the
-# iOS lane, uploads the signed AAB to the Play internal track and the IPA
-# to TestFlight when the credentials exist, attached to a real GitHub
-# Release. MANUAL RUNS (Actions -> Release CD -> Run workflow) do the same
-# from any branch with a typed version, so the lanes can be proven from
-# a work branch before anything reaches main.
+# iOS lane, attached to a real GitHub Release. MANUAL RUNS (Actions -> Release
+# CD -> Run workflow) do the same from any branch with a typed version, so the
+# lanes can be proven from a work branch before anything reaches main.
+#
+# DELIVERY POLICY (owner decision, 2026-10-02):
+#   ANDROID: this workflow only BUILDS the signed AAB (downloadable artifact). It NEVER
+#            uploads to Google Play and needs no PLAY_SERVICE_ACCOUNT_JSON; the owner
+#            uploads the AAB to Internal Testing by hand.
+#   IOS:     builds + validates the signed IPA, then uploads it to TestFlight through the
+#            App Store Connect API key (tags always; manual runs when testflight_upload).
 
 on:
   push:
@@ -33,17 +38,8 @@ on:
         default: both
         type: choice
         options: [both, ios, android]
-      play_track:
-        description: "Google Play track"
-        default: internal
-        type: choice
-        options: [internal, beta, production]
-      confirm_production:
-        description: "Type PUBLISH to allow a production-track upload (ignored for internal/beta)"
-        required: false
-        default: ""
       testflight_upload:
-        description: "iOS: also upload the signed IPA to TestFlight (manual runs only; tags always do when the ASC key exists)"
+        description: "iOS: also upload the signed IPA to TestFlight (manual runs only; tags always do when the ASC key exists). Android is never uploaded."
         type: boolean
         default: false
 
@@ -61,7 +57,6 @@ jobs:
     outputs:
       version: ${{ steps.ver.outputs.version }}
       has_android: ${{ steps.creds.outputs.has_android }}
-      has_play_upload: ${{ steps.creds.outputs.has_play_upload }}
       has_ios: ${{ steps.creds.outputs.has_ios }}
       has_ios_upload: ${{ steps.creds.outputs.has_ios_upload }}
     steps:
@@ -95,7 +90,6 @@ jobs:
           # store jobs only run once their secrets exist; a tag always
           # produces packages either way
           echo "has_android=${{ secrets.ANDROID_KEYSTORE_B64 != '' }}" >> "$GITHUB_OUTPUT"
-          echo "has_play_upload=${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}" >> "$GITHUB_OUTPUT"
           # A certificate plus a provisioning profile is enough to sign an
           # installable IPA; the App Store Connect key is only needed to
           # hand that IPA to TestFlight.
@@ -195,15 +189,15 @@ jobs:
         run: tools/ci/stamp_version.sh "${{ needs.guard.outputs.version }}"
 
       # Refuses a non-production BuildConfig. Fails without PLAY_GAMES_GAME_ID (the build
-      # cannot compile without it); AdMob ids missing = ads OFF, or a failure when the
-      # production track is requested.
+      # cannot compile without it); AdMob ids missing = ads OFF on a merge to main, a failure on a
+      # tag or manual (release) run.
       - name: Stamp store config (Play Games id, AdMob ids)
         env:
           PLAY_GAMES_GAME_ID: ${{ secrets.PLAY_GAMES_GAME_ID }}
           ADMOB_ANDROID_APP_ID: ${{ secrets.ADMOB_ANDROID_APP_ID }}
           ADMOB_ANDROID_REWARDED_ID: ${{ secrets.ADMOB_ANDROID_REWARDED_ID }}
           ADMOB_ANDROID_INTERSTITIAL_ID: ${{ secrets.ADMOB_ANDROID_INTERSTITIAL_ID }}
-          REQUIRE_ADMOB: ${{ (startsWith(github.ref, 'refs/tags/') || inputs.play_track == 'production') && '1' || '' }}
+          REQUIRE_ADMOB: ${{ (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && '1' || '' }}
         run: tools/ci/stamp_store_config.sh android
 
       - name: Prepare signing (release keystore, or generated debug key)
@@ -215,8 +209,13 @@ jobs:
           ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
           ANDROID_KEYSTORE_USER: ${{ secrets.ANDROID_KEYSTORE_USER }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          IS_RELEASE_RUN: ${{ (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && '1' || '' }}
         run: |
           umask 077
+          if [ -z "$ANDROID_KEYSTORE_B64" ] && [ -n "$IS_RELEASE_RUN" ]; then
+            echo "::error::A tag or manual run must produce a RELEASE-signed AAB, but ANDROID_KEYSTORE_B64 is not set (a debug-signed bundle cannot be uploaded to Play)."
+            exit 1
+          fi
           if [ -n "$ANDROID_KEYSTORE_B64" ]; then
             # Strip whitespace and any BOM before decoding; a value pasted
             # from a PowerShell console can carry both.
@@ -269,6 +268,7 @@ jobs:
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ runner.temp }}/debug.keystore
           GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
           GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+          IS_RELEASE_RUN: ${{ (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && '1' || '' }}
         run: |
           mkdir -p build/android
           GODOT=~/godot/Godot_v${GODOT_VERSION}_linux.x86_64
@@ -282,8 +282,13 @@ jobs:
           # exporter occasionally hangs AFTER writing the file, so a timeout
           # kill is not by itself a failure: the file is the truth.
           timeout 45m $GODOT --headless --path . $EXPORT_FLAG "Android" build/android/${APP_NAME}.aab || true
-          timeout 45m $GODOT --headless --path . $EXPORT_FLAG "Android Debug" build/android/${APP_NAME}.apk || true
-          for f in build/android/${APP_NAME}.aab build/android/${APP_NAME}.apk; do
+          # Tag / manual (release) runs ship the signed AAB only; the sideload APK is for merges to main.
+          FILES="build/android/${APP_NAME}.aab"
+          if [ -z "$IS_RELEASE_RUN" ]; then
+            timeout 45m $GODOT --headless --path . $EXPORT_FLAG "Android Debug" build/android/${APP_NAME}.apk || true
+            FILES="$FILES build/android/${APP_NAME}.apk"
+          fi
+          for f in $FILES; do
             size=$(stat -c%s "$f" 2>/dev/null || echo 0)
             if [ "$size" -lt 5000000 ]; then
               echo "::error::$f missing or too small (${size} bytes) - export failed"
@@ -316,28 +321,8 @@ jobs:
         if: always()
         run: rm -f "$RUNNER_TEMP/release.keystore" "$RUNNER_TEMP/debug.keystore" || true
 
-      # A production-track upload publishes to real players, so it needs an
-      # explicit typed confirmation on top of the dispatch choice. Tag pushes
-      # never reach production: they resolve to the internal track below.
-      - name: Refuse an unconfirmed production upload
-        if: inputs.play_track == 'production' && inputs.confirm_production != 'PUBLISH'
-        run: |
-          echo "::error::play_track=production requires confirm_production=PUBLISH. Nothing was uploaded."
-          exit 1
-
-      - name: Upload to Google Play
-        if: >-
-          (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch')
-          && steps.signing.outputs.mode == 'release'
-          && needs.guard.outputs.has_play_upload == 'true'
-          && (inputs.play_track != 'production' || inputs.confirm_production == 'PUBLISH')
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: ${{ env.PACKAGE_NAME }}
-          releaseFiles: build/android/${{ env.APP_NAME }}.aab
-          track: ${{ inputs.play_track || 'internal' }}
-          status: completed
+      # Android is NEVER uploaded from CI: download the AAB from this run's artifact
+      # (BeamShift-<version>-android) and upload it to Play Internal Testing by hand.
 
   # RELEASE-ONLY TARGET: version tags and manual dispatch, NOT every merge.
   # GitHub bills macOS runners at a 10x minute multiplier, so a ~10 minute
