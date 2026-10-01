@@ -48,7 +48,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("5")
 horizontal_margin_override = 32.0
-vertical_margin_override = 8.0
+vertical_margin_override = 28.0
 
 [node name="Layout" type="VBoxContainer" parent="SafeMargin"]
 layout_mode = 2
@@ -59,9 +59,10 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 0
 script = ExtResource("13")
-aspect_ratio = 2.834899
+aspect_ratio = 6.4
 
 [node name="Background" type="TextureRect" parent="SafeMargin/Layout/TopBar"]
+visible = false
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -69,24 +70,31 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-texture = ExtResource("7")
 expand_mode = 1
 stretch_mode = 6
+
+[node name="Plate" type="Panel" parent="SafeMargin/Layout/TopBar"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_type_variation = &"HudPlate"
 
 [node name="BackButton" type="Button" parent="SafeMargin/Layout/TopBar"]
 unique_name_in_owner = true
 layout_mode = 1
-anchor_left = 0.04
+anchors_preset = 4
 anchor_top = 0.5
-anchor_right = 0.04
 anchor_bottom = 0.5
-offset_left = -40.0
-offset_top = -40.0
-offset_right = 40.0
-offset_bottom = 40.0
-grow_horizontal = 2
+offset_left = 18.0
+offset_top = -46.0
+offset_right = 110.0
+offset_bottom = 46.0
 grow_vertical = 2
-flat = true
+theme_type_variation = &"IconButton"
 text = ""
 
 [node name="BackIcon" type="TextureRect" parent="SafeMargin/Layout/TopBar/BackButton"]
@@ -96,10 +104,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -20.0
-offset_top = -20.0
-offset_right = 20.0
-offset_bottom = 20.0
+offset_left = -26.0
+offset_top = -26.0
+offset_right = 26.0
+offset_bottom = 26.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
@@ -109,12 +117,12 @@ stretch_mode = 5
 
 [node name="LeftSlot" type="Control" parent="SafeMargin/Layout/TopBar"]
 layout_mode = 1
-anchor_left = 0.07
-anchor_top = 0.0
-anchor_right = 0.33
+anchor_left = 0.14
+anchor_right = 0.62
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 
 [node name="LevelLabel" type="Label" parent="SafeMargin/Layout/TopBar/LeftSlot"]
 unique_name_in_owner = true
@@ -124,22 +132,20 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-horizontal_alignment = 1
-vertical_alignment = 1
-autowrap_mode = 0
-clip_text = true
-theme_override_font_sizes/font_size = 22
-theme_override_constants/line_spacing = 2
+theme_override_constants/line_spacing = 0
+theme_override_font_sizes/font_size = 36
 text = "LEVEL 1"
+vertical_alignment = 1
+clip_text = true
 
 [node name="RightSlot" type="Control" parent="SafeMargin/Layout/TopBar"]
 layout_mode = 1
-anchor_left = 0.67
-anchor_top = 0.0
-anchor_right = 0.93
+anchor_left = 0.62
+anchor_right = 0.97
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 
 [node name="MovesLabel" type="Label" parent="SafeMargin/Layout/TopBar/RightSlot"]
 unique_name_in_owner = true
@@ -149,10 +155,11 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-horizontal_alignment = 1
-vertical_alignment = 1
-theme_override_font_sizes/font_size = 24
+theme_type_variation = &"SectionLabel"
+theme_override_font_sizes/font_size = 38
 text = "MOVES: 0"
+horizontal_alignment = 2
+vertical_alignment = 1
 
 [node name="CenterArea" type="Control" parent="SafeMargin/Layout"]
 layout_mode = 2
@@ -172,9 +179,10 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 0
 script = ExtResource("13")
-aspect_ratio = 2.838710
+aspect_ratio = 5.6
 
 [node name="Background" type="TextureRect" parent="SafeMargin/Layout/BottomBar"]
+visible = false
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -182,93 +190,35 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-texture = ExtResource("8")
 expand_mode = 1
 stretch_mode = 6
 
-[node name="ResetButton" type="Button" parent="SafeMargin/Layout/BottomBar"]
-unique_name_in_owner = true
+[node name="Plate" type="Panel" parent="SafeMargin/Layout/BottomBar"]
 layout_mode = 1
-anchor_left = 0.294
-anchor_top = 0.5175
-anchor_right = 0.294
-anchor_bottom = 0.5175
-offset_left = -72.0
-offset_top = -72.0
-offset_right = 72.0
-offset_bottom = 72.0
-grow_horizontal = 2
-grow_vertical = 2
-flat = true
-text = ""
-
-[node name="ResetIcon" type="TextureRect" parent="SafeMargin/Layout/BottomBar/ResetButton"]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -38.0
-offset_top = -38.0
-offset_right = 38.0
-offset_bottom = 38.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-texture = ExtResource("10")
-expand_mode = 1
-stretch_mode = 5
-
-[node name="PauseButton" type="Button" parent="SafeMargin/Layout/BottomBar"]
-unique_name_in_owner = true
-layout_mode = 1
-anchor_left = 0.7045
-anchor_top = 0.5161
-anchor_right = 0.7045
-anchor_bottom = 0.5161
-offset_left = -72.0
-offset_top = -72.0
-offset_right = 72.0
-offset_bottom = 72.0
-grow_horizontal = 2
-grow_vertical = 2
-flat = true
-text = ""
-
-[node name="PauseIcon" type="TextureRect" parent="SafeMargin/Layout/BottomBar/PauseButton"]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -38.0
-offset_top = -38.0
-offset_right = 38.0
-offset_bottom = 38.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-texture = ExtResource("11")
-expand_mode = 1
-stretch_mode = 5
+theme_type_variation = &"HudPlate"
 
 [node name="HintButton" type="Button" parent="SafeMargin/Layout/BottomBar"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
-anchor_left = 0.1212
-anchor_top = 0.5175
-anchor_right = 0.1212
-anchor_bottom = 0.5175
-offset_left = -72.0
-offset_top = -72.0
-offset_right = 72.0
-offset_bottom = 72.0
+anchors_preset = -1
+anchor_left = 0.18
+anchor_top = 0.5
+anchor_right = 0.18
+anchor_bottom = 0.5
+offset_left = -62.0
+offset_top = -62.0
+offset_right = 62.0
+offset_bottom = 62.0
 grow_horizontal = 2
 grow_vertical = 2
-flat = true
+theme_type_variation = &"IconButton"
 text = ""
 
 [node name="HintIcon" type="TextureRect" parent="SafeMargin/Layout/BottomBar/HintButton"]
@@ -278,10 +228,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -38.0
-offset_top = -38.0
-offset_right = 38.0
-offset_bottom = 38.0
+offset_left = -36.0
+offset_top = -36.0
+offset_right = 36.0
+offset_bottom = 36.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
@@ -289,21 +239,95 @@ texture = ExtResource("12")
 expand_mode = 1
 stretch_mode = 5
 
+[node name="ResetButton" type="Button" parent="SafeMargin/Layout/BottomBar"]
+unique_name_in_owner = true
+
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -62.0
+offset_top = -62.0
+offset_right = 62.0
+offset_bottom = 62.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_type_variation = &"IconButton"
+text = ""
+
+[node name="ResetIcon" type="TextureRect" parent="SafeMargin/Layout/BottomBar/ResetButton"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -36.0
+offset_top = -36.0
+offset_right = 36.0
+offset_bottom = 36.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("10")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="PauseButton" type="Button" parent="SafeMargin/Layout/BottomBar"]
+unique_name_in_owner = true
+
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.82
+anchor_top = 0.5
+anchor_right = 0.82
+anchor_bottom = 0.5
+offset_left = -62.0
+offset_top = -62.0
+offset_right = 62.0
+offset_bottom = 62.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_type_variation = &"IconButton"
+text = ""
+
+[node name="PauseIcon" type="TextureRect" parent="SafeMargin/Layout/BottomBar/PauseButton"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -36.0
+offset_top = -36.0
+offset_right = 36.0
+offset_bottom = 36.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("11")
+expand_mode = 1
+stretch_mode = 5
+
 [node name="QANextButton" type="Button" parent="SafeMargin/Layout/BottomBar"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
-anchor_left = 0.88
-anchor_top = 0.5175
-anchor_right = 0.88
-anchor_bottom = 0.5175
-offset_left = -52.0
-offset_top = -30.0
-offset_right = 52.0
-offset_bottom = 30.0
+anchors_preset = -1
+anchor_left = 0.95
+anchor_top = 0.5
+anchor_right = 0.95
+anchor_bottom = 0.5
+offset_left = -50.0
+offset_top = -34.0
+offset_right = 50.0
+offset_bottom = 34.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_font_sizes/font_size = 16
+theme_type_variation = &"SecondaryButton"
+theme_override_font_sizes/font_size = 26
 text = "+50"
 
 [node name="LevelCompletePopup" parent="." instance=ExtResource("3")]

@@ -72,14 +72,15 @@ static func build(parent: Node, title_text: String, body_text: String, backgroun
 	title.text = title_text
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	title.add_theme_font_size_override("font_size", 38)
+	title.theme_type_variation = &"TitleLabel"
+	title.add_theme_font_size_override("font_size", 50)
 	box.add_child(title)
 
 	var body := Label.new()
 	body.text = body_text
 	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.add_theme_font_size_override("font_size", 28)
+	body.add_theme_font_size_override("font_size", 34)
 	box.add_child(body)
 
 	var row := VBoxContainer.new()
@@ -90,7 +91,7 @@ static func build(parent: Node, title_text: String, body_text: String, backgroun
 	retry_button.text = "RETRY"
 	retry_button.custom_minimum_size = Vector2(480, 132)
 	retry_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	retry_button.add_theme_font_size_override("font_size", 28)
+	retry_button.add_theme_font_size_override("font_size", 40)
 	row.add_child(retry_button)
 	screen.retry_button = retry_button
 
@@ -99,7 +100,8 @@ static func build(parent: Node, title_text: String, body_text: String, backgroun
 	exit_button.theme_type_variation = &"DangerButton"
 	exit_button.custom_minimum_size = Vector2(480, 112)
 	exit_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	exit_button.add_theme_font_size_override("font_size", 24)
+	exit_button.theme_type_variation = &"SecondaryButton"
+	exit_button.add_theme_font_size_override("font_size", 36)
 	row.add_child(exit_button)
 	screen.exit_button = exit_button
 

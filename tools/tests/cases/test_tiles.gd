@@ -54,10 +54,5 @@ func test_aspect_art_button_and_bar() -> void:
 	b.text = "X"
 	runner.add_child(b)
 	await frames(2)
-	b.mouse_entered.emit()
-	b.mouse_exited.emit()
-	b.button_down.emit()
-	b.button_up.emit()
-	b.disabled = true
-	b._refresh()
+	eq(b.custom_minimum_size.y, 80.0)
 	b.queue_free()

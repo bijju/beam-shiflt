@@ -1795,3 +1795,21 @@ Full architecture, band table, family catalog, measured evidence and known weakn
 - **The committed `BuildConfig.BUILD_MODE` is `MODE_PRODUCTION`; never commit another value.** Internal QA: `tools/ci/set_build_mode.sh internal_qa`, then restore. New QA-only UI must derive from `BuildConfig.QA_TOOLS`.
 - **Production ad ids and the Play Games Game ID are never in source**: `tools/ci/stamp_store_config.sh` injects them from CI secrets (`config/ad_ids.local.json` is gitignored; `AdConfig.USE_TEST_IDS` follows the build mode). Missing production ad ids => `AdConfig.ads_active()` false => ads OFF and hints free - never an empty/sample unit request. Do not hardcode a fake Game ID or ad id.
 - Store readiness is tracked in `STORE_RELEASE.md` 6b (checklist + every GitHub secret). "Source production-ready" is not "store submission-ready".
+
+## UI design system (UI Redesign pass, branch dev_abhilas)
+
+- **`BeamUI` (`scripts/ui/beam_ui.gd`) is the ONE source of UI tokens and StyleBox recipes** (palette, radii, font
+  sizes, button/panel/card/field/HUD-plate styles). `themes/beamshift_theme.tres` is GENERATED from it - edit
+  `BeamUI`, then run `godot --headless --path . --script res://tools/ui_shots/build_theme.gd`. Never hand-edit the
+  `.tres`, never add per-node `StyleBoxFlat`/`StyleBoxTexture` overrides for routine styling. Theme variations:
+  `SecondaryButton`, `DangerButton`, `GhostButton`, `IconButton`, `CardPanel`, `DialogPanel`, `HeaderPanel`,
+  `HudPlate`, `TitleLabel`, `SectionLabel`, `DimLabel`. Level/tutorial cards use `BeamUI.apply_card_styles()`.
+- Font is Rajdhani (SIL OFL, `assets/fonts/`). No baked-in UI text, no per-screen panel art (the old
+  `bs_panel_*_portrait.png` frames and HUD bar art are unreferenced); text is always a Label/Button.
+- Every full screen follows one composition: Back button + `TitleLabel` header, content using the full height
+  (sections that expand, or a brand footer), 40 px side margins via `SafeAreaMargin.horizontal_margin_override`.
+  Don't reintroduce a small centered panel with dead space around it.
+- The gameplay HUD is flat `HudPlate` panels at aspect 6.4 (top) / 5.6 (bottom); the `HUD_*_ART_PAD_FRACTION`
+  constants are 0.0 because the plates have no transparent padding. Re-measure only if padded art returns.
+- `tools/ui_shots/shoot.sh <WxH> <outdir> [only=a,b]` renders every screen from an isolated COPY of the project
+  (never run `ui_shots` against the real project: it writes progress into `SaveManager`).

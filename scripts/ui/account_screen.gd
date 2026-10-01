@@ -709,11 +709,12 @@ func _show_sign_out_confirmation() -> void:
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_sign_out_confirm_layer.add_child(center)
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(880, 0)
+	panel.theme_type_variation = &"DialogPanel"
+	panel.custom_minimum_size = Vector2(900, 0)
 	center.add_child(panel)
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 60)
+		margin.add_theme_constant_override("margin_" + side, 0)
 	panel.add_child(margin)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 28)
@@ -722,31 +723,33 @@ func _show_sign_out_confirmation() -> void:
 	title.text = "SIGN OUT OF YOUR BEAMSHIFT ACCOUNT?"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	title.add_theme_font_size_override("font_size", 36)
+	title.theme_type_variation = &"TitleLabel"
+	title.add_theme_font_size_override("font_size", 50)
 	box.add_child(title)
 	var body := Label.new()
 	body.text = "Your progress will remain on this device."
 	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.add_theme_font_size_override("font_size", 26)
+	body.add_theme_font_size_override("font_size", 32)
 	box.add_child(body)
 	var row := VBoxContainer.new()
 	row.add_theme_constant_override("separation", 24)
 	box.add_child(row)
 	var cancel := Button.new()
 	cancel.text = "CANCEL"
-	cancel.custom_minimum_size = Vector2(480, 120)
-	cancel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	cancel.add_theme_font_size_override("font_size", 28)
+	cancel.custom_minimum_size = Vector2(0, 130)
+	cancel.size_flags_horizontal = Control.SIZE_FILL
+	cancel.theme_type_variation = &"SecondaryButton"
+	cancel.add_theme_font_size_override("font_size", 38)
 	cancel.pressed.connect(AudioManager.play_ui_button_press)
 	cancel.pressed.connect(_close_sign_out_confirmation)
 	row.add_child(cancel)
 	var confirm := Button.new()
 	confirm.text = "SIGN OUT"
 	confirm.theme_type_variation = &"DangerButton"
-	confirm.custom_minimum_size = Vector2(480, 120)
-	confirm.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	confirm.add_theme_font_size_override("font_size", 28)
+	confirm.custom_minimum_size = Vector2(0, 130)
+	confirm.size_flags_horizontal = Control.SIZE_FILL
+	confirm.add_theme_font_size_override("font_size", 38)
 	confirm.pressed.connect(AudioManager.play_ui_button_press)
 	confirm.pressed.connect(_on_sign_out_confirmed)
 	row.add_child(confirm)

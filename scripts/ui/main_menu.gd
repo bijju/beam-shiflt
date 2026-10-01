@@ -214,6 +214,7 @@ func _maybe_show_fusion_tutorial_nudge() -> void:
 	SaveManager.fusion_tutorial_nudge_seen = true
 	SaveManager.save_game()
 	var panel := PanelContainer.new()
+	panel.theme_type_variation = &"CardPanel"
 	panel.name = "FusionTutorialNudge"
 	panel.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	panel.offset_left = 40.0
@@ -228,7 +229,7 @@ func _maybe_show_fusion_tutorial_nudge() -> void:
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 26)
+	label.add_theme_font_size_override("font_size", 32)
 	row.add_child(label)
 	var view := Button.new()
 	view.text = "VIEW"
@@ -250,7 +251,7 @@ func _maybe_show_fusion_tutorial_nudge() -> void:
 ## nothing is erased until START NEW GAME is confirmed. _busy blocks double taps / duplicate callbacks.
 var _busy := false
 # Matches the button art's ~3.13:1 region aspect (1705x545); full-width 9-slice stretched it to ~6.3:1.
-const CONFIRM_BUTTON_SIZE := Vector2(480, 154)
+const CONFIRM_BUTTON_SIZE := Vector2(0, 140)
 var _confirm_layer: Control = null
 
 
@@ -286,11 +287,12 @@ func _show_new_game_confirmation() -> void:
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_confirm_layer.add_child(center)
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(880, 0)
+	panel.theme_type_variation = &"DialogPanel"
+	panel.custom_minimum_size = Vector2(900, 0)
 	center.add_child(panel)
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 60)
+		margin.add_theme_constant_override("margin_" + side, 0)
 	panel.add_child(margin)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 28)
@@ -298,14 +300,15 @@ func _show_new_game_confirmation() -> void:
 	var title := Label.new()
 	title.text = "START NEW GAME?"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 44)
+	title.theme_type_variation = &"TitleLabel"
+	title.add_theme_font_size_override("font_size", 56)
 	box.add_child(title)
 	var body := Label.new()
 	body.text = "Your current game progress will be reset and you'll start again from Level 1.
 This cannot be undone."
 	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.add_theme_font_size_override("font_size", 30)
+	body.add_theme_font_size_override("font_size", 34)
 	box.add_child(body)
 	var row := VBoxContainer.new()
 	row.add_theme_constant_override("separation", 48)
@@ -313,8 +316,9 @@ This cannot be undone."
 	var cancel := Button.new()
 	cancel.text = "CANCEL"
 	cancel.custom_minimum_size = CONFIRM_BUTTON_SIZE
-	cancel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	cancel.add_theme_font_size_override("font_size", 32)
+	cancel.size_flags_horizontal = Control.SIZE_FILL
+	cancel.theme_type_variation = &"SecondaryButton"
+	cancel.add_theme_font_size_override("font_size", 40)
 	cancel.pressed.connect(AudioManager.play_ui_button_press)
 	cancel.pressed.connect(_close_new_game_confirmation)
 	row.add_child(cancel)
@@ -322,8 +326,9 @@ This cannot be undone."
 	confirm.name = "ConfirmNewGame"
 	confirm.text = "START NEW GAME"
 	confirm.custom_minimum_size = CONFIRM_BUTTON_SIZE
-	confirm.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	confirm.add_theme_font_size_override("font_size", 26)
+	confirm.size_flags_horizontal = Control.SIZE_FILL
+	confirm.theme_type_variation = &"DangerButton"
+	confirm.add_theme_font_size_override("font_size", 36)
 	confirm.pressed.connect(AudioManager.play_ui_button_press)
 	confirm.pressed.connect(func() -> void:
 		if _busy:
@@ -373,11 +378,12 @@ func _show_cloud_chooser() -> void:
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_cloud_layer.add_child(center)
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(880, 0)
+	panel.theme_type_variation = &"DialogPanel"
+	panel.custom_minimum_size = Vector2(900, 0)
 	center.add_child(panel)
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 60)
+		margin.add_theme_constant_override("margin_" + side, 0)
 	panel.add_child(margin)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 28)
@@ -385,13 +391,14 @@ func _show_cloud_chooser() -> void:
 	var title := Label.new()
 	title.text = "WHICH PROGRESS?"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 44)
+	title.theme_type_variation = &"TitleLabel"
+	title.add_theme_font_size_override("font_size", 56)
 	box.add_child(title)
 	var body := Label.new()
 	body.text = "Your %s save and this device have different progress. The one you don't pick will be replaced." % CloudSave.service_name()
 	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.add_theme_font_size_override("font_size", 30)
+	body.add_theme_font_size_override("font_size", 34)
 	box.add_child(body)
 	var cloud_button := Button.new()
 	cloud_button.text = "CLOUD: %s" % _progress_text(CloudSave.pending_cloud)
@@ -399,8 +406,8 @@ func _show_cloud_chooser() -> void:
 	device_button.text = "THIS DEVICE: %s" % _progress_text(CloudSave.pending_local)
 	for button: Button in [cloud_button, device_button]:
 		button.custom_minimum_size = CONFIRM_BUTTON_SIZE
-		button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		button.add_theme_font_size_override("font_size", 24)
+		button.size_flags_horizontal = Control.SIZE_FILL
+		button.add_theme_font_size_override("font_size", 32)
 		button.pressed.connect(AudioManager.play_ui_button_press)
 		box.add_child(button)
 	cloud_button.pressed.connect(_on_take_cloud)

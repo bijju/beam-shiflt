@@ -23,6 +23,8 @@ const TEXTURE_TOGGLE_OFF := preload("res://assets/ui/settings/bs_ui_toggle_off_r
 @onready var _cloud_sync: Button = %CloudSyncButton
 @onready var _privacy_options: Button = %PrivacyOptionsButton
 @onready var _privacy_policy: Button = %PrivacyPolicyButton
+@onready var _about: Button = %AboutButton
+@onready var _version: Label = %VersionLabel
 @onready var _message: Label = %StoreMessageLabel
 
 const MESSAGE_SECONDS := 4.0
@@ -32,8 +34,8 @@ const MESSAGE_SECONDS := 4.0
 # Widening the button (scenes/ui/settings_menu.tscn) covers most locales; this is a
 # last-resort shrink so an unusually long localized price never overflows/clips the
 # button art instead of being truncated.
-const BUY_BUTTON_DEFAULT_FONT_SIZE := 24
-const BUY_BUTTON_MIN_FONT_SIZE := 15
+const BUY_BUTTON_DEFAULT_FONT_SIZE := 40
+const BUY_BUTTON_MIN_FONT_SIZE := 26
 # The button's StyleBoxTexture has a 70px left/right texture_margin (its content
 # margin, per CLAUDE.md's content_margin note) plus a little breathing room so text
 # never touches the metallic end caps.
@@ -73,6 +75,9 @@ func _ready_store_rows() -> void:
 	_privacy_options.pressed.connect(_on_privacy_options_pressed)
 	_privacy_policy.visible = StoreConfig.PRIVACY_POLICY_URL != ""
 	_privacy_policy.pressed.connect(_on_privacy_policy_pressed)
+	_about.pressed.connect(func() -> void: GameManager.go_to_about())
+	_about.pressed.connect(AudioManager.play_ui_button_press)
+	_version.text = "BeamShift v%s" % ProjectSettings.get_setting("application/config/version", "1.0.0")
 
 
 func _refresh_store() -> void:
@@ -98,7 +103,7 @@ func _refresh_store() -> void:
 func _set_buy_button_label(label: String) -> void:
 	_buy_button.text = label
 	var font: Font = _buy_button.get_theme_font("font")
-	var max_width: float = _buy_button.custom_minimum_size.x - BUY_BUTTON_TEXT_SIDE_INSET
+	var max_width: float = maxf(_buy_button.size.x, 640.0) - BUY_BUTTON_TEXT_SIDE_INSET
 	var size := BUY_BUTTON_DEFAULT_FONT_SIZE
 	while size > BUY_BUTTON_MIN_FONT_SIZE and font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > max_width:
 		size -= 1

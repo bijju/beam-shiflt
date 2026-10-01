@@ -2,15 +2,7 @@
 
 [ext_resource type="Script" path="res://scripts/ui/level_complete_popup.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/ui/safe_area_margin.gd" id="2"]
-[ext_resource type="Texture2D" path="res://assets/ui/panels/bs_panel_level_complete_portrait.png" id="3"]
 [ext_resource type="Texture2D" path="res://assets/ui/level_select/bs_ui_star_unearned_runtime.png" id="4"]
-
-[sub_resource type="StyleBoxTexture" id="LevelCompletePanelStyle"]
-texture = ExtResource("3")
-texture_margin_left = 160.0
-texture_margin_top = 465.0
-texture_margin_right = 175.0
-texture_margin_bottom = 255.0
 
 [node name="LevelCompletePopup" type="Control"]
 layout_mode = 3
@@ -29,7 +21,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0, 0, 0, 0.72)
+color = Color(0.01, 0.025, 0.06, 0.84)
 
 [node name="SafeMargin" type="MarginContainer" parent="."]
 layout_mode = 1
@@ -39,131 +31,143 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("2")
+horizontal_margin_override = 44.0
+vertical_margin_override = 140.0
 
-[node name="CenterContainer" type="CenterContainer" parent="SafeMargin"]
-layout_mode = 2
-
-[node name="Panel" type="PanelContainer" parent="SafeMargin/CenterContainer"]
+[node name="Panel" type="PanelContainer" parent="SafeMargin"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(900, 0)
 layout_mode = 2
-theme_override_styles/panel = SubResource("LevelCompletePanelStyle")
+theme_type_variation = &"DialogPanel"
 
-[node name="Margin" type="MarginContainer" parent="SafeMargin/CenterContainer/Panel"]
+[node name="VBox" type="VBoxContainer" parent="SafeMargin/Panel"]
 layout_mode = 2
-theme_override_constants/margin_left = 44
-theme_override_constants/margin_top = 32
-theme_override_constants/margin_right = 44
-theme_override_constants/margin_bottom = 32
+theme_override_constants/separation = 30
 
-[node name="VBox" type="VBoxContainer" parent="SafeMargin/CenterContainer/Panel/Margin"]
+[node name="Title" type="Label" parent="SafeMargin/Panel/VBox"]
 layout_mode = 2
-theme_override_constants/separation = 26
-
-[node name="StarsRow" type="HBoxContainer" parent="SafeMargin/CenterContainer/Panel/Margin/VBox"]
-layout_mode = 2
-alignment = 1
-theme_override_constants/separation = 16
-
-[node name="Star1" type="TextureRect" parent="SafeMargin/CenterContainer/Panel/Margin/VBox/StarsRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(84, 84)
-layout_mode = 2
-texture = ExtResource("4")
-expand_mode = 1
-stretch_mode = 5
-
-[node name="Star2" type="TextureRect" parent="SafeMargin/CenterContainer/Panel/Margin/VBox/StarsRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(84, 84)
-layout_mode = 2
-texture = ExtResource("4")
-expand_mode = 1
-stretch_mode = 5
-
-[node name="Star3" type="TextureRect" parent="SafeMargin/CenterContainer/Panel/Margin/VBox/StarsRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(84, 84)
-layout_mode = 2
-texture = ExtResource("4")
-expand_mode = 1
-stretch_mode = 5
-
-[node name="EraTransitionLabel" type="Label" parent="SafeMargin/CenterContainer/Panel/Margin/VBox"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
+theme_type_variation = &"TitleLabel"
+text = "LEVEL COMPLETE"
 horizontal_alignment = 1
-autowrap_mode = 2
-theme_override_font_sizes/font_size = 24
-theme_override_colors/font_color = Color(0.4, 0.75, 1.0, 1)
-text = "ERA 2 — REFRACTIONS UNLOCKED
-New tutorials (T11–T20) are now available."
 
-[node name="HintUsedLabel" type="Label" parent="SafeMargin/CenterContainer/Panel/Margin/VBox"]
-unique_name_in_owner = true
-visible = false
+[node name="Rule" type="ColorRect" parent="SafeMargin/Panel/VBox"]
+custom_minimum_size = Vector2(0, 3)
 layout_mode = 2
-horizontal_alignment = 1
-theme_override_font_sizes/font_size = 22
-theme_override_colors/font_color = Color(0.4, 0.75, 1, 1)
-text = "HINT USED"
+color = Color(0.3, 0.86, 1, 0.45)
 
-[node name="MovesRow" type="HBoxContainer" parent="SafeMargin/CenterContainer/Panel/Margin/VBox"]
+[node name="StarsRow" type="HBoxContainer" parent="SafeMargin/Panel/VBox"]
 layout_mode = 2
+size_flags_vertical = 3
 alignment = 1
-
-[node name="MovesLabel" type="Label" parent="SafeMargin/CenterContainer/Panel/Margin/VBox/MovesRow"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 32
-text = "Moves Used: "
-
-[node name="MovesValueLabel" type="Label" parent="SafeMargin/CenterContainer/Panel/Margin/VBox/MovesRow"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_font_sizes/font_size = 32
-text = "0"
-
-[node name="BestMovesRow" type="HBoxContainer" parent="SafeMargin/CenterContainer/Panel/Margin/VBox"]
-unique_name_in_owner = true
-layout_mode = 2
-alignment = 1
-
-[node name="BestMovesLabel" type="Label" parent="SafeMargin/CenterContainer/Panel/Margin/VBox/BestMovesRow"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 28
-text = "Best Moves: "
-
-[node name="BestMovesValueLabel" type="Label" parent="SafeMargin/CenterContainer/Panel/Margin/VBox/BestMovesRow"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_font_sizes/font_size = 28
-text = "0"
-
-[node name="ButtonRow" type="VBoxContainer" parent="SafeMargin/CenterContainer/Panel/Margin/VBox"]
-layout_mode = 2
 theme_override_constants/separation = 20
 
-[node name="NextLevelButton" type="Button" parent="SafeMargin/CenterContainer/Panel/Margin/VBox/ButtonRow"]
+[node name="Star1" type="TextureRect" parent="SafeMargin/Panel/VBox/StarsRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(190, 190)
+layout_mode = 2
+texture = ExtResource("4")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Star2" type="TextureRect" parent="SafeMargin/Panel/VBox/StarsRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(190, 190)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("4")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Star3" type="TextureRect" parent="SafeMargin/Panel/VBox/StarsRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(190, 190)
+layout_mode = 2
+texture = ExtResource("4")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="EraTransitionLabel" type="Label" parent="SafeMargin/Panel/VBox"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.75, 1, 1)
+theme_override_font_sizes/font_size = 30
+text = "ERA 2 — REFRACTIONS UNLOCKED
+New tutorials (T11–T20) are now available."
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="HintUsedLabel" type="Label" parent="SafeMargin/Panel/VBox"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_type_variation = &"SectionLabel"
+text = "HINT USED"
+horizontal_alignment = 1
+
+[node name="StatsCard" type="PanelContainer" parent="SafeMargin/Panel/VBox"]
+layout_mode = 2
+theme_type_variation = &"CardPanel"
+
+[node name="Stats" type="VBoxContainer" parent="SafeMargin/Panel/VBox/StatsCard"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="MovesRow" type="HBoxContainer" parent="SafeMargin/Panel/VBox/StatsCard/Stats"]
+layout_mode = 2
+
+[node name="MovesLabel" type="Label" parent="SafeMargin/Panel/VBox/StatsCard/Stats/MovesRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 42
+text = "Moves used"
+
+[node name="MovesValueLabel" type="Label" parent="SafeMargin/Panel/VBox/StatsCard/Stats/MovesRow"]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_horizontal = 4
-custom_minimum_size = Vector2(600, 140)
-theme_override_font_sizes/font_size = 30
+theme_type_variation = &"SectionLabel"
+theme_override_font_sizes/font_size = 48
+text = "0"
+
+[node name="BestMovesRow" type="HBoxContainer" parent="SafeMargin/Panel/VBox/StatsCard/Stats"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="BestMovesLabel" type="Label" parent="SafeMargin/Panel/VBox/StatsCard/Stats/BestMovesRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 36
+text = "Best moves"
+
+[node name="BestMovesValueLabel" type="Label" parent="SafeMargin/Panel/VBox/StatsCard/Stats/BestMovesRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"DimLabel"
+theme_override_font_sizes/font_size = 40
+text = "0"
+
+[node name="ButtonRow" type="VBoxContainer" parent="SafeMargin/Panel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 22
+
+[node name="NextLevelButton" type="Button" parent="SafeMargin/Panel/VBox/ButtonRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 156)
+layout_mode = 2
+theme_override_font_sizes/font_size = 48
 text = "NEXT LEVEL"
 
-[node name="RetryButton" type="Button" parent="SafeMargin/CenterContainer/Panel/Margin/VBox/ButtonRow"]
+[node name="RetryButton" type="Button" parent="SafeMargin/Panel/VBox/ButtonRow"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 124)
 layout_mode = 2
-size_flags_horizontal = 4
-custom_minimum_size = Vector2(600, 140)
-theme_override_font_sizes/font_size = 30
+theme_type_variation = &"SecondaryButton"
+theme_override_font_sizes/font_size = 40
 text = "RETRY"
 
-[node name="LevelSelectButton" type="Button" parent="SafeMargin/CenterContainer/Panel/Margin/VBox/ButtonRow"]
+[node name="LevelSelectButton" type="Button" parent="SafeMargin/Panel/VBox/ButtonRow"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 124)
 layout_mode = 2
-size_flags_horizontal = 4
-custom_minimum_size = Vector2(600, 140)
-theme_override_font_sizes/font_size = 30
+theme_type_variation = &"SecondaryButton"
+theme_override_font_sizes/font_size = 40
 text = "LEVEL SELECT"

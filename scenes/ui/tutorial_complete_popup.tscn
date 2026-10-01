@@ -1,23 +1,7 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/tutorial_complete_popup.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/ui/aspect_art_button.gd" id="2"]
-
-[sub_resource type="StyleBoxFlat" id="SBPanel"]
-bg_color = Color(0.05, 0.08, 0.11, 0.96)
-border_width_left = 4
-border_width_top = 4
-border_width_right = 4
-border_width_bottom = 4
-border_color = Color(0.3, 0.95, 1.0, 0.9)
-corner_radius_top_left = 20
-corner_radius_top_right = 20
-corner_radius_bottom_right = 20
-corner_radius_bottom_left = 20
-content_margin_left = 48.0
-content_margin_top = 40.0
-content_margin_right = 48.0
-content_margin_bottom = 40.0
+[ext_resource type="Script" path="res://scripts/ui/safe_area_margin.gd" id="2"]
 
 [node name="TutorialCompletePopup" type="Control"]
 visible = false
@@ -37,63 +21,74 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0, 0, 0, 0.55)
+color = Color(0.01, 0.025, 0.06, 0.84)
 
-[node name="Center" type="CenterContainer" parent="."]
+[node name="SafeMargin" type="MarginContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-
-[node name="Panel" type="PanelContainer" parent="Center"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(640, 0)
-layout_mode = 2
-theme_override_styles/panel = SubResource("SBPanel")
-
-[node name="Body" type="VBoxContainer" parent="Center/Panel"]
-layout_mode = 2
-theme_override_constants/separation = 20
-
-[node name="TitleLabel" type="Label" parent="Center/Panel/Body"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.95, 1.0, 1)
-theme_override_font_sizes/font_size = 34
-horizontal_alignment = 1
-text = "LESSON COMPLETE"
-
-[node name="NextTutorialButton" type="Button" parent="Center/Panel/Body"]
-unique_name_in_owner = true
-layout_mode = 2
 script = ExtResource("2")
-button_height = 120.0
-theme_override_font_sizes/font_size = 24
+horizontal_margin_override = 44.0
+vertical_margin_override = 140.0
+
+[node name="Center" type="CenterContainer" parent="SafeMargin"]
+layout_mode = 2
+
+[node name="Panel" type="PanelContainer" parent="SafeMargin/Center"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(980, 0)
+layout_mode = 2
+theme_type_variation = &"DialogPanel"
+
+[node name="Body" type="VBoxContainer" parent="SafeMargin/Center/Panel"]
+layout_mode = 2
+theme_override_constants/separation = 28
+
+[node name="TitleLabel" type="Label" parent="SafeMargin/Center/Panel/Body"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"TitleLabel"
+theme_override_font_sizes/font_size = 58
+text = "LESSON COMPLETE"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="Rule" type="ColorRect" parent="SafeMargin/Center/Panel/Body"]
+custom_minimum_size = Vector2(0, 3)
+layout_mode = 2
+color = Color(0.3, 0.86, 1, 0.45)
+
+[node name="NextTutorialButton" type="Button" parent="SafeMargin/Center/Panel/Body"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 150)
+layout_mode = 2
+theme_override_font_sizes/font_size = 44
 text = "NEXT TUTORIAL"
 
-[node name="CampaignButton" type="Button" parent="Center/Panel/Body"]
+[node name="CampaignButton" type="Button" parent="SafeMargin/Center/Panel/Body"]
 unique_name_in_owner = true
 visible = false
+custom_minimum_size = Vector2(0, 150)
 layout_mode = 2
-script = ExtResource("2")
-button_height = 120.0
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 44
 text = "PLAY"
 
-[node name="RetryButton" type="Button" parent="Center/Panel/Body"]
+[node name="RetryButton" type="Button" parent="SafeMargin/Center/Panel/Body"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 124)
 layout_mode = 2
-script = ExtResource("2")
-button_height = 120.0
-theme_override_font_sizes/font_size = 24
+theme_type_variation = &"SecondaryButton"
+theme_override_font_sizes/font_size = 40
 text = "RETRY"
 
-[node name="TutorialSelectButton" type="Button" parent="Center/Panel/Body"]
+[node name="TutorialSelectButton" type="Button" parent="SafeMargin/Center/Panel/Body"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 124)
 layout_mode = 2
-script = ExtResource("2")
-button_height = 120.0
-theme_override_font_sizes/font_size = 24
+theme_type_variation = &"SecondaryButton"
+theme_override_font_sizes/font_size = 40
 text = "TUTORIAL SELECT"

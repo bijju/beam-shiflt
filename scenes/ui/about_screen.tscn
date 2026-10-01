@@ -3,19 +3,7 @@
 [ext_resource type="Script" path="res://scripts/ui/about_screen.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/ui/safe_area_margin.gd" id="2"]
 [ext_resource type="Texture2D" path="res://assets/ui/backgrounds/bs_bg_tutorial_select_v2.png" id="3"]
-[ext_resource type="Texture2D" path="res://assets/ui/icons/bs_ui_icon_back_runtime.png" id="4"]
 [ext_resource type="Texture2D" path="res://assets/ui/branding/bs_logo_main_menu_portrait.png" id="5"]
-
-[sub_resource type="Gradient" id="Gradient_scrim"]
-offsets = PackedFloat32Array(0, 0.12, 0.88, 1)
-colors = PackedColorArray(0.015, 0.03, 0.08, 0, 0.015, 0.03, 0.08, 0.24, 0.015, 0.03, 0.08, 0.24, 0.015, 0.03, 0.08, 0)
-
-[sub_resource type="GradientTexture2D" id="GradientTexture2D_scrim"]
-gradient = SubResource("Gradient_scrim")
-width = 256
-height = 16
-fill_from = Vector2(0, 0)
-fill_to = Vector2(1, 0)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_logo_crop"]
 atlas = ExtResource("5")
@@ -42,17 +30,15 @@ texture = ExtResource("3")
 expand_mode = 1
 stretch_mode = 6
 
-[node name="ReadabilityScrim" type="TextureRect" parent="."]
-mouse_filter = 2
+[node name="Dim" type="ColorRect" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-texture = SubResource("GradientTexture2D_scrim")
-expand_mode = 1
-stretch_mode = 0
+mouse_filter = 2
+color = Color(0.01, 0.03, 0.08, 0.62)
 
 [node name="SafeArea" type="MarginContainer" parent="."]
 layout_mode = 1
@@ -62,66 +48,37 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("2")
+horizontal_margin_override = 40.0
+vertical_margin_override = 56.0
 
 [node name="Layout" type="VBoxContainer" parent="SafeArea"]
 layout_mode = 2
-theme_override_constants/separation = 28
+theme_override_constants/separation = 26
 
-[node name="Header" type="Control" parent="SafeArea/Layout"]
-custom_minimum_size = Vector2(0, 144)
+[node name="Header" type="HBoxContainer" parent="SafeArea/Layout"]
 layout_mode = 2
 size_flags_vertical = 0
-
-[node name="TitleLabel" type="Label" parent="SafeArea/Layout/Header"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
-theme_override_colors/font_shadow_color = Color(0, 0.05, 0.12, 0.85)
-theme_override_colors/font_outline_color = Color(0.01, 0.04, 0.1, 0.9)
-theme_override_constants/shadow_offset_x = 0
-theme_override_constants/shadow_offset_y = 4
-theme_override_constants/outline_size = 8
-theme_override_font_sizes/font_size = 72
-text = "ABOUT US"
-horizontal_alignment = 1
-vertical_alignment = 1
-autowrap_mode = 0
-text_overrun_behavior = 0
+theme_override_constants/separation = 16
 
 [node name="BackButton" type="Button" parent="SafeArea/Layout/Header"]
 unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 4
-anchor_top = 0.5
-anchor_bottom = 0.5
-offset_top = -72.0
-offset_right = 144.0
-offset_bottom = 72.0
-grow_vertical = 2
-flat = true
+custom_minimum_size = Vector2(230, 108)
+layout_mode = 2
+theme_type_variation = &"SecondaryButton"
+theme_override_font_sizes/font_size = 36
+text = "< BACK"
 
-[node name="BackIcon" type="TextureRect" parent="SafeArea/Layout/Header/BackButton"]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -48.0
-offset_top = -48.0
-offset_right = 48.0
-offset_bottom = 48.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-texture = ExtResource("4")
-expand_mode = 1
-stretch_mode = 5
+[node name="TitleLabel" type="Label" parent="SafeArea/Layout/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"TitleLabel"
+text = "ABOUT US"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Balance" type="Control" parent="SafeArea/Layout/Header"]
+custom_minimum_size = Vector2(230, 0)
+layout_mode = 2
 
 [node name="ScrollContainer" type="ScrollContainer" parent="SafeArea/Layout"]
 layout_mode = 2
@@ -132,10 +89,10 @@ scroll_deadzone = 24
 [node name="Column" type="VBoxContainer" parent="SafeArea/Layout/ScrollContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 32
+theme_override_constants/separation = 28
 
 [node name="Logo" type="TextureRect" parent="SafeArea/Layout/ScrollContainer/Column"]
-custom_minimum_size = Vector2(0, 300)
+custom_minimum_size = Vector2(0, 340)
 layout_mode = 2
 mouse_filter = 2
 texture = SubResource("AtlasTexture_logo_crop")
@@ -144,16 +101,15 @@ stretch_mode = 5
 
 [node name="Subtitle" type="Label" parent="SafeArea/Layout/ScrollContainer/Column"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.62, 0.78, 0.9, 1)
-theme_override_font_sizes/font_size = 28
+theme_type_variation = &"SectionLabel"
 text = "SCI-FI LASER PUZZLE"
 horizontal_alignment = 1
 
 [node name="Content" type="VBoxContainer" parent="SafeArea/Layout/ScrollContainer/Column"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 32
+theme_override_constants/separation = 28
 
 [node name="BottomPadding" type="Control" parent="SafeArea/Layout/ScrollContainer/Column"]
-custom_minimum_size = Vector2(0, 48)
+custom_minimum_size = Vector2(0, 32)
 layout_mode = 2

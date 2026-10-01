@@ -29,20 +29,10 @@ func setup(id: int, unlocked: bool, completed: bool, stars: int) -> void:
 	disabled = not unlocked
 	_number_label.text = str(id)
 
-	if not unlocked:
-		_background.texture = TEXTURE_LOCKED
-	elif completed:
-		_background.texture = TEXTURE_COMPLETED
-	else:
-		_background.texture = TEXTURE_UNLOCKED
-
-	## Era identity is communicated by tinting the SAME compact square
-	## frame Levels 1-100 use (modulate), never by swapping in a
-	## differently-shaped card texture - bs_level_card_era2.png is a
-	## 1024x1536 tall poster/panel asset, not a button frame (same bug
-	## tutorial_button.gd had for T11-T20 - see DECISIONS.md). Era 1's
-	## accent_color is white (no-op tint).
-	_background.modulate = EraTheme.for_era(EraTheme.get_era_for_level(id)).accent_color
+	# Redesign: the card is drawn by the shared BeamUI card style (no baked frame art).
+	_background.visible = false
+	BeamUI.apply_card_styles(self, "locked" if not unlocked else ("done" if completed else "open"))
+	_number_label.modulate = Color(1, 1, 1, 0.4) if not unlocked else Color.WHITE
 
 	for i in _stars.size():
 		_stars[i].visible = completed

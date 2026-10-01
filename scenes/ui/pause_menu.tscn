@@ -2,14 +2,6 @@
 
 [ext_resource type="Script" path="res://scripts/ui/pause_menu.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/ui/safe_area_margin.gd" id="2"]
-[ext_resource type="Texture2D" path="res://assets/ui/panels/bs_panel_pause_portrait.png" id="3"]
-
-[sub_resource type="StyleBoxTexture" id="PausePanelStyle"]
-texture = ExtResource("3")
-texture_margin_left = 160.0
-texture_margin_top = 450.0
-texture_margin_right = 175.0
-texture_margin_bottom = 255.0
 
 [node name="PauseMenu" type="Control"]
 process_mode = 3
@@ -29,7 +21,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0, 0, 0, 0.72)
+color = Color(0.01, 0.025, 0.06, 0.86)
 
 [node name="SafeMargin" type="MarginContainer" parent="."]
 layout_mode = 1
@@ -39,58 +31,68 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("2")
+horizontal_margin_override = 44.0
+vertical_margin_override = 210.0
 
-[node name="CenterContainer" type="CenterContainer" parent="SafeMargin"]
+[node name="Panel" type="PanelContainer" parent="SafeMargin"]
 layout_mode = 2
+theme_type_variation = &"DialogPanel"
 
-[node name="Panel" type="PanelContainer" parent="SafeMargin/CenterContainer"]
-custom_minimum_size = Vector2(840, 0)
+[node name="VBox" type="VBoxContainer" parent="SafeMargin/Panel"]
 layout_mode = 2
-theme_override_styles/panel = SubResource("PausePanelStyle")
+theme_override_constants/separation = 28
 
-[node name="Margin" type="MarginContainer" parent="SafeMargin/CenterContainer/Panel"]
+[node name="Title" type="Label" parent="SafeMargin/Panel/VBox"]
 layout_mode = 2
-theme_override_constants/margin_left = 40
-theme_override_constants/margin_top = 32
-theme_override_constants/margin_right = 40
-theme_override_constants/margin_bottom = 32
+theme_type_variation = &"TitleLabel"
+text = "PAUSED"
+horizontal_alignment = 1
 
-[node name="VBox" type="VBoxContainer" parent="SafeMargin/CenterContainer/Panel/Margin"]
+[node name="Rule" type="ColorRect" parent="SafeMargin/Panel/VBox"]
+custom_minimum_size = Vector2(0, 3)
 layout_mode = 2
-theme_override_constants/separation = 26
+color = Color(0.3, 0.86, 1, 0.45)
 
-[node name="ResumeButton" type="Button" parent="SafeMargin/CenterContainer/Panel/Margin/VBox"]
+[node name="ResumeButton" type="Button" parent="SafeMargin/Panel/VBox"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 150)
 layout_mode = 2
-custom_minimum_size = Vector2(0, 148)
-theme_override_font_sizes/font_size = 32
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 46
 text = "RESUME"
 
-[node name="RestartButton" type="Button" parent="SafeMargin/CenterContainer/Panel/Margin/VBox"]
+[node name="RestartButton" type="Button" parent="SafeMargin/Panel/VBox"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 130)
 layout_mode = 2
-custom_minimum_size = Vector2(0, 148)
-theme_override_font_sizes/font_size = 32
+size_flags_vertical = 3
+theme_type_variation = &"SecondaryButton"
+theme_override_font_sizes/font_size = 42
 text = "RESTART"
 
-[node name="SettingsButton" type="Button" parent="SafeMargin/CenterContainer/Panel/Margin/VBox"]
+[node name="SettingsButton" type="Button" parent="SafeMargin/Panel/VBox"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 130)
 layout_mode = 2
-custom_minimum_size = Vector2(0, 148)
-theme_override_font_sizes/font_size = 32
+size_flags_vertical = 3
+theme_type_variation = &"SecondaryButton"
+theme_override_font_sizes/font_size = 42
 text = "SETTINGS"
 
-[node name="LevelSelectButton" type="Button" parent="SafeMargin/CenterContainer/Panel/Margin/VBox"]
+[node name="LevelSelectButton" type="Button" parent="SafeMargin/Panel/VBox"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 130)
 layout_mode = 2
-custom_minimum_size = Vector2(0, 148)
-theme_override_font_sizes/font_size = 32
+size_flags_vertical = 3
+theme_type_variation = &"SecondaryButton"
+theme_override_font_sizes/font_size = 42
 text = "LEVEL SELECT"
 
-[node name="MainMenuButton" type="Button" parent="SafeMargin/CenterContainer/Panel/Margin/VBox"]
+[node name="MainMenuButton" type="Button" parent="SafeMargin/Panel/VBox"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 130)
 layout_mode = 2
-custom_minimum_size = Vector2(0, 148)
+size_flags_vertical = 3
 theme_type_variation = &"DangerButton"
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 42
 text = "MAIN MENU"

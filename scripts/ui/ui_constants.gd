@@ -97,8 +97,8 @@ const GAMEPLAY_STACK_VERTICAL_OFFSET := -30.0
 ## QA TEST ONLY (D107): lifts the safe-edge cap on the stack shift so the -100 offset is really applied. The Top HUD may
 ## cross the safe area in an internal QA build. External test/production restore the normal clamp.
 const ALLOW_LARGE_GAMEPLAY_STACK_QA_OFFSET := BuildConfig.QA_TOOLS
-const HUD_TOP_ART_PAD_FRACTION := 0.2054
-const HUD_BOTTOM_ART_PAD_FRACTION := 0.2003
+const HUD_TOP_ART_PAD_FRACTION := 0.0
+const HUD_BOTTOM_ART_PAD_FRACTION := 0.0
 
 ## Hint attention pulse (visual only, animates the HintIcon child - never the Button or any layout). One cycle =
 ## idle wait, glow in, hold, glow out. GLOW_ALPHA is the peak alpha of the additive halo layer; GLOW_SCALE is how much

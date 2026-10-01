@@ -149,7 +149,7 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 4
 custom_minimum_size = Vector2(600, 146)
-theme_override_font_sizes/font_size = 30
+theme_override_font_sizes/font_size = 44
 text = "CONTINUE"
 
 [node name="PlayButton" type="Button" parent="SafeMargin/Root/ButtonGroup"]
@@ -157,7 +157,7 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 4
 custom_minimum_size = Vector2(600, 146)
-theme_override_font_sizes/font_size = 30
+theme_override_font_sizes/font_size = 44
 text = "NEW GAME"
 
 [node name="TutorialButton" type="Button" parent="SafeMargin/Root/ButtonGroup"]
@@ -165,7 +165,7 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 4
 custom_minimum_size = Vector2(600, 146)
-theme_override_font_sizes/font_size = 30
+theme_override_font_sizes/font_size = 44
 text = "TUTORIALS"
 
 [node name="AboutButton" type="Button" parent="SafeMargin/Root/ButtonGroup"]
@@ -173,7 +173,7 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 4
 custom_minimum_size = Vector2(600, 146)
-theme_override_font_sizes/font_size = 30
+theme_override_font_sizes/font_size = 44
 text = "ABOUT US"
 
 [node name="QuitSpacer" type="Control" parent="SafeMargin/Root/ButtonGroup"]
@@ -186,7 +186,7 @@ layout_mode = 2
 size_flags_horizontal = 4
 custom_minimum_size = Vector2(420, 112)
 theme_type_variation = &"DangerButton"
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 32
 text = "QUIT"
 
 [node name="QASpacer" type="Control" parent="SafeMargin/Root/ButtonGroup"]

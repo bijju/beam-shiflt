@@ -21,9 +21,9 @@ const CREDITS := [
 	},
 ]
 
-const COLOR_HEADING := Color(0.36, 0.85, 1.0, 1)
-const COLOR_ROLE := Color(0.62, 0.78, 0.9, 1)
-const COLOR_NAME := Color(0.94, 0.97, 1, 1)
+const COLOR_HEADING := BeamUI.CYAN
+const COLOR_ROLE := BeamUI.TEXT_DIM
+const COLOR_NAME := BeamUI.TEXT
 const PANEL_PADDING := 44
 
 @onready var _back_button: Button = %BackButton
@@ -58,28 +58,20 @@ func _credit_groups(groups: Array) -> Array[Control]:
 	for group: Dictionary in groups:
 		var box := VBoxContainer.new()
 		box.add_theme_constant_override("separation", 6)
-		box.add_child(_label(str(group["role"]).to_upper(), 26, COLOR_ROLE))
+		box.add_child(_label(str(group["role"]).to_upper(), 30, COLOR_ROLE))
 		for n in group["names"]:
-			box.add_child(_label(n, 36, COLOR_NAME))
+			box.add_child(_label(n, 46, COLOR_NAME))
 		out.append(box)
 	return out
 
 
 func _build_panel(heading: String, groups: Array[Control]) -> PanelContainer:
 	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.035, 0.07, 0.125, 0.92)
-	style.set_border_width_all(3)
-	style.border_color = Color(0.28, 0.72, 0.95, 0.85)
-	style.set_corner_radius_all(18)
-	style.shadow_color = Color(0.1, 0.55, 0.9, 0.35)
-	style.shadow_size = 10
-	style.set_content_margin_all(PANEL_PADDING)
-	panel.add_theme_stylebox_override("panel", style)
+	panel.theme_type_variation = &"CardPanel"
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 28)
 	panel.add_child(box)
-	box.add_child(_label(heading, 44, COLOR_HEADING))
+	box.add_child(_label(heading, 50, COLOR_HEADING))
 	var rule := ColorRect.new()
 	rule.color = Color(0.28, 0.72, 0.95, 0.45)
 	rule.custom_minimum_size = Vector2(0, 2)
