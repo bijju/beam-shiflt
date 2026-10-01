@@ -33,9 +33,10 @@ func test_main_menu_fresh_and_buttons() -> void:
 	var m := await _scene("res://scenes/ui/main_menu.tscn")
 	ok(m._continue_button.disabled, "no resumable game on a fresh save")
 	m._layout_hero_elements()
-	for b in [m._continue_button, m._play_button, m._tutorial_button, m._about_button]:
+	for b in [m._continue_button, m._play_button, m._tutorial_button]:
 		eq(b.custom_minimum_size, m._play_button.custom_minimum_size, "equal main buttons")
-	ok(m._about_button.get_parent() == m._button_group, "ABOUT US lives in the main stack")
+	eq(m._about_button.custom_minimum_size, m._settings_button.custom_minimum_size, "round buttons share one size")
+	ok(m._about_button.get_parent() == m._settings_button.get_parent(), "ABOUT and SETTINGS share the bottom row")
 	m._on_new_game_pressed()  # fresh save: starts straight away
 	await frames(3)
 	m._busy = false

@@ -33,19 +33,19 @@ const PREVIEW_BOARD_ASPECT := 5.0 / 6.0
 ## preview is a soft 84% that yields to whatever vertical budget remains
 ## after the logo and button stack, since Level 3's tall board means a
 ## preview sized purely by width would frequently blow the screen height.
-const LOGO_WIDTH_FRACTION := 0.70
-const PREVIEW_WIDTH_FRACTION_TARGET := 0.84
-const PREVIEW_WIDTH_FRACTION_MIN := 0.55
+const LOGO_WIDTH_FRACTION := 0.96
+const LOGO_HEIGHT_FRACTION := 0.27
+const PREVIEW_WIDTH_FRACTION_TARGET := 0.96
+const MENU_SIDE_MARGIN := 40.0
+const MENU_VERTICAL_MARGIN := 56.0
+const MAIN_BUTTON_HEIGHT_FRACTION := 0.078
+const MAIN_BUTTON_WIDTH_FRACTION := 0.86
 
 ## Matches Root's own theme_override_constants/separation in main_menu.tscn
 ## (the gap the removed flex Spacer used to paper over) and a small reserve
 ## for the breathing room below ButtonGroup, above the corner Settings icon.
-const PREVIEW_WIDTH_FRACTION_PREFERRED := 0.62
-const MAIN_BUTTON_MIN_H := 146.0
-const MAIN_BUTTON_MAX_H := 200.0
-const MAIN_BUTTON_ASPECT := 4.1
-## Settings icon: 16px inset + 112px wide, plus a gap.
-const SETTINGS_COLUMN := 144.0
+const MAIN_BUTTON_MIN_H := 120.0
+const MAIN_BUTTON_MAX_H := 170.0
 const HERO_GAP := 20.0
 const BOTTOM_BREATHING := 28.0
 
@@ -63,6 +63,7 @@ const BOTTOM_BREATHING := 28.0
 @onready var _settings_button: BaseButton = %SettingsButton
 @onready var _quit_button: Button = %QuitButton
 @onready var _about_button: Button = %AboutButton
+@onready var _bottom_row: Control = %BottomRow
 @onready var _qa_spacer: Control = %QASpacer
 ## QA/dev-only - see DECISIONS.md D85. Not part of the normal player-
 ## facing flow; visibility is gated in _ready() below.
@@ -168,46 +169,30 @@ func _ready() -> void:
 ## the button group off-screen or reopens the old giant empty gap.
 func _layout_hero_elements() -> void:
 	var viewport_size := get_viewport().get_visible_rect().size
-	var safe_w := maxf(viewport_size.x - UIConstants.BASELINE_MARGIN * 2.0, 1.0)
-	var safe_h := maxf(viewport_size.y - UIConstants.BASELINE_MARGIN * 2.0, 1.0)
+	var safe_w := maxf(viewport_size.x - MENU_SIDE_MARGIN * 2.0, 1.0)
+	var safe_h := maxf(viewport_size.y - MENU_VERTICAL_MARGIN * 2.0, 1.0)
+	var sep := float(_button_group.get_theme_constant("separation"))
+	var root_sep := float(_button_group.get_parent().get_theme_constant("separation"))
 
-	var logo_w := safe_w * LOGO_WIDTH_FRACTION
-	var logo_h := logo_w / LOGO_ASPECT
+	# Three equal primary buttons (the QA/desktop extras below them are measured via the group's real height).
+	var button_h := clampf(safe_h * MAIN_BUTTON_HEIGHT_FRACTION, MAIN_BUTTON_MIN_H, MAIN_BUTTON_MAX_H)
+	var button_w := safe_w * MAIN_BUTTON_WIDTH_FRACTION
+	for b: Button in [_continue_button, _play_button, _tutorial_button]:
+		b.custom_minimum_size = Vector2(button_w, button_h)
+	var group_h := _button_group.get_combined_minimum_size().y
+
+	var logo_h := minf(safe_w * LOGO_WIDTH_FRACTION / LOGO_ASPECT, safe_h * LOGO_HEIGHT_FRACTION)
+	var logo_w := logo_h * LOGO_ASPECT
 	_logo.custom_minimum_size = Vector2(logo_w, logo_h)
 
-	_size_main_buttons(safe_w, safe_h, logo_h)
-
-	var button_h := _button_group.get_combined_minimum_size().y
-	var available_for_preview_h := maxf(
-		safe_h - logo_h - button_h - HERO_GAP * 2.0 - BOTTOM_BREATHING,
-		safe_h * 0.20
-	)
-
-	var preview_w := safe_w * PREVIEW_WIDTH_FRACTION_TARGET
-	preview_w = minf(preview_w, available_for_preview_h * PREVIEW_BOARD_ASPECT)
-	preview_w = maxf(preview_w, safe_w * PREVIEW_WIDTH_FRACTION_MIN)
-	preview_w = minf(preview_w, safe_w)
-	var preview_h := preview_w / PREVIEW_BOARD_ASPECT
+	var bottom_h := _bottom_row.get_combined_minimum_size().y
+	var gaps := root_sep * 3.0 + sep
+	var preview_h := maxf(safe_h - logo_h - group_h - bottom_h - gaps, safe_h * 0.2)
+	var preview_w := minf(preview_h * PREVIEW_BOARD_ASPECT, safe_w * PREVIEW_WIDTH_FRACTION_TARGET)
+	preview_h = preview_w / PREVIEW_BOARD_ASPECT
 	_preview_frame.custom_minimum_size = Vector2(preview_w, preview_h)
 
 
-## The four main buttons share one size. Height grows with the vertical room
-## left after the logo and a preview of its preferred size (floor
-## MAIN_BUTTON_MIN_H, cap MAIN_BUTTON_MAX_H); width is capped so the stack
-## never reaches the bottom-left Settings icon column.
-func _size_main_buttons(safe_w: float, safe_h: float, logo_h: float) -> void:
-	var preview_h := safe_w * PREVIEW_WIDTH_FRACTION_PREFERRED / PREVIEW_BOARD_ASPECT
-	var sep := float(_button_group.get_theme_constant("separation"))
-	var left := safe_h - logo_h - preview_h - HERO_GAP * 2.0 - BOTTOM_BREATHING
-	var h := clampf((left - sep * 3.0) / 4.0, MAIN_BUTTON_MIN_H, MAIN_BUTTON_MAX_H)
-	var w := minf(h * MAIN_BUTTON_ASPECT, safe_w - SETTINGS_COLUMN * 2.0)
-	for b: Button in [_continue_button, _play_button, _tutorial_button, _about_button]:
-		b.custom_minimum_size = Vector2(w, h)
-
-
-## Phase 4 (D102): a one-time, non-blocking "NEW TUTORIAL: FUSION" note the first time the Fusion tutorial pack is
-## available (LevelManager.should_show_fusion_tutorial_nudge()). Built from the shared theme (no new art), never
-## blocks Play, never locks anything, and is marked seen the moment it is shown so it cannot repeat.
 func _maybe_show_fusion_tutorial_nudge() -> void:
 	if not LevelManager.should_show_fusion_tutorial_nudge():
 		return

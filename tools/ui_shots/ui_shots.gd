@@ -60,6 +60,9 @@ func _shoot(name: String) -> void:
 	for i in 14:
 		await get_tree().process_frame
 	match name:
+		"main_menu":
+			node._quit_button.visible = false  # phones hide Quit
+			node._layout_hero_elements()
 		"pause": node._on_pause_pressed()
 		"level_complete": node._complete_popup.show_result(7, 2, true, 5, false, false, true)
 		"tutorial_complete": node._tutorial_complete_popup.show_result(false)

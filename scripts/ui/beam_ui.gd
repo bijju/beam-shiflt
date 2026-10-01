@@ -158,6 +158,10 @@ static func build_theme() -> Theme:
 	_apply_button(t, "SecondaryButton", "secondary")
 	_apply_button(t, "DangerButton", "danger")
 	_apply_button(t, "GhostButton", "ghost")
+	_apply_button(t, "RoundIconButton", "primary")
+	for st in ["normal", "hover", "pressed", "disabled", "focus"]:
+		t.set_stylebox(st, "RoundIconButton", round_box(st))
+	t.set_font("font", "RoundIconButton", FONT_BOLD)
 	t.set_type_variation("IconButton", "SecondaryButton")
 	t.set_stylebox("normal", "IconButton", _icon_box("normal"))
 	t.set_stylebox("hover", "IconButton", _icon_box("hover"))
@@ -281,3 +285,15 @@ static func apply_card_styles(button: Button, status: String) -> void:
 ## Gameplay HUD strip: a quiet glass plate that frames controls without competing with the board.
 static func hud_plate_box() -> StyleBoxFlat:
 	return _flat(Color(0.02, 0.05, 0.11, 0.86), Color(CYAN_DIM, 0.75), 22, BORDER, Color(CYAN, 0.12), 10)
+
+
+## Circular icon button (Settings / About on the main menu).
+static func round_box(state: String) -> StyleBoxFlat:
+	var s := button_box("primary", state)
+	s.set_corner_radius_all(120)
+	s.set_border_width_all(3)
+	s.content_margin_left = 0
+	s.content_margin_right = 0
+	s.content_margin_top = 0
+	s.content_margin_bottom = 0
+	return s
