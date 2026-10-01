@@ -33,6 +33,7 @@ func _ready() -> void:
 
 	for button in [_next_button, _campaign_button, _retry_button, _tutorial_select_button]:
 		button.pressed.connect(AudioManager.play_ui_button_press)
+	BeamUI.bind_dialog_button_fonts(self, [_next_button, _campaign_button, _retry_button, _tutorial_select_button])
 
 
 ## `is_final`: true for T10 - shows CAMPAIGN instead of NEXT TUTORIAL,

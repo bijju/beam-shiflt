@@ -19,14 +19,8 @@ extends Control
 const LOGO_CROP_SIZE := Vector2(1215.0, 810.0)
 const LOGO_ASPECT := LOGO_CROP_SIZE.x / LOGO_CROP_SIZE.y
 
-## Level 3 ("Signal Path", the preview's fixed level - see
-## menu_gameplay_preview.gd) is a 5-wide/6-tall board. PreviewViewport's own
-## `size` (menu_gameplay_preview.tscn) is set to the same 5:6 ratio so
-## GridManager's layout fills nearly the whole viewport instead of
-## letterboxing a non-square board inside a square one - this constant is
-## the outer frame's matching target ratio. Keep both in sync if
-## PREVIEW_LEVEL_PATH ever changes.
-const PREVIEW_BOARD_ASPECT := 5.0 / 6.0
+## The preview shows Level 3 ("Signal Path", 5x6 board - see menu_gameplay_preview.gd) inside a frame as wide as
+## the primary buttons; the board keeps its own aspect and is centred inside the frame.
 
 ## Soft target fractions of the safe-area width (see CLAUDE.md's Responsive
 ## rules / UIConstants.BASELINE_MARGIN) - the logo is a hard 70%, the
@@ -35,9 +29,8 @@ const PREVIEW_BOARD_ASPECT := 5.0 / 6.0
 ## preview sized purely by width would frequently blow the screen height.
 const LOGO_WIDTH_FRACTION := 0.96
 const LOGO_HEIGHT_FRACTION := 0.27
-const PREVIEW_WIDTH_FRACTION_TARGET := 0.96
 const MENU_SIDE_MARGIN := 40.0
-const MENU_VERTICAL_MARGIN := 56.0
+const MENU_VERTICAL_MARGIN := 32.0
 const MAIN_BUTTON_HEIGHT_FRACTION := 0.078
 const MAIN_BUTTON_WIDTH_FRACTION := 0.86
 
@@ -188,9 +181,10 @@ func _layout_hero_elements() -> void:
 	var bottom_h := _bottom_row.get_combined_minimum_size().y
 	var gaps := root_sep * 3.0 + sep
 	var preview_h := maxf(safe_h - logo_h - group_h - bottom_h - gaps, safe_h * 0.2)
-	var preview_w := minf(preview_h * PREVIEW_BOARD_ASPECT, safe_w * PREVIEW_WIDTH_FRACTION_TARGET)
-	preview_h = preview_w / PREVIEW_BOARD_ASPECT
-	_preview_frame.custom_minimum_size = Vector2(preview_w, preview_h)
+	# The frame is exactly as wide as the primary buttons so both form one aligned column. The 5:6 board is never
+	# stretched: PreviewViewportContainer resizes its viewport to the frame and GridManager fits square cells,
+	# centring the board (side bands when the frame is wider than 5:6, top/bottom bands when taller).
+	_preview_frame.custom_minimum_size = Vector2(button_w, preview_h)
 
 
 func _maybe_show_fusion_tutorial_nudge() -> void:
@@ -303,7 +297,6 @@ This cannot be undone."
 	cancel.custom_minimum_size = CONFIRM_BUTTON_SIZE
 	cancel.size_flags_horizontal = Control.SIZE_FILL
 	cancel.theme_type_variation = &"SecondaryButton"
-	cancel.add_theme_font_size_override("font_size", 40)
 	cancel.pressed.connect(AudioManager.play_ui_button_press)
 	cancel.pressed.connect(_close_new_game_confirmation)
 	row.add_child(cancel)
@@ -313,7 +306,6 @@ This cannot be undone."
 	confirm.custom_minimum_size = CONFIRM_BUTTON_SIZE
 	confirm.size_flags_horizontal = Control.SIZE_FILL
 	confirm.theme_type_variation = &"DangerButton"
-	confirm.add_theme_font_size_override("font_size", 36)
 	confirm.pressed.connect(AudioManager.play_ui_button_press)
 	confirm.pressed.connect(func() -> void:
 		if _busy:
@@ -323,6 +315,7 @@ This cannot be undone."
 		if not _busy and _confirm_layer != null:
 			confirm.disabled = false)
 	row.add_child(confirm)
+	BeamUI.bind_dialog_button_fonts(self, [cancel, confirm])
 	add_child(_confirm_layer)
 
 

@@ -37,9 +37,37 @@ const FONT_TITLE := 64
 const FONT_SECTION := 30
 const FONT_BODY := 28
 const FONT_SMALL := 24
+## Dialog action buttons (Pause, Level Complete, Tutorial Complete, confirmations): size scales with the logical
+## viewport width (stretch mode keeps that >= 1080 on every portrait phone, independent of pixel density) and is
+## capped by the button's own height so the label never crowds its border.
+const DIALOG_BUTTON_FONT_MIN := 44
+const DIALOG_BUTTON_FONT_MAX := 80
+const DIALOG_BUTTON_FONT_WIDTH_FRACTION := 0.07
+const DIALOG_BUTTON_FONT_HEIGHT_FRACTION := 0.58
 
 const FONT_REGULAR := preload("res://assets/fonts/Rajdhani-SemiBold.ttf")
 const FONT_BOLD := preload("res://assets/fonts/Rajdhani-Bold.ttf")
+
+
+static func dialog_button_font_size(viewport_width: float, button_height: float = 0.0) -> int:
+	var size := viewport_width * DIALOG_BUTTON_FONT_WIDTH_FRACTION
+	if button_height > 0.0:
+		size = minf(size, button_height * DIALOG_BUTTON_FONT_HEIGHT_FRACTION)
+	return clampi(int(size), DIALOG_BUTTON_FONT_MIN, DIALOG_BUTTON_FONT_MAX)
+
+
+## Gives every button in `buttons` the same responsive font size (smallest button height drives the cap) and
+## keeps it updated when the viewport resizes. Call once from the dialog's _ready().
+static func bind_dialog_button_fonts(owner: Control, buttons: Array) -> void:
+	var apply := func() -> void:
+		var min_h := INF
+		for b: Button in buttons:
+			min_h = minf(min_h, b.custom_minimum_size.y)
+		var fs := dialog_button_font_size(owner.get_viewport().get_visible_rect().size.x, min_h)
+		for b: Button in buttons:
+			b.add_theme_font_size_override("font_size", fs)
+	apply.call()
+	owner.get_viewport().size_changed.connect(apply)
 
 
 # --- StyleBox recipes ---------------------------------------------------------------------------------

@@ -40,6 +40,7 @@ func _ready() -> void:
 
 	for button in [_next_button, _retry_button, _level_select_button]:
 		button.pressed.connect(AudioManager.play_ui_button_press)
+	BeamUI.bind_dialog_button_fonts(self, [_next_button, _retry_button, _level_select_button])
 
 
 ## Phase 2 (Direct Play + Continue Flow, see DECISIONS.md D85): game.gd

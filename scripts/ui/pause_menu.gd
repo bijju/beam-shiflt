@@ -29,6 +29,8 @@ func _ready() -> void:
 	for button in [_resume_button, _restart_button, _settings_button, _level_select_button, _main_menu_button]:
 		button.pressed.connect(AudioManager.play_ui_button_press)
 
+	BeamUI.bind_dialog_button_fonts(self, [_resume_button, _restart_button, _settings_button, _level_select_button, _main_menu_button])
+
 	hide()
 
 

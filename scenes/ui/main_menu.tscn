@@ -117,7 +117,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("2")
 horizontal_margin_override = 40.0
-vertical_margin_override = 56.0
+vertical_margin_override = 32.0
 
 [node name="Root" type="VBoxContainer" parent="SafeMargin"]
 layout_mode = 2
