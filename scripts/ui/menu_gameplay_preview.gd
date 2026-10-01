@@ -2,7 +2,7 @@ class_name MenuGameplayPreview
 extends PanelContainer
 ## Main Menu live gameplay preview (Main Menu Redesign pass, 2026-09-28).
 ## A fully isolated, looping demonstration of BeamShift's laser-routing
-## puzzle: loads Campaign Level 3 ("Signal Path") directly into its own
+## puzzle: builds a dedicated preview board (see _build_preview_level) directly into its own
 ## GridManager instance inside a SubViewport, drives it through a
 ## deterministic scripted sequence, and resets. Presentation-only:
 ## - never touches SaveManager/GameManager/LevelManager progression state.
@@ -23,21 +23,18 @@ extends PanelContainer
 ##   (this node included) before the new Main Menu is built, so a fresh
 ##   instance (and a fresh SubViewport) is created every time.
 
-const PREVIEW_LEVEL_PATH := "res://levels/campaign/stage_01/level_03.gd"
+## The board is a dedicated, code-built preview (never a real level): the Level 3 "Signal Path" staircase
+## (emitter -> A -> B -> C -> target, solved by flipping A and B to BACKSLASH) stretched over however many square
+## cells fit the frame, so the board fills the blue frame instead of floating in it. Filler cells are plain floor.
+const _MIN_CELL := 90.0
+const _MAX_CELL := 130.0
+const _FRAME_PAD := 16.0 ## GridManager.GRID_SAFETY_MARGIN on both sides
+const _MIN_COLS := 4
+const _MIN_ROWS := 3
 
-## Main Menu Mobile Layout Correction (2026-09-28): PreviewViewport's `size` (menu_gameplay_preview.tscn)
-## is 700x840 (140px/cell) specifically to match Level 3's grid_width=5/grid_height=6 (5:6) aspect exactly -
-## GridManager._recalculate_layout() then fills nearly the whole viewport instead of letterboxing a
-## non-square board inside a square viewport. If PREVIEW_LEVEL_PATH is ever changed, re-match
-## PreviewViewport's size AND main_menu.gd's PREVIEW_BOARD_ASPECT to the new level's grid_width/grid_height.
-
-## Solver-authored fix for the two mirrors that start wrong - see
-## levels/hint_solutions.json key "c3": [[2,0,1],[2,3,1]] (x, y,
-## MirrorOrientation). The level's third mirror, at (4,3), already starts
-## correctly oriented per its own developer_notes and is deliberately
-## never touched here - not every piece needs touching.
-const _MOVE_1_POS := Vector2i(2, 0)
-const _MOVE_2_POS := Vector2i(2, 3)
+var _grid_dims := Vector2i.ZERO
+var _move_1_pos := Vector2i.ZERO
+var _move_2_pos := Vector2i.ZERO
 
 const _STEP_DELAY := 1.1
 const _SOLVED_HOLD := 2.0
@@ -47,23 +44,69 @@ const _RESET_DELAY := 0.6
 
 
 func _ready() -> void:
-	var level_data := LevelManager.load_level_from_path(PREVIEW_LEVEL_PATH)
-	if level_data == null:
-		push_warning("MenuGameplayPreview: failed to load preview level, preview stays empty")
+	# The container only has its real size after the first layout pass.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if not is_inside_tree():
 		return
-	_grid.load_level(level_data)
+	_rebuild()
+	# Main Menu's layout settles over a few frames/resizes; re-pick the grid whenever the frame size changes.
+	%PreviewViewportContainer.resized.connect(_rebuild)
 	_run_sequence()
+
+
+func _rebuild() -> void:
+	var level_data := _build_preview_level(%PreviewViewportContainer.size)
+	if level_data.grid_width == _grid_dims.x and level_data.grid_height == _grid_dims.y:
+		return
+	_grid_dims = Vector2i(level_data.grid_width, level_data.grid_height)
+	_grid.load_level(level_data)
+
+
+func _build_preview_level(frame: Vector2) -> LevelData:
+	var avail := Vector2(maxf(frame.x - _FRAME_PAD, 1.0), maxf(frame.y - _FRAME_PAD, 1.0))
+	# Pick the square-cell grid that covers the most of the frame while keeping cells comfortably large.
+	var rows := _MIN_ROWS
+	var cols := _MIN_COLS
+	var best := -1.0
+	for r in range(_MIN_ROWS, 9):
+		for c in range(_MIN_COLS, 13):
+			var cell := minf(avail.x / c, avail.y / r)
+			if cell < _MIN_CELL or cell > _MAX_CELL:
+				continue
+			var coverage := float(c * r) * cell * cell
+			if coverage > best:
+				best = coverage
+				rows = r
+				cols = c
+	var level := LevelData.new()
+	level.display_name = "Menu Preview"
+	level.grid_width = cols
+	level.grid_height = rows
+	level.optimal_moves = 2
+	var col_a := maxi(1, cols / 2)
+	var row_b := maxi(1, (rows - 1) / 2)
+	_move_1_pos = Vector2i(col_a, 0)
+	_move_2_pos = Vector2i(col_a, row_b)
+	level.tiles = [
+		TilePlacement.make_emitter(Vector2i(0, 0), GridTypes.Direction.RIGHT),
+		TilePlacement.make_mirror(_move_1_pos, GridTypes.MirrorOrientation.SLASH),
+		TilePlacement.make_mirror(_move_2_pos, GridTypes.MirrorOrientation.SLASH),
+		TilePlacement.make_mirror(Vector2i(cols - 1, row_b), GridTypes.MirrorOrientation.BACKSLASH),
+		TilePlacement.make_target(Vector2i(cols - 1, rows - 1)),
+	]
+	return level
 
 
 func _run_sequence() -> void:
 	while true:
 		if not await _wait(_STEP_DELAY):
 			return
-		_grid.restore_orientations({_MOVE_1_POS: GridTypes.MirrorOrientation.BACKSLASH})
+		_grid.restore_orientations({_move_1_pos: GridTypes.MirrorOrientation.BACKSLASH})
 
 		if not await _wait(_STEP_DELAY):
 			return
-		_grid.restore_orientations({_MOVE_2_POS: GridTypes.MirrorOrientation.BACKSLASH})
+		_grid.restore_orientations({_move_2_pos: GridTypes.MirrorOrientation.BACKSLASH})
 
 		if not await _wait(_SOLVED_HOLD):
 			return

@@ -93,6 +93,12 @@ func test_editor_playtest_handoff() -> void:
 
 
 func test_level_manager_gating() -> void:
+	# The gates below are production behaviour. In an internal-QA build the QA flags deliberately open every tutorial.
+	if BuildConfig.QA_TOOLS:
+		ok(LevelManager.is_tutorial_level_selectable(12), "QA build opens Era 2 tutorials")
+		ok(LevelManager.is_fusion_tutorial_selectable(LevelManager.FUSION_TUTORIAL_FIRST + 1))
+		ok(LevelManager.is_selector_tutorial_selectable(LevelManager.SELECTOR_TUTORIAL_FIRST + 1))
+		return
 	ok(LevelManager.is_tutorial_level_selectable(1))
 	ok(not LevelManager.is_tutorial_level_selectable(5))
 	SaveManager.record_tutorial_level_result(1, 34)

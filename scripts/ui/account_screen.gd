@@ -22,6 +22,8 @@ func _ready() -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		if InternetManager.is_blocking():
+			return # no navigation under the InternetBlocker
 		GameManager.go_to_settings()
 
 

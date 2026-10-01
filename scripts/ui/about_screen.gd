@@ -33,6 +33,7 @@ const PANEL_PADDING := 44
 func _ready() -> void:
 	_back_button.pressed.connect(AudioManager.play_ui_back)
 	_back_button.pressed.connect(GameManager.go_to_main_menu)
+	BeamButtonGlow.attach(_back_button)
 	for section: Dictionary in CREDITS:
 		_content.add_child(_build_panel(section["heading"], _credit_groups(section["groups"])))
 	_content.add_child(_build_panel("BUILT WITH", _credit_groups([
@@ -93,4 +94,6 @@ func _label(text: String, size: int, color: Color) -> Label:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		if InternetManager.is_blocking():
+			return # no navigation under the InternetBlocker
 		GameManager.go_to_main_menu()

@@ -3,6 +3,10 @@
 [ext_resource type="Script" path="res://scripts/ui/level_complete_popup.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/ui/safe_area_margin.gd" id="2"]
 [ext_resource type="Texture2D" path="res://assets/ui/level_select/bs_ui_star_unearned_runtime.png" id="4"]
+[ext_resource type="Script" path="res://scripts/ui/settings_art_button.gd" id="5"]
+[ext_resource type="Texture2D" path="res://assets/ui/level_complete/bs_btn_complete_next_level.png" id="6"]
+[ext_resource type="Texture2D" path="res://assets/ui/level_complete/bs_btn_complete_retry.png" id="7"]
+[ext_resource type="Texture2D" path="res://assets/ui/level_complete/bs_btn_complete_main_menu.png" id="8"]
 
 [node name="LevelCompletePopup" type="Control"]
 layout_mode = 3
@@ -147,27 +151,31 @@ text = "0"
 
 [node name="ButtonRow" type="VBoxContainer" parent="SafeMargin/Panel/VBox"]
 layout_mode = 2
-theme_override_constants/separation = 22
+theme_override_constants/separation = 10
 
 [node name="NextLevelButton" type="Button" parent="SafeMargin/Panel/VBox/ButtonRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 156)
 layout_mode = 2
-theme_override_font_sizes/font_size = 48
-text = "NEXT LEVEL"
+size_flags_horizontal = 4
+script = ExtResource("5")
+art = ExtResource("6")
+content_rect = Rect2(0.0092, 0.1367, 0.9820, 0.7238)
+display_width = 760.0
 
 [node name="RetryButton" type="Button" parent="SafeMargin/Panel/VBox/ButtonRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 124)
 layout_mode = 2
-theme_type_variation = &"SecondaryButton"
-theme_override_font_sizes/font_size = 40
-text = "RETRY"
+size_flags_horizontal = 4
+script = ExtResource("5")
+art = ExtResource("7")
+content_rect = Rect2(0.0078, 0.1326, 0.9848, 0.7334)
+display_width = 760.0
 
 [node name="LevelSelectButton" type="Button" parent="SafeMargin/Panel/VBox/ButtonRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 124)
 layout_mode = 2
-theme_type_variation = &"SecondaryButton"
-theme_override_font_sizes/font_size = 40
-text = "LEVEL SELECT"
+size_flags_horizontal = 4
+script = ExtResource("5")
+art = ExtResource("8")
+content_rect = Rect2(0.0083, 0.1285, 0.9839, 0.7403)
+display_width = 760.0

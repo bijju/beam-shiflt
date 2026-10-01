@@ -9,6 +9,7 @@
 > touched by this change). MANUAL TEST REQUIRED on a real Android device: launch offline, Play Games connect/retry/
 > cancel (needs the Play Games Game ID), Account + Settings text, local save persistence across restart, ads/IAP
 > unaffected. MANUAL TEST REQUIRED on a real iPhone: Sign in with Apple sign-in/cancel/sign-out, local save.
+> **Update 2026-10-02 (release-blocker cleanup):** `test_level_manager_gating` asserted PRODUCTION gating, so it failed only in the internal-QA pass where the QA flags deliberately open every tutorial (production pass: pass). It now asserts the QA behaviour when `BuildConfig.QA_TOOLS` and the production gates otherwise. Added `test_internet_required.gd::test_back_request_cannot_navigate_under_the_blocker` and `..._cannot_cancel_new_game_dialog_or_open_pause_under_the_blocker` (verified to FAIL when a Back guard is removed).
 
 
 ## Phase 4B - existing-account linking QA + Android keyboard/IME fix (2026-09-28)

@@ -2,12 +2,21 @@
 
 > **SUPERSEDED 2026-10-01 - Firebase removed.** BeamShift now uses Android = Google Play Games + local save,
 > iOS = Sign in with Apple + local save, desktop = local save. There is no Firebase, Firestore, cloud save,
-> cross-platform sync, CloudSave/FirebaseAuth autoload, Google Credential Manager plugin or startup internet gate.
+> cross-platform sync, CloudSave/FirebaseAuth autoload, or Google Credential Manager plugin. (The mandatory-internet `InternetManager`/`InternetBlocker` gate was RESTORED 2026-10-01 and is current.)
 > Every section below that describes them (cloud save policy, sections 8-15, 17, 18) is HISTORICAL only. Current
 > architecture: `CLAUDE.md` "Account / platform identity rules"; code: `scripts/managers/platform_account.gd`.
 > Obsolete GitHub secrets: none were Firebase-specific (the workflow never referenced one). Console leftovers the
 > owner may clean up manually: the `beamshift-game` Firebase project (Auth/Firestore), the Web API key, and the
 > Firebase-registered Android SHA-1s. Play Games still needs its Game ID (`godot_play_game_services/game_id`).
+
+> **CURRENT RELEASE STATE (2026-10-02, release-blocker cleanup pass, branch dev_abhilas, nothing committed):**
+> - GitHub Actions secrets present (names only): `ADMOB_IOS_APP_ID/REWARDED_ID/INTERSTITIAL_ID`, `APPLE_TEAM_ID`, `ASC_API_PRIVATE_KEY/KEY_ID/ISSUER_ID`,
+>   `IOS_DIST_CERT_B64/PASSWORD`, `IOS_PROVISIONING_PROFILE_B64`. **MISSING (Android lane cannot pass without them):** `PLAY_GAMES_GAME_ID`,
+>   `ANDROID_KEYSTORE_B64/USER/PASSWORD`, `ADMOB_ANDROID_APP_ID/REWARDED_ID/INTERSTITIAL_ID`, and `PLAY_SERVICE_ACCOUNT_JSON` (only for auto-upload).
+> - **`StoreConfig.PRIVACY_POLICY_URL` is still empty** - no real URL exists in the repo; it must be supplied by the owner (store-listing blocker).
+> - `AD_ID` permission is merged in by the Google Mobile Ads SDK, not by project code. Stripping it is a Play Families policy decision, not a code fix.
+> - CI (`release.yml`) runs only on pushes to `main`, `v*` tags (must point at `main`) and manual dispatch.
+
 
 
 Built with the `godot-store-release` playbook. This file is the project's own reference for everything store-facing:
@@ -24,7 +33,7 @@ complete — a stale checklist is worse than none.
 | Audience | **Includes children under 13** → Play Families policy + COPPA apply; **not** in Apple's Kids category |
 | Ads | Existing rewarded hint + interstitial, **child-safe for everyone** (`AdConfig.CHILD_DIRECTED`: TFCD + TFUA + rating G, non-personalised, no ATT/IDFA) — `ADS_MONETIZATION.md` 6a |
 | IAP | ONE non-consumable: **`beamshift_no_forced_ads`, "No Forced Ads", US $3.99** — removes interstitials only; the optional rewarded hint video stays (owner decision). Never call it "Remove Ads" |
-| Cloud save | **Yes**: Play Games Services Saved Games (Android), Game Center saved games stored in iCloud (iOS) |
+| Account / save | **No cloud save (removed 2026-10-01).** Progress is local only. Android: optional Google Play Games identity; iOS: optional Sign in with Apple; desktop: none |
 | Version | Stores start at **1.0.0 = build code 10000** (`major*10000+minor*100+patch`, one scheme for both stores, stamped by `tools/ci/stamp_version.sh`; the iOS build number additionally carries `.<run_number>.<run_attempt>` so re-uploads never collide, see `references/ci-cd.md`) |
 
 ## 2. Architecture (all store SDKs behind SDK-free autoloads)
@@ -33,7 +42,7 @@ complete — a stale checklist is worse than none.
 |---|---|---|---|
 | `AdManager` (existing) | `scripts/ads/ad_backend_admob.gd` (both platforms) | same | `AdConfig` |
 | **`StoreManager`** (6th) | `scripts/store/play_billing_backend.gd` (GodotGooglePlayBilling 3.3.0) | `scripts/store/store_kit_backend.gd` (godot-store-kit 1.5, StoreKit 2, iOS 17) | `StoreConfig` |
-| **`CloudSave`** (7th, after the plugin's `GodotPlayGameServices` autoload) | `scripts/cloud/play_games_cloud_backend.gd` (GodotPlayGameServices 3.4.0) | `scripts/cloud/game_center_cloud_backend.gd` (GodotApplePlugins, pinned build) | constants in `cloud_save.gd` |
+| ~~`CloudSave`~~ | **REMOVED 2026-10-01** (with `scripts/cloud/`). Identity is `PlatformAccount` (optional Play Games / Sign in with Apple) | none | none |
 
 Rules (each fixed a real bug in the reference game — do not relax):
 - Backends are loaded **by path**, only on Android/iOS, and kept only if their plugin is present. Desktop/editor: no store, no
@@ -47,7 +56,7 @@ Rules (each fixed a real bug in the reference game — do not relax):
 - iOS plugins are **not vendored**: the macOS CI job downloads godot-store-kit v1.5.0 and GodotApplePlugins
   `build-bfade13…` (their macOS frameworks use symlinks a Windows checkout cannot hold).
 
-### Cloud save policy (`scripts/managers/cloud_save.gd`)
+### Cloud save policy - REMOVED 2026-10-01 (historical; nothing below in this subsection exists in the code)
 - Pull **once**, on the first successful sign-in. Merge = **more `play_time_seconds` wins, ties on `saved_at`**.
 - `play_time_seconds` counts only a board on screen, not paused, not solved, not an editor playtest (`game.gd _process`) — menu time
   never counts, so a fresh install stays at 0.
@@ -62,13 +71,13 @@ Rules (each fixed a real bug in the reference game — do not relax):
 | Value | Where | Status |
 |---|---|---|
 | Bundle id | `export_presets.cfg` all 3 presets | done |
-| Play Games **Game ID** (PGS project number) | both Android presets `godot_play_game_services/game_id` | **EMPTY — every Android build fails until set** (AAPT: `string/game_services_project_id not found`) |
-| AdMob **App IDs** (`~`) | `project.godot` `admob/general/android/app_id`, `admob/general/ios/app_id` (plugin default = Google sample) | sample IDs |
-| AdMob **unit IDs** (`/`) | `AdConfig.PRODUCTION_IDS` (never committed) + `USE_TEST_IDS=false` | test IDs |
+| Play Games **Game ID** (PGS project number) | CI secret `PLAY_GAMES_GAME_ID`, stamped into both Android presets by `tools/ci/stamp_store_config.sh` (never committed; the preset value stays empty) | **GitHub secret MISSING (2026-10-02)** - the Android lane fails without it |
+| AdMob **App IDs** (`~`) | CI secrets `ADMOB_<PLATFORM>_APP_ID`, stamped into `project.godot [admob]` by `tools/ci/stamp_store_config.sh` | Android secrets MISSING, iOS present |
+| AdMob **unit IDs** (`/`) | CI secrets `ADMOB_<PLATFORM>_REWARDED_ID` / `_INTERSTITIAL_ID`, written to the gitignored `config/ad_ids.local.json`; production builds never use Google test ids (`BuildConfig`) | Android secrets MISSING, iOS present |
 | IAP product id | `StoreConfig.NO_FORCED_ADS` — must equal both consoles | done |
 | Privacy policy URL | `StoreConfig.PRIVACY_POLICY_URL` (Settings button hidden while empty) | **EMPTY** |
 | Apple Team ID / profile UUID | stamped by CI from secrets — **left empty in git** | — |
-| iCloud container | `iCloud.com.foursagez.beamshift` in the iOS preset `entitlements/additional` | must be registered + ASSIGNED in the portal |
+| iCloud container | **Not used.** iCloud and Game Center are disabled; the iOS preset has only the Sign in with Apple entitlement | n/a |
 
 ## 4. Verified in this pass (AUTOMATED / RENDERED — not MANUAL)
 
@@ -109,7 +118,7 @@ Do them in order; each ends with what to send back. Keep every signing file in `
    wait for **Active**. StoreKit returns NO products until then, and no build fixes it.
 2. **AdMob account** in the **payee's country** (fixed at sign-up) + payment verification.
 3. **Host a privacy policy** (e.g. GitHub Pages `index.html`) covering: ads (AdMob, child-directed, non-personalised), advertising ID,
-   the in-app purchase, cloud save via Google Play Games / Game Center + iCloud, children under 13 (COPPA), contact email.
+   the in-app purchase, optional Google Play Games / Sign in with Apple sign-in (local progress only, no cloud save), children under 13 (COPPA), contact email.
    Also a **developer website** with `/app-ads.txt` (see Batch E).
 4. **Upload keystore** (run yourself; choose and keep the password safe — never share it in chat):
    ```
@@ -129,12 +138,12 @@ Do them in order; each ends with what to send back. Keep every signing file in `
    "Removes all interrupting ads. Optional hint videos stay available.", one purchase option, **US $3.99** → **Activate**.
 **Send back:** the App Signing SHA-1, confirmation the product is Active.
 
-### Batch C — Play Games Services + Google Cloud (cloud save)
+### Batch C - Play Games Services (sign-in only; cloud save REMOVED 2026-10-01)
 1. console.cloud.google.com → new project "BeamShift" (no billing needed).
 2. APIs & Services → Library → enable **Google Drive API** and **Google Play Games Services API** (not Publishing/Management).
 3. OAuth consent screen (Google Auth Platform): External, app name, support + developer email.
 4. Play Console → **Grow users → Play Games Services → Setup and management → Configuration** → create a PGS project, link the
-   Cloud project. **Edit properties → Saved games: On** (one-way once published), add the description.
+   Cloud project. (Saved games is no longer needed: there is no cloud save. Do not enable it.)
 5. **Credentials → Add credential → Android**, anti-piracy **off**: one for the **App Signing SHA-1** (Batch B.3), and a second with
    **"Use for new installs" unchecked** for your debug keystore — its SHA-1:
    ```
@@ -142,13 +151,12 @@ Do them in order; each ends with what to send back. Keep every signing file in `
    ```
 6. **Testers** (PGS list — a third, separate list): add every tester email.
 7. Families check: confirm in the Console that Play Games sign-in is permitted for a mixed-audience (includes under-13) game; if
-   Play flags it, cloud save can be hidden without touching progress (the game is complete without a backend).
+   Play flags it, the sign-in row can be hidden without touching progress (the game is complete without it).
 **Send back:** the **Game ID** (the PGS project *number*, e.g. 123456789012 — not the Cloud project's string id).
 
 ### Batch D — Apple Developer portal (Account Holder/Admin; from Windows)
-1. Identifiers → **iCloud Containers** → register `iCloud.com.foursagez.beamshift`.
-2. Identifiers → App IDs → explicit `com.foursagez.beamshift`; tick **In-App Purchase**, **Game Center**, **iCloud** → **assign the
-   container** so it reads **Enabled iCloud Containers (1)** → Save.
+1. (OBSOLETE - iCloud is not used; skip creating a container.)
+2. Identifiers → App IDs → explicit `com.foursagez.beamshift`; tick **In-App Purchase** and **Sign in with Apple** (NOT Game Center, NOT iCloud) → Save.
 3. Apple Distribution certificate (Git Bash, in the signing folder):
    `openssl req -new -newkey rsa:2048 -nodes -keyout dist.key -out dist.csr` → Certificates → **Apple Distribution** → upload
    `dist.csr` → download `distribution.cer`.
@@ -168,7 +176,7 @@ Do them in order; each ends with what to send back. Keep every signing file in `
 
 ### Batch F — App Store Connect app record
 1. My Apps → + New App → iOS, "BeamShift", bundle `com.foursagez.beamshift`, SKU `beamshift`.
-2. **Game Center**: enable. **In-App Purchases** → + Non-Consumable, product id `beamshift_no_forced_ads`, display name
+2. **In-App Purchases** → + Non-Consumable, product id `beamshift_no_forced_ads`, display name
    "No Forced Ads" (≤30), description "No interrupting ads. Hints stay." (≤45), US $3.99, all territories, review screenshot
    exactly **640x920** (I can crop one from a Settings render), review note "Settings → NO FORCED ADS; Restore in Settings".
 3. **App Privacy**: no tracking. Declare what AdMob collects per Google's App Store data disclosure (Device ID / Advertising Data /
@@ -206,17 +214,17 @@ added via **"Draft Submission (N)"** (never "Create New Submission"). Before Pla
 - [ ] Play Games project id -> secret `PLAY_GAMES_GAME_ID` (the Android lane fails without it)
 - [x] IAP product `beamshift_no_forced_ads` created in Play Console (same id on both stores - `StoreConfig.NO_FORCED_ADS`), purchase option `no-forced-ads-lifetime`, status **ACTIVE**; Android device confirmed live localized price retrieval (INR ₹450.00) 2026-09-29 - see section 20. **Purchase/restore/reinstall/refund still NOT device-verified** - see section 20's manual QA checklist.
 - [ ] upload keystore -> secrets `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_USER`, `ANDROID_KEYSTORE_PASSWORD`
-- [ ] cloud save: PGS Saved Games enabled, OAuth client with the App Signing SHA-1, testers
+- [x] cloud save: REMOVED 2026-10-01 - nothing to configure (Play Games is sign-in only)
 - [ ] signed AAB (`Release CD`), uploaded via `PLAY_SERVICE_ACCOUNT_JSON` or by hand
 - [ ] Play Console: listing, privacy policy URL (`StoreConfig.PRIVACY_POLICY_URL`, empty = BLOCKER), Data safety, IARC, Families/target audience, Advertising-ID declaration + AD_ID permission decision (item 4 above)
 
 **IOS** (final archive/sign/upload needs macOS: the `ios-appstore` job on `macos-26`)
-- [ ] Apple Team ID (`APPLE_TEAM_ID`), bundle id registered with Game Center + iCloud container `iCloud.com.foursagez.beamshift`
+- [x] Apple Team ID (`APPLE_TEAM_ID`) secret present; bundle id registered with Sign in with Apple (no Game Center, no iCloud)
 - [ ] distribution certificate + provisioning profile (`IOS_DIST_CERT_B64`, `IOS_DIST_CERT_PASSWORD`, `IOS_PROVISIONING_PROFILE_B64`)
 - [ ] AdMob iOS ids (`ADMOB_IOS_APP_ID`, `ADMOB_IOS_REWARDED_ID`, `ADMOB_IOS_INTERSTITIAL_ID`)
 - [ ] privacy policy URL; UMP/child-directed already configured; ATT NOT used (`privacy/tracking_enabled=false`) - keep it that way
 - [ ] IAP product in App Store Connect; Paid Apps Agreement
-- [ ] Game Center enabled for the app (cloud save = GKSavedGame, iCloud)
+- [x] Game Center / iCloud: NOT used (removed 2026-10-01)
 - [ ] icon: only the 1024x1024 RGB (no alpha) `bs_app_icon_ios_1024.png` exists - valid single-size AppIcon; launch screen = Godot default (no custom art; do not generate)
 - [ ] Xcode archive -> App Store Connect key (`ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_API_PRIVATE_KEY`) -> TestFlight test
 
@@ -228,9 +236,8 @@ added via **"Draft Submission (N)"** (never "Create New Submission"). Before Pla
 - Android (installed **from Play internal testing**, license tester account): price shows in local currency; BUY → Play sheet →
   "Thank you!" and interstitials stop; reinstall → Restore Purchases → owned again; cancel → no message, nothing changes.
 - Rewarded hint still works for an owner. Interstitial every 4th completion (≥120 s) for a non-owner.
-- Cloud: sign in → Settings shows "synced"; delete + reinstall → progress returns without a question; repeat with **> 1 h** of play
-  on the cloud side → still no question on the fresh install; two devices far apart → chooser appears on the menu.
-- iOS (TestFlight, sandbox): same purchase/restore flow; Game Center sign-in; save/restore round trip; no ATT prompt; no QUIT button.
+- Account (no cloud): Android Play Games sign-in is optional and never blocks play; iOS Sign in with Apple likewise. Progress stays on the device (no restore after reinstall).
+- iOS (TestFlight, sandbox): same purchase/restore flow; optional Sign in with Apple; no ATT prompt; no QUIT button. Progress is local (no cloud restore).
 
 **2026-09-26:** Android AdMob production ids configured via the stamp script; next internal-test build = versionCode 10001 (1.0.0). Still pending: real Play Games Game ID, iOS AdMob ids, AdMob app review, test-device registration.
 

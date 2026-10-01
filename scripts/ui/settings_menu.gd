@@ -5,16 +5,18 @@ extends Control
 ## override - the source art is a wide pill graphic, not a small checkbox
 ## glyph. See ARCHITECTURE.md "Settings" and DECISIONS.md D37.
 
-const TEXTURE_TOGGLE_ON := preload("res://assets/ui/settings/bs_ui_toggle_on_runtime.png")
-const TEXTURE_TOGGLE_OFF := preload("res://assets/ui/settings/bs_ui_toggle_off_runtime.png")
+const TEXTURE_TOGGLE_ON := preload("res://assets/ui/settings/bs_toggle_on.png")
+const TEXTURE_TOGGLE_OFF := preload("res://assets/ui/settings/bs_toggle_off.png")
+# Visible (non-transparent) bounds of each toggle PNG, normalized; the two files pad differently.
+const RECT_TOGGLE_ON := Rect2(0.1087, 0.0387, 0.7762, 0.9337)
+const RECT_TOGGLE_OFF := Rect2(0.0192, 0.0328, 0.9612, 0.9483)
 
-@onready var _sound_toggle: Button = %SoundToggle
-@onready var _sound_toggle_icon: TextureRect = %SoundToggleIcon
-@onready var _music_toggle: Button = %MusicToggle
-@onready var _music_toggle_icon: TextureRect = %MusicToggleIcon
+@onready var _sound_toggle: SettingsArtButton = %SoundToggle
+@onready var _music_toggle: SettingsArtButton = %MusicToggle
 @onready var _back_button: Button = %BackButton
 @onready var _store_section: Control = %StoreSection
-@onready var _buy_button: Button = %BuyNoForcedAdsButton
+@onready var _buy_button: SettingsArtButton = %BuyNoForcedAdsButton
+@onready var _price_label: Label = %PriceLabel
 @onready var _store_status: Label = %StoreStatusLabel
 @onready var _restore_button: Button = %RestorePurchasesButton
 @onready var _cloud_section: Control = %CloudSection
@@ -28,23 +30,18 @@ const TEXTURE_TOGGLE_OFF := preload("res://assets/ui/settings/bs_ui_toggle_off_r
 
 const MESSAGE_SECONDS := 4.0
 
-# The buy button's label is dynamic (a live, localized Play Store price string -
-# see StoreManager.price_text()) so its width can't be guaranteed at authoring time.
-# Widening the button (scenes/ui/settings_menu.tscn) covers most locales; this is a
-# last-resort shrink so an unusually long localized price never overflows/clips the
-# button art instead of being truncated.
-const BUY_BUTTON_DEFAULT_FONT_SIZE := 40
-const BUY_BUTTON_MIN_FONT_SIZE := 26
-# The button's StyleBoxTexture has a 70px left/right texture_margin (its content
-# margin, per CLAUDE.md's content_margin note) plus a little breathing room so text
-# never touches the metallic end caps.
-const BUY_BUTTON_TEXT_SIDE_INSET := 90.0
-
+# The price is a live, localized Play Store string (StoreManager.price_text()), so its width
+# can't be known at authoring time. It sits in the art's empty right-hand region and shrinks
+# (never clips) down to PRICE_MIN_FONT_SIZE for an unusually long string.
+const PRICE_DEFAULT_FONT_SIZE := 42
+const PRICE_MIN_FONT_SIZE := 22
 
 
 func _ready() -> void:
 	_ready_audio_rows()
 	_ready_store_rows()
+	for b in [_back_button, _cloud_sign_in, _buy_button, _restore_button, _about]:
+		BeamButtonGlow.attach(b)
 
 
 func _ready_store_rows() -> void:
@@ -73,31 +70,33 @@ func _ready_store_rows() -> void:
 func _refresh_store() -> void:
 	_store_status.visible = false
 	if StoreManager.owns_no_forced_ads():
-		_set_buy_button_label("NO FORCED ADS - OWNED")
+		_set_price_text("OWNED")
 		_buy_button.disabled = true
 	elif StoreManager.is_busy():
-		_set_buy_button_label("WORKING...")
+		_set_price_text("...")
 		_buy_button.disabled = true
 	elif StoreManager.can_purchase():
-		_set_buy_button_label("NO FORCED ADS - %s" % StoreManager.price_text())
+		_set_price_text(StoreManager.price_text())
 		_buy_button.disabled = false
 	else:
 		# Never a dead-looking BUY button: say why it can't be pressed, on a plain line under the art.
 		_store_status.text = "Store unavailable right now."
 		_store_status.visible = true
-		_set_buy_button_label("NO FORCED ADS")
+		_set_price_text("")
 		_buy_button.disabled = true
 	_restore_button.disabled = StoreManager.is_busy()
 
 
-func _set_buy_button_label(label: String) -> void:
-	_buy_button.text = label
-	var font: Font = _buy_button.get_theme_font("font")
-	var max_width: float = maxf(_buy_button.size.x, 640.0) - BUY_BUTTON_TEXT_SIDE_INSET
-	var size := BUY_BUTTON_DEFAULT_FONT_SIZE
-	while size > BUY_BUTTON_MIN_FONT_SIZE and font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > max_width:
+func _set_price_text(label: String) -> void:
+	_price_label.text = label
+	var font: Font = _price_label.get_theme_font("font")
+	var max_width: float = _buy_button.size.x * (_price_label.anchor_right - _price_label.anchor_left)
+	if max_width <= 0.0:
+		max_width = _buy_button.display_width * (_price_label.anchor_right - _price_label.anchor_left)
+	var size := PRICE_DEFAULT_FONT_SIZE
+	while size > PRICE_MIN_FONT_SIZE and font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > max_width:
 		size -= 1
-	_buy_button.add_theme_font_size_override("font_size", size)
+	_price_label.add_theme_font_size_override("font_size", size)
 
 
 func _on_buy_pressed() -> void:
@@ -148,8 +147,8 @@ func _on_privacy_policy_pressed() -> void:
 func _ready_audio_rows() -> void:
 	_sound_toggle.button_pressed = SaveManager.sound_enabled
 	_music_toggle.button_pressed = SaveManager.music_enabled
-	_update_toggle_icon(_sound_toggle_icon, _sound_toggle.button_pressed)
-	_update_toggle_icon(_music_toggle_icon, _music_toggle.button_pressed)
+	_update_toggle_art(_sound_toggle, _sound_toggle.button_pressed)
+	_update_toggle_art(_music_toggle, _music_toggle.button_pressed)
 
 	_sound_toggle.toggled.connect(_on_sound_toggled)
 	_music_toggle.toggled.connect(_on_music_toggled)
@@ -161,17 +160,17 @@ func _on_sound_toggled(enabled: bool) -> void:
 	SaveManager.sound_enabled = enabled
 	SaveManager.save_game()
 	AudioManager.set_sound_enabled(enabled)
-	_update_toggle_icon(_sound_toggle_icon, enabled)
+	_update_toggle_art(_sound_toggle, enabled)
 
 
 func _on_music_toggled(enabled: bool) -> void:
 	SaveManager.music_enabled = enabled
 	SaveManager.save_game()
-	_update_toggle_icon(_music_toggle_icon, enabled)
+	_update_toggle_art(_music_toggle, enabled)
 
 
-func _update_toggle_icon(icon: TextureRect, enabled: bool) -> void:
-	icon.texture = TEXTURE_TOGGLE_ON if enabled else TEXTURE_TOGGLE_OFF
+func _update_toggle_art(toggle: SettingsArtButton, enabled: bool) -> void:
+	toggle.set_art(TEXTURE_TOGGLE_ON if enabled else TEXTURE_TOGGLE_OFF, RECT_TOGGLE_ON if enabled else RECT_TOGGLE_OFF)
 
 
 ## project.godot's quit_on_go_back=false means every top-level screen
@@ -179,4 +178,6 @@ func _update_toggle_icon(icon: TextureRect, enabled: bool) -> void:
 ## gesture/button itself - see main_menu.gd's _notification().
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		if InternetManager.is_blocking():
+			return # no navigation under the InternetBlocker
 		GameManager.go_to_main_menu()

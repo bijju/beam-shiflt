@@ -1,5 +1,8 @@
 # references/ci-cd.md — BeamShift iOS CI/CD pipeline
 
+> **2026-10-02 note:** Game Center and iCloud are NOT used any more (Firebase/cloud-save removal, 2026-10-01). References below to the Game Center extension, iCloud/Game Center entitlements or provisioning-profile capabilities are historical: the live iOS entitlement is Sign in with Apple only (`entitlements/game_center=false`), the profile needs only Sign in with Apple + In-App Purchase, and no iCloud container is required. The CI step that still installs/verifies the Game Center extension is harmless leftovers, not a runtime dependency.
+
+
 Referenced by `.github/workflows/release.yml`. This is the project's own reference for
 the iOS build/signing/TestFlight pipeline: how it's triggered, what each stage does, what
 secrets it needs, and how to bring up the first signed build safely. Update it whenever

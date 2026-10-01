@@ -75,6 +75,25 @@ func _shoot(name: String) -> void:
 			node._show_new_game_confirmation()
 	for i in 10:
 		await get_tree().process_frame
+	if name == "pause":
+		var glows := node.find_children("*", "ColorRect", true, false).filter(func(c): return c is BeamButtonGlow)
+		print("GLOWDBG ", glows.size(), " ", glows[0].size, " ", glows[0].get_global_rect(), " ", glows[0].is_visible_in_tree(), " ", glows[0].material)
+		for frac in [0.12, 0.3, 0.55, 0.8]:
+			glows[0]._sweeping = true
+			glows[0]._sweep_t = frac * glows[0].sweep_duration
+			glows[0]._apply()
+			await get_tree().process_frame
+			get_viewport().get_texture().get_image().save_png("%s/pause_sweep_%d_%d.png" % [_out, int(frac * 100), int(get_viewport().get_visible_rect().size.y)])
+	if name == "main_menu":
+		var gl := node.find_children("*", "ColorRect", true, false).filter(func(c): return c is BeamButtonGlow)
+		for g in gl: print("MGLOW ", g.get_parent().name, " ", g.position, " ", g.size, " ", g.get_global_rect(), " ", g.is_visible_in_tree(), " ", g.get_parent().size)
+		for frac in [0.2, 0.6]:
+			for i in gl.size():
+				gl[i]._sweeping = true
+				gl[i]._sweep_t = fmod(frac + i * 0.17, 1.0) * gl[i].sweep_duration
+				gl[i]._apply()
+			await get_tree().process_frame
+			get_viewport().get_texture().get_image().save_png("%s/menu_sweep_%d_%d.png" % [_out, int(frac * 100), int(get_viewport().get_visible_rect().size.y)])
 	var img := get_viewport().get_texture().get_image()
 	print("SHOTS saving ", name, " ", img.get_size())
 	img.save_png("%s/%s_%d.png" % [_out, name, int(get_viewport().get_visible_rect().size.y)])

@@ -22,6 +22,7 @@ const DEFAULT_BACKGROUND := preload("res://assets/ui/backgrounds/bs_bg_tutorial_
 func _ready() -> void:
 	_back_button.pressed.connect(func() -> void: GameManager.go_to_main_menu())
 	_back_button.pressed.connect(AudioManager.play_ui_back)
+	BeamButtonGlow.attach(_back_button)
 	_apply_era_background()
 	_populate_tutorials()
 
@@ -67,4 +68,6 @@ func _on_tutorial_selected(tutorial_id: int) -> void:
 ## behavior for the system Back gesture/button itself.
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		if InternetManager.is_blocking():
+			return # no navigation under the InternetBlocker
 		GameManager.go_to_main_menu()

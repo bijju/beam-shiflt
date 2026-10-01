@@ -7,7 +7,12 @@
 
 [ext_resource type="Script" path="res://scripts/ui/menu_particles.gd" id="5"]
 [ext_resource type="PackedScene" path="res://scenes/ui/menu_gameplay_preview.tscn" id="6"]
-[ext_resource type="Texture2D" path="res://assets/ui/icons/bs_ui_icon_settings.png" id="7"]
+[ext_resource type="Texture2D" path="res://assets/ui/buttons/bs_btn_main_about_footer.png" id="7"]
+[ext_resource type="Texture2D" path="res://assets/ui/buttons/bs_btn_main_settings_footer.png" id="12"]
+[ext_resource type="Script" path="res://scripts/ui/menu_art_button.gd" id="8"]
+[ext_resource type="Texture2D" path="res://assets/ui/buttons/bs_btn_continue.png" id="9"]
+[ext_resource type="Texture2D" path="res://assets/ui/buttons/bs_btn_new_game.png" id="10"]
+[ext_resource type="Texture2D" path="res://assets/ui/buttons/bs_btn_tutorials.png" id="11"]
 
 [sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_add"]
 blend_mode = 1
@@ -118,7 +123,7 @@ grow_vertical = 2
 script = ExtResource("2")
 horizontal_margin_override = 40.0
 vertical_margin_override = 32.0
-top_margin_extra = -8.0
+top_margin_extra = -24.0
 bottom_margin_extra = 42.0
 
 [node name="Root" type="VBoxContainer" parent="SafeMargin"]
@@ -145,7 +150,7 @@ custom_minimum_size = Vector2(300, 360)
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 0
-theme_override_constants/separation = 14
+theme_override_constants/separation = 0
 alignment = 1
 
 [node name="ContinueButton" type="Button" parent="SafeMargin/Root/ButtonGroup"]
@@ -153,24 +158,54 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 4
 custom_minimum_size = Vector2(860, 136)
-theme_override_font_sizes/font_size = 44
-text = "CONTINUE"
+script = ExtResource("8")
+art = ExtResource("9")
+content_rect = Rect2(0.0151, 0.1393, 0.9698, 0.7368)
 
 [node name="PlayButton" type="Button" parent="SafeMargin/Root/ButtonGroup"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 4
 custom_minimum_size = Vector2(860, 136)
-theme_override_font_sizes/font_size = 44
-text = "NEW GAME"
+script = ExtResource("8")
+art = ExtResource("10")
+content_rect = Rect2(0.0148, 0.1511, 0.9704, 0.7143)
 
 [node name="TutorialButton" type="Button" parent="SafeMargin/Root/ButtonGroup"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 4
 custom_minimum_size = Vector2(860, 136)
-theme_override_font_sizes/font_size = 44
-text = "TUTORIALS"
+script = ExtResource("8")
+art = ExtResource("11")
+content_rect = Rect2(0.0148, 0.1497, 0.9704, 0.7170)
+
+[node name="FooterGap" type="Control" parent="SafeMargin/Root/ButtonGroup"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 4)
+
+[node name="FooterRow" type="HBoxContainer" parent="SafeMargin/Root/ButtonGroup"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 24
+
+[node name="AboutButton" type="Button" parent="SafeMargin/Root/ButtonGroup/FooterRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(400, 134)
+script = ExtResource("8")
+art = ExtResource("7")
+content_rect = Rect2(0.0193, 0.0732, 0.9581, 0.8439)
+
+[node name="SettingsButton" type="Button" parent="SafeMargin/Root/ButtonGroup/FooterRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(400, 134)
+script = ExtResource("8")
+art = ExtResource("12")
+content_rect = Rect2(0.0147, 0.0884, 0.9480, 0.7997)
 
 [node name="QuitSpacer" type="Control" parent="SafeMargin/Root/ButtonGroup"]
 layout_mode = 2
@@ -197,44 +232,3 @@ size_flags_horizontal = 4
 custom_minimum_size = Vector2(320, 72)
 theme_override_font_sizes/font_size = 18
 text = "Level Select (QA)"
-
-[node name="BottomRow" type="HBoxContainer" parent="SafeMargin/Root"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_vertical = 8
-
-[node name="SettingsButton" type="Button" parent="SafeMargin/Root/BottomRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(120, 120)
-layout_mode = 2
-theme_type_variation = &"RoundIconButton"
-
-[node name="Icon" type="TextureRect" parent="SafeMargin/Root/BottomRow/SettingsButton"]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -42.0
-offset_top = -42.0
-offset_right = 42.0
-offset_bottom = 42.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-texture = ExtResource("7")
-expand_mode = 1
-stretch_mode = 5
-
-[node name="Spacer" type="Control" parent="SafeMargin/Root/BottomRow"]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="AboutButton" type="Button" parent="SafeMargin/Root/BottomRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(120, 120)
-layout_mode = 2
-theme_type_variation = &"RoundIconButton"
-theme_override_font_sizes/font_size = 72
-text = "i"

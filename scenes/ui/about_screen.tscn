@@ -4,6 +4,8 @@
 [ext_resource type="Script" path="res://scripts/ui/safe_area_margin.gd" id="2"]
 [ext_resource type="Texture2D" path="res://assets/ui/backgrounds/bs_bg_tutorial_select_v2.png" id="3"]
 [ext_resource type="Texture2D" path="res://assets/ui/branding/bs_logo_main_menu_portrait.png" id="5"]
+[ext_resource type="Script" path="res://scripts/ui/settings_art_button.gd" id="6"]
+[ext_resource type="Texture2D" path="res://assets/ui/settings/bs_btn_settings_back.png" id="7"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_logo_crop"]
 atlas = ExtResource("5")
@@ -62,11 +64,12 @@ theme_override_constants/separation = 16
 
 [node name="BackButton" type="Button" parent="SafeArea/Layout/Header"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(230, 108)
 layout_mode = 2
-theme_type_variation = &"SecondaryButton"
-theme_override_font_sizes/font_size = 36
-text = "< BACK"
+size_flags_vertical = 4
+script = ExtResource("6")
+art = ExtResource("7")
+content_rect = Rect2(0.035, 0.0304, 0.9249, 0.9669)
+display_width = 230.0
 
 [node name="TitleLabel" type="Label" parent="SafeArea/Layout/Header"]
 layout_mode = 2

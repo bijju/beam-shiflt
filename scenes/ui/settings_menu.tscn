@@ -3,7 +3,13 @@
 [ext_resource type="Script" path="res://scripts/ui/settings_menu.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/ui/safe_area_margin.gd" id="2"]
 [ext_resource type="Texture2D" path="res://assets/ui/backgrounds/bs_bg_tutorial_select_v2.png" id="3"]
-[ext_resource type="Texture2D" path="res://assets/ui/settings/bs_ui_toggle_off_runtime.png" id="4"]
+[ext_resource type="Script" path="res://scripts/ui/settings_art_button.gd" id="6"]
+[ext_resource type="Texture2D" path="res://assets/ui/settings/bs_btn_settings_back.png" id="7"]
+[ext_resource type="Texture2D" path="res://assets/ui/settings/bs_toggle_on.png" id="8"]
+[ext_resource type="Texture2D" path="res://assets/ui/settings/bs_btn_account.png" id="9"]
+[ext_resource type="Texture2D" path="res://assets/ui/settings/bs_btn_restore_purchases.png" id="10"]
+[ext_resource type="Texture2D" path="res://assets/ui/settings/bs_btn_about_us.png" id="11"]
+[ext_resource type="Texture2D" path="res://assets/ui/settings/bs_btn_no_forced_ads.png" id="12"]
 [ext_resource type="Texture2D" path="res://assets/ui/branding/bs_logo_main_menu_portrait.png" id="5"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_logo"]
@@ -62,11 +68,12 @@ theme_override_constants/separation = 16
 
 [node name="BackButton" type="Button" parent="SafeMargin/Layout/Header"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(230, 108)
 layout_mode = 2
-theme_type_variation = &"SecondaryButton"
-theme_override_font_sizes/font_size = 36
-text = "< BACK"
+size_flags_vertical = 4
+script = ExtResource("6")
+art = ExtResource("7")
+content_rect = Rect2(0.035, 0.0304, 0.9249, 0.9669)
+display_width = 230.0
 
 [node name="Title" type="Label" parent="SafeMargin/Layout/Header"]
 layout_mode = 2
@@ -122,23 +129,13 @@ text = "Sound effects"
 
 [node name="SoundToggle" type="Button" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Box/Body/SoundRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(270, 112)
 layout_mode = 2
+size_flags_vertical = 4
 toggle_mode = true
-flat = true
-
-[node name="SoundToggleIcon" type="TextureRect" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Box/Body/SoundRow/SoundToggle"]
-unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-texture = ExtResource("4")
-expand_mode = 1
-stretch_mode = 5
+script = ExtResource("6")
+art = ExtResource("8")
+content_rect = Rect2(0.1087, 0.0387, 0.7762, 0.9337)
+display_width = 250.0
 
 [node name="Rule" type="ColorRect" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Box/Body"]
 custom_minimum_size = Vector2(0, 2)
@@ -157,23 +154,13 @@ text = "Music"
 
 [node name="MusicToggle" type="Button" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Box/Body/MusicRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(270, 112)
 layout_mode = 2
+size_flags_vertical = 4
 toggle_mode = true
-flat = true
-
-[node name="MusicToggleIcon" type="TextureRect" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Box/Body/MusicRow/MusicToggle"]
-unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-texture = ExtResource("4")
-expand_mode = 1
-stretch_mode = 5
+script = ExtResource("6")
+art = ExtResource("8")
+content_rect = Rect2(0.1087, 0.0387, 0.7762, 0.9337)
+display_width = 250.0
 
 [node name="CloudSection" type="PanelContainer" parent="SafeMargin/Layout/Scroll/Sections"]
 unique_name_in_owner = true
@@ -203,10 +190,12 @@ autowrap_mode = 3
 
 [node name="CloudSignInButton" type="Button" parent="SafeMargin/Layout/Scroll/Sections/CloudSection/Box/Body"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 136)
 layout_mode = 2
-theme_override_font_sizes/font_size = 40
-text = "ACCOUNT"
+size_flags_horizontal = 4
+script = ExtResource("6")
+art = ExtResource("9")
+content_rect = Rect2(0.0055, 0.2293, 0.989, 0.5691)
+display_width = 640.0
 
 [node name="StoreSection" type="PanelContainer" parent="SafeMargin/Layout/Scroll/Sections"]
 unique_name_in_owner = true
@@ -231,10 +220,27 @@ alignment = 1
 
 [node name="BuyNoForcedAdsButton" type="Button" parent="SafeMargin/Layout/Scroll/Sections/StoreSection/Box/Body"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 136)
 layout_mode = 2
-theme_override_font_sizes/font_size = 40
-text = "NO FORCED ADS"
+size_flags_horizontal = 4
+script = ExtResource("6")
+art = ExtResource("12")
+content_rect = Rect2(0.0046, 0.2155, 0.9908, 0.5912)
+display_width = 700.0
+
+[node name="PriceLabel" type="Label" parent="SafeMargin/Layout/Scroll/Sections/StoreSection/Box/Body/BuyNoForcedAdsButton"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_left = 0.66
+anchor_right = 0.915
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.86, 0.97, 1, 1)
+theme_override_font_sizes/font_size = 44
+horizontal_alignment = 2
+vertical_alignment = 1
 
 [node name="StoreStatusLabel" type="Label" parent="SafeMargin/Layout/Scroll/Sections/StoreSection/Box/Body"]
 unique_name_in_owner = true
@@ -246,11 +252,12 @@ autowrap_mode = 3
 
 [node name="RestorePurchasesButton" type="Button" parent="SafeMargin/Layout/Scroll/Sections/StoreSection/Box/Body"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 116)
 layout_mode = 2
-theme_type_variation = &"SecondaryButton"
-theme_override_font_sizes/font_size = 36
-text = "RESTORE PURCHASES"
+size_flags_horizontal = 4
+script = ExtResource("6")
+art = ExtResource("10")
+content_rect = Rect2(0.0046, 0.1934, 0.9908, 0.6243)
+display_width = 600.0
 
 [node name="LegalRow" type="VBoxContainer" parent="SafeMargin/Layout/Scroll/Sections"]
 layout_mode = 2
@@ -289,11 +296,12 @@ theme_override_constants/separation = 14
 
 [node name="AboutButton" type="Button" parent="SafeMargin/Layout/Footer"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 100)
 layout_mode = 2
-theme_type_variation = &"GhostButton"
-theme_override_font_sizes/font_size = 34
-text = "ABOUT US"
+size_flags_horizontal = 4
+script = ExtResource("6")
+art = ExtResource("11")
+content_rect = Rect2(0.0055, 0.1961, 0.9871, 0.6133)
+display_width = 520.0
 
 [node name="Logo" type="TextureRect" parent="SafeMargin/Layout/Footer"]
 custom_minimum_size = Vector2(0, 220)

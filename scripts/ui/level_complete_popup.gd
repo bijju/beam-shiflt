@@ -40,7 +40,9 @@ func _ready() -> void:
 
 	for button in [_next_button, _retry_button, _level_select_button]:
 		button.pressed.connect(AudioManager.play_ui_button_press)
-	BeamUI.bind_dialog_button_fonts(self, [_next_button, _retry_button, _level_select_button])
+	BeamButtonGlow.attach(_next_button)
+	BeamButtonGlow.attach(_retry_button)
+	BeamButtonGlow.attach(_level_select_button, BeamButtonGlow.RED_ORANGE)
 
 
 ## Phase 2 (Direct Play + Continue Flow, see DECISIONS.md D85): game.gd
@@ -49,8 +51,9 @@ func _ready() -> void:
 ## label always matches where level_select_pressed will actually
 ## navigate to - purely presentational, this popup still has no
 ## navigation logic of its own.
+## The button is baked-in MAIN MENU art (no text), so only the tooltip tracks the real destination.
 func set_navigation_label(text: String) -> void:
-	_level_select_button.text = text
+	_level_select_button.tooltip_text = text
 
 
 ## best_moves < 0 hides the row entirely (used for editor-playtest levels,

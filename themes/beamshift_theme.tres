@@ -1,7 +1,7 @@
-[gd_resource type="Theme" format=3]
+[gd_resource type="Theme" format=3 uid="uid://c1bxvatrnx8yn"]
 
-[ext_resource type="FontFile" path="res://assets/fonts/Rajdhani-Bold.ttf" id="1_dti6w"]
-[ext_resource type="FontFile" path="res://assets/fonts/Rajdhani-SemiBold.ttf" id="2_ufxkt"]
+[ext_resource type="FontFile" uid="uid://brga6x1uaqraq" path="res://assets/fonts/Rajdhani-Bold.ttf" id="1_dti6w"]
+[ext_resource type="FontFile" uid="uid://ribheicwnx0t" path="res://assets/fonts/Rajdhani-SemiBold.ttf" id="2_ufxkt"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_dti6w"]
 content_margin_left = 30.0

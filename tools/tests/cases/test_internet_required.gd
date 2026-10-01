@@ -147,6 +147,50 @@ func test_nothing_unpauses_under_the_blocker() -> void:
 	ok(runner.get_tree().paused)
 
 
+func test_back_request_cannot_navigate_under_the_blocker() -> void:
+	_open_gate()
+	var screens := {
+		"settings": GameManager.go_to_settings, "about": GameManager.go_to_about, "account": GameManager.go_to_account,
+		"level_select": GameManager.go_to_level_select, "tutorial_select": GameManager.go_to_tutorial_select,
+	}
+	for name: String in screens:
+		(screens[name] as Callable).call()
+		await frames(3)
+		var scene := current_scene()
+		ok(scene != null, name + " opened")
+		_lose_connection()
+		scene.notification(Node.NOTIFICATION_WM_GO_BACK_REQUEST)
+		await frames(3)
+		ok(current_scene() == scene, name + ": Back must not navigate while blocked")
+		_open_gate()
+		await frames(2)
+
+
+func test_back_request_cannot_cancel_new_game_dialog_or_open_pause_under_the_blocker() -> void:
+	_open_gate()
+	GameManager.go_to_main_menu()
+	await frames(3)
+	var menu := current_scene()
+	menu._show_new_game_confirmation()
+	await frames(2)
+	_lose_connection()
+	menu.notification(Node.NOTIFICATION_WM_GO_BACK_REQUEST)
+	await frames(2)
+	ok(menu._confirm_layer != null, "New Game dialog stays open (Back must not cancel under the blocker)")
+	_open_gate()
+	menu.notification(Node.NOTIFICATION_WM_GO_BACK_REQUEST)
+	await frames(2)
+	ok(menu._confirm_layer == null, "Back cancels the dialog once online again")
+	GameManager.start_level(1)
+	await frames(3)
+	var game := current_scene()
+	_lose_connection()
+	var pause = game.get_node_or_null("%PauseMenu")
+	game.notification(Node.NOTIFICATION_WM_GO_BACK_REQUEST)
+	await frames(2)
+	ok(pause == null or not pause.visible, "Back must not open Pause under the blocker")
+	_open_gate()
+
 func test_play_games_failure_is_not_an_internet_failure() -> void:
 	_open_gate()
 	PlatformAccount.platform = PlatformAccount.Platform.ANDROID

@@ -1,7 +1,7 @@
 # CLAUDE.md — Permanent Instructions for Future Claude Sessions
 
 > **Firebase removed (2026-10-01):** Android = Google Play Games + local save, iOS = Sign in with Apple + local save, desktop = local save. No Firebase/Firestore/cloud save/sync anywhere; see "Account / platform identity rules" below. Older notes about Firebase auth/cloud save in this repo's other docs are historical only.
-> **Store-release pass (2026-09-26):** owner asked to prepare Google Play + App Store: bundle `com.foursagez.beamshift`, child-directed ads, "No Forced Ads" IAP, cloud save, AAB/iOS presets, CI - code done, console work pending (`STORE_RELEASE.md` section 5). The IAP/SDK additions were explicitly requested; the "no IAP/external SDKs" scope line below predates them.
+> **Store-release pass (2026-09-26):** owner asked to prepare Google Play + App Store: bundle `com.foursagez.beamshift`, child-directed ads, "No Forced Ads" IAP, (cloud save - later REMOVED 2026-10-01), AAB/iOS presets, CI - code done, console work pending (`STORE_RELEASE.md` section 5). The IAP/SDK additions were explicitly requested; the "no IAP/external SDKs" scope line below predates them.
 > **Current phase (2026-09-25): S3.1 NEXT - V5 J/K difficulty refinement.** S1/S2 complete, S3 implemented but NOT certified, S4 (APK) not started. Tool-independent continuation prompt: `NEXT_AI_PROMPT.md`. Nothing from S1-S3 is committed; do not commit/push/build unless asked.
 
 This file is permanent guidance for any Claude session (or account) that
@@ -1307,7 +1307,7 @@ Details: `STORE_RELEASE.md`, `ADS_MONETIZATION.md` 6a-6c.
 - **`play_time_seconds` counts real play only** (`game.gd _process`); the cloud fresh-install guard depends on menu time never counting.
 - **Android builds FAIL while `godot_play_game_services/game_id` is empty** (AAPT resource error) - that is expected until the owner
   creates the PGS project; test exports may use a placeholder but must restore the empty value.
-- iOS StoreKit/Game Center GDExtensions are never vendored (CI downloads pinned releases). Signing material stays outside the repo
+- iOS StoreKit/AuthenticationServices GDExtensions are never vendored (CI downloads pinned releases). Signing material stays outside the repo
   (`.gitignore` covers `*.keystore *.jks *.p12 *.p8 *.mobileprovision`).
 - AdMob callbacks are named methods only (no lambdas handed to the plugin) + `AdBackendAdMob.release()`: iOS swipe-away crash otherwise.
 
@@ -1498,7 +1498,11 @@ reintroduce any of it without an explicit owner decision.
   failure; 8 s probe while healthy, 2 s while unsettled). `InternetBlocker` (autoload, CanvasLayer 128) is the ONE gate: it pauses
   the SceneTree while `InternetManager.is_blocking()`, restores the prior pause state on reconnect (scene never reloaded) and shows the
   INTERNET CONNECTION REQUIRED/LOST panel with RETRY (QUIT on desktop only). Never add per-scene offline code. Play Games / Apple
-  sign-in failure is NOT an internet failure and never blocks. Tests: `tools/tests/cases/test_internet_required.gd`.
+  sign-in failure is NOT an internet failure and never blocks.
+  **Every `NOTIFICATION_WM_GO_BACK_REQUEST` handler (about/account/level_select/settings/tutorial_select, the Main Menu New Game dialog
+  cancel, and `game.gd` pause) must start with `if InternetManager.is_blocking(): return`** so Back can never navigate or cancel under the gate
+  (regression: `test_internet_required.gd::test_back_request_*`). Main Menu / splash plain Back-to-quit stays allowed (it is not navigation and
+  mobile has no QUIT button on the blocker). A NEW Back/cancel handler needs the same guard. Tests: `tools/tests/cases/test_internet_required.gd`.
 - iOS keeps the `com.apple.developer.applesignin` entitlement; Game Center and iCloud stay disabled. Do not claim
   Sign in with Apple or Play Games as DEVICE VERIFIED without a real device (cancel-message heuristic and the
   Play Games `game_id`, still empty in presets, are unconfirmed - see `tools/ios_plugin_src/README.md`).
@@ -1508,6 +1512,8 @@ reintroduce any of it without an explicit owner decision.
   reset is `SaveManager.reset_main_progress_for_new_game()` (NEW GAME), not account deletion.
 
 ## Production build rules (D114)
+
+- **Release presets (`Android`, `iOS`) exclude `config/ad_test_devices.local.json`; `Android Debug` keeps it** (owner test devices on production-id debug APKs). `config/ad_ids.local.json` must NEVER be excluded: CI writes the production ids there and `AdConfig` reads it at runtime.
 
 - **The committed `BuildConfig.BUILD_MODE` is `MODE_PRODUCTION`; never commit another value.** Internal QA: `tools/ci/set_build_mode.sh internal_qa`, then restore. New QA-only UI must derive from `BuildConfig.QA_TOOLS`.
 - **Production ad ids and the Play Games Game ID are never in source**: `tools/ci/stamp_store_config.sh` injects them from CI secrets (`config/ad_ids.local.json` is gitignored; `AdConfig.USE_TEST_IDS` follows the build mode). Missing production ad ids => `AdConfig.ads_active()` false => ads OFF and hints free - never an empty/sample unit request. Do not hardcode a fake Game ID or ad id.

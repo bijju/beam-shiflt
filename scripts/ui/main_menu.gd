@@ -32,14 +32,15 @@ const LOGO_HEIGHT_FRACTION := 0.27
 const MENU_SIDE_MARGIN := 40.0
 ## Nominal margin the logo/button sizes are derived from (kept so those sizes never change with the lift).
 const MENU_VERTICAL_MARGIN := 32.0
-const MAIN_BUTTON_HEIGHT_FRACTION := 0.078
-const MAIN_BUTTON_WIDTH_FRACTION := 0.86
+const MAIN_BUTTON_WIDTH_FRACTION := 0.84
+const PREVIEW_WIDTH_FRACTION := 0.86
 
 ## Matches Root's own theme_override_constants/separation in main_menu.tscn
 ## (the gap the removed flex Spacer used to paper over) and a small reserve
 ## for the breathing room below ButtonGroup, above the corner Settings icon.
-const MAIN_BUTTON_MIN_H := 120.0
-const MAIN_BUTTON_MAX_H := 170.0
+## The logo sits this many px higher than the nominal margin (SafeMargin's top_margin_extra, main_menu.tscn); the
+## preview floor grows by the same amount so the lift gives the preview room instead of moving the buttons.
+const LOGO_LIFT := 16.0
 const HERO_GAP := 20.0
 const BOTTOM_BREATHING := 28.0
 
@@ -47,18 +48,18 @@ const BOTTOM_BREATHING := 28.0
 @onready var _logo: TextureRect = %Logo
 @onready var _preview_frame: Control = %PreviewFrame
 @onready var _button_group: VBoxContainer = %ButtonGroup
-@onready var _play_button: Button = %PlayButton
-@onready var _continue_button: Button = %ContinueButton
-@onready var _tutorial_button: Button = %TutorialButton
+@onready var _play_button: MenuArtButton = %PlayButton
+@onready var _continue_button: MenuArtButton = %ContinueButton
+@onready var _tutorial_button: MenuArtButton = %TutorialButton
 ## Main Menu Redesign pass (2026-09-28): a compact icon button
 ## (bs_ui_icon_settings.png), not a full-width text Button - see
 ## scenes/ui/main_menu.tscn's CornerLayer/SettingsButton. Typed as
 ## BaseButton (the common ancestor of Button/TextureButton) so this
 ## reference works regardless of which control type the scene uses.
-@onready var _settings_button: BaseButton = %SettingsButton
+@onready var _settings_button: MenuArtButton = %SettingsButton
 @onready var _quit_button: Button = %QuitButton
-@onready var _about_button: Button = %AboutButton
-@onready var _bottom_row: Control = %BottomRow
+@onready var _about_button: MenuArtButton = %AboutButton
+@onready var _footer_row: HBoxContainer = %FooterRow
 @onready var _qa_spacer: Control = %QASpacer
 ## QA/dev-only - see DECISIONS.md D85. Not part of the normal player-
 ## facing flow; visibility is gated in _ready() below.
@@ -86,6 +87,8 @@ func _ready() -> void:
 	# NOT derived from unlock/completion progress - see SaveManager.
 	# has_resumable_procedural_game()'s own doc comment for why.
 	_continue_button.disabled = not SaveManager.has_resumable_procedural_game()
+	for b in [_continue_button, _play_button, _tutorial_button, _about_button, _settings_button]:
+		BeamButtonGlow.attach(b)
 
 	# Godot's quit() call is intended for desktop; on mobile the OS back
 	# gesture/button is the platform-expected way to leave the app.
@@ -169,26 +172,38 @@ func _layout_hero_elements() -> void:
 	var root_sep := float(_button_group.get_parent().get_theme_constant("separation"))
 
 	# Three equal primary buttons (the QA/desktop extras below them are measured via the group's real height).
-	var button_h := clampf(safe_h * MAIN_BUTTON_HEIGHT_FRACTION, MAIN_BUTTON_MIN_H, MAIN_BUTTON_MAX_H)
+	# The art is never stretched: one shared box (identical for all three buttons) takes the narrowest of the
+	# PNGs' own aspects, so every image fits inside it by width. Width is a fraction of the safe width.
+	var art_buttons: Array[MenuArtButton] = [_continue_button, _play_button, _tutorial_button]
+	var box_aspect := 1000.0
+	for ab in art_buttons:
+		box_aspect = minf(box_aspect, ab.art_aspect())
 	var button_w := safe_w * MAIN_BUTTON_WIDTH_FRACTION
-	for b: Button in [_continue_button, _play_button, _tutorial_button]:
+	var button_h := button_w / box_aspect
+	var frame_w := safe_w * PREVIEW_WIDTH_FRACTION
+	for b: MenuArtButton in art_buttons:
 		b.custom_minimum_size = Vector2(button_w, button_h)
+	# Footer row sits directly under TUTORIALS: two equal art buttons split the primary width around a centre gap.
+	var footer_gap := float(_footer_row.get_theme_constant("separation"))
+	var footer_w := (button_w - footer_gap) * 0.5
+	var footer_h := footer_w / minf(_about_button.art_aspect(), _settings_button.art_aspect())
+	_about_button.custom_minimum_size = Vector2(footer_w, footer_h)
+	_settings_button.custom_minimum_size = Vector2(footer_w, footer_h)
 	var group_h := _button_group.get_combined_minimum_size().y
 
 	var logo_h := minf(safe_w * LOGO_WIDTH_FRACTION / LOGO_ASPECT, safe_h * LOGO_HEIGHT_FRACTION)
 	var logo_w := logo_h * LOGO_ASPECT
 	_logo.custom_minimum_size = Vector2(logo_w, logo_h)
 
-	var bottom_h := _bottom_row.get_combined_minimum_size().y
-	var gaps := root_sep * 3.0 + sep
+	var gaps := root_sep * 2.0 + sep
 	# Preview height is the flexible element: it gets whatever the REAL safe margins (incl. Android insets) leave,
 	# so the stack can never overflow the bottom edge. All other sizes derive from the nominal safe_h above.
 	var avail_h := viewport_size.y - float(_safe_margin.get_theme_constant("margin_top") + _safe_margin.get_theme_constant("margin_bottom"))
-	var preview_h := maxf(avail_h - logo_h - group_h - bottom_h - gaps, safe_h * 0.2)
+	var preview_h := maxf(avail_h - logo_h - group_h - gaps, safe_h * 0.2 + LOGO_LIFT)
 	# The frame is exactly as wide as the primary buttons so both form one aligned column. The 5:6 board is never
 	# stretched: PreviewViewportContainer resizes its viewport to the frame and GridManager fits square cells,
 	# centring the board (side bands when the frame is wider than 5:6, top/bottom bands when taller).
-	_preview_frame.custom_minimum_size = Vector2(button_w, preview_h)
+	_preview_frame.custom_minimum_size = Vector2(frame_w, preview_h)
 
 
 func _maybe_show_fusion_tutorial_nudge() -> void:
@@ -233,8 +248,12 @@ func _maybe_show_fusion_tutorial_nudge() -> void:
 ## NEW GAME (D107). Fresh/settings-only save: starts Level 1 immediately, no popup. Meaningful main progress: asks first;
 ## nothing is erased until START NEW GAME is confirmed. _busy blocks double taps / duplicate callbacks.
 var _busy := false
-# Matches the button art's ~3.13:1 region aspect (1705x545); full-width 9-slice stretched it to ~6.3:1.
-const CONFIRM_BUTTON_SIZE := Vector2(0, 140)
+# Art buttons (label baked in); content rects are the alpha-visible bounds, display width < the 900 px panel.
+const CANCEL_ART := preload("res://assets/ui/dialogs/new_game/bs_btn_new_game_cancel.png")
+const CONFIRM_ART := preload("res://assets/ui/dialogs/new_game/bs_btn_new_game_confirm.png")
+const CANCEL_RECT := Rect2(0.0083, 0.1285, 0.9843, 0.7417)
+const CONFIRM_RECT := Rect2(0.0078, 0.1257, 0.9848, 0.7459)
+const CONFIRM_BUTTON_WIDTH := 780.0
 var _confirm_layer: Control = null
 
 
@@ -287,29 +306,32 @@ func _show_new_game_confirmation() -> void:
 	title.add_theme_font_size_override("font_size", 56)
 	box.add_child(title)
 	var body := Label.new()
-	body.text = "Your current game progress will be reset and you'll start again from Level 1.
-This cannot be undone."
+	body.text = "Starting a new game will erase your current progress and begin again from Level 1.
+
+Are you sure you want to continue?"
 	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_theme_font_size_override("font_size", 34)
 	box.add_child(body)
 	var row := VBoxContainer.new()
-	row.add_theme_constant_override("separation", 48)
+	row.add_theme_constant_override("separation", 20)
 	box.add_child(row)
-	var cancel := Button.new()
-	cancel.text = "CANCEL"
-	cancel.custom_minimum_size = CONFIRM_BUTTON_SIZE
-	cancel.size_flags_horizontal = Control.SIZE_FILL
-	cancel.theme_type_variation = &"SecondaryButton"
+	var cancel := SettingsArtButton.new()
+	cancel.name = "CancelNewGame"
+	cancel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	cancel.art = CANCEL_ART
+	cancel.content_rect = CANCEL_RECT
+	cancel.display_width = CONFIRM_BUTTON_WIDTH
 	cancel.pressed.connect(AudioManager.play_ui_button_press)
 	cancel.pressed.connect(_close_new_game_confirmation)
 	row.add_child(cancel)
-	var confirm := Button.new()
+	BeamButtonGlow.attach(cancel)
+	var confirm := SettingsArtButton.new()
 	confirm.name = "ConfirmNewGame"
-	confirm.text = "START NEW GAME"
-	confirm.custom_minimum_size = CONFIRM_BUTTON_SIZE
-	confirm.size_flags_horizontal = Control.SIZE_FILL
-	confirm.theme_type_variation = &"DangerButton"
+	confirm.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	confirm.art = CONFIRM_ART
+	confirm.content_rect = CONFIRM_RECT
+	confirm.display_width = CONFIRM_BUTTON_WIDTH
 	confirm.pressed.connect(AudioManager.play_ui_button_press)
 	confirm.pressed.connect(func() -> void:
 		if _busy:
@@ -319,7 +341,7 @@ This cannot be undone."
 		if not _busy and _confirm_layer != null:
 			confirm.disabled = false)
 	row.add_child(confirm)
-	BeamUI.bind_dialog_button_fonts(self, [cancel, confirm])
+	BeamButtonGlow.attach(confirm, BeamButtonGlow.RED_ORANGE)
 	add_child(_confirm_layer)
 
 
@@ -337,6 +359,7 @@ func _close_new_game_confirmation() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
 		if _confirm_layer != null:
-			_close_new_game_confirmation() # Back on the popup = CANCEL
+			if not InternetManager.is_blocking():
+				_close_new_game_confirmation() # Back on the popup = CANCEL
 			return
 		GameManager.quit_game()
