@@ -15,8 +15,9 @@ const FALLBACK_PRICES := {
 }
 
 
-## Hosted privacy policy (same URL as both store listings). Empty = Settings hides the
-## button. Must be filled before release: Families/Kids apps must link it in-app.
+## Hosted web copy of the privacy policy (docs/privacy-policy/, GitHub Pages) for the Play Console
+## and App Store Connect listings. NOT opened in-game: Settings > Privacy Policy shows the native
+## screen (privacy_policy_screen.gd) built from PrivacyPolicyText. Empty until Pages is verified live.
 const PRIVACY_POLICY_URL := ""
 
 

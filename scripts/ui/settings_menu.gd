@@ -60,7 +60,6 @@ func _ready_store_rows() -> void:
 
 	_privacy_options.visible = AdManager.is_privacy_options_required()
 	_privacy_options.pressed.connect(_on_privacy_options_pressed)
-	_privacy_policy.visible = StoreConfig.PRIVACY_POLICY_URL != ""
 	_privacy_policy.pressed.connect(_on_privacy_policy_pressed)
 	_about.pressed.connect(func() -> void: GameManager.go_to_about())
 	_about.pressed.connect(AudioManager.play_ui_button_press)
@@ -141,7 +140,8 @@ func _on_privacy_options_closed() -> void:
 
 
 func _on_privacy_policy_pressed() -> void:
-	OS.shell_open(StoreConfig.PRIVACY_POLICY_URL)
+	AudioManager.play_ui_button_press()
+	GameManager.go_to_privacy_policy()
 
 
 func _ready_audio_rows() -> void:

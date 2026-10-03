@@ -1536,3 +1536,9 @@ reintroduce any of it without an explicit owner decision.
   constants are 0.0 because the plates have no transparent padding. Re-measure only if padded art returns.
 - `tools/ui_shots/shoot.sh <WxH> <outdir> [only=a,b]` renders every screen from an isolated COPY of the project
   (never run `ui_shots` against the real project: it writes progress into `SaveManager`).
+
+## Privacy Policy rules (2026-10-03)
+
+- **One canonical text: `PrivacyPolicyText` (`scripts/ui/privacy_policy_text.gd`).** The in-game screen renders it; `docs/privacy-policy/index.html` is GENERATED from it (`tools/privacy/build_policy_html.gd`) and a test fails on drift. Never hand-edit the HTML.
+- **Settings > Privacy Policy opens the native screen (`GameManager.go_to_privacy_policy()`), never `OS.shell_open`.** Back -> Settings. Keep every node inside its ScrollContainer `mouse_filter = IGNORE` (touch-drag/wheel) and the Back button outside the scroll.
+- Any change to what the game stores, sends or integrates (SDKs, permissions, analytics, accounts, ads config) needs the policy text, "Last updated" and `PRIVACY_AUDIT.md` updated in the same change. Audit table + open WARNINGS (AD_ID permission, store-console URL) live in `PRIVACY_AUDIT.md`.
