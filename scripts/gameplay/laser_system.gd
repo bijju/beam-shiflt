@@ -129,6 +129,7 @@ static func simulate(level_data: LevelData, tile_orientations: Dictionary, gate_
 	var remote_emitters_by_link: Dictionary = {} # link_id -> Array[TilePlacement] (Era 2)
 	var fusions: Dictionary = {} # pos -> TilePlacement (Fusion Phase 1)
 	var selectors: Dictionary = {} # pos -> TilePlacement (Splitter Selector, Selector Phase S1)
+	var phase_bit: Dictionary = {} # pos -> bit index in phase_mask (Phase Shifter Stage A), tile-array order
 
 	for t in level_data.tiles:
 		match t.tile_type:
@@ -168,6 +169,8 @@ static func simulate(level_data: LevelData, tile_orientations: Dictionary, gate_
 				fusions[t.position] = t
 			GridTypes.TileType.SPLITTER_SELECTOR:
 				selectors[t.position] = t
+			GridTypes.TileType.PHASE_SHIFTER:
+				phase_bit[t.position] = phase_bit.size()
 
 	# Only pairs with exactly 2 members are functional. An unpaired/over-
 	# paired portal fails safe: the cell is simply inert (treated as an
@@ -197,6 +200,18 @@ static func simulate(level_data: LevelData, tile_orientations: Dictionary, gate_
 	# whole pass, so (position, direction, color) fully determines the
 	# rest of a beam's path - no need to also encode board state in the key.
 	var visited_states: Dictionary = {}
+
+	# PHASE SHIFTER (Phase Shifter Stage A): the one tile whose behaviour changes DURING a pass. Every
+	# Phase Shifter starts each simulate() call in PHASE_A (bit clear); each beam interaction flips its bit.
+	# The mask is shared by every beam of the pass, so interaction ORDER matters and is fixed by the work
+	# list: a LIFO stack seeded with emitters (tile-array order), then remote emitters, then fusion
+	# nodes (Dictionary iteration is insertion-ordered), where each branch runs to completion before the
+	# next pop and splitter/prism branches are pushed as they are met. Since the mask changes what the
+	# SAME (position, direction, colour) leads to, it is part of the visited key - but only on boards that
+	# have a Phase Shifter, so every other board keeps its exact previous keys and behaviour.
+	var phase_mask := 0
+	var phase_hits: Dictionary = {} # pos -> interactions this pass
+	var phase_in_states: Dictionary = {} # pos -> Array of phases (PHASE_A/PHASE_B) met in order
 
 	# Explicit work list instead of recursion, per architecture rule -
 	# splitters push a second branch onto this list rather than calling
@@ -256,6 +271,8 @@ static func simulate(level_data: LevelData, tile_orientations: Dictionary, gate_
 				break
 
 			var state_key := "%d,%d|%d|%d" % [pos.x, pos.y, dir, color]
+			if not phase_bit.is_empty():
+				state_key += "|%d" % phase_mask
 			if visited_states.has(state_key):
 				looped = true
 				break
@@ -367,6 +384,22 @@ static func simulate(level_data: LevelData, tile_orientations: Dictionary, gate_
 					dir = GridTypes.prism_output_direction(dir, color)
 					continue
 
+			if phase_bit.has(pos):
+				# PHASE SHIFTER: PHASE_A passes straight, PHASE_B reflects by the tile's orientation; either way the
+				# interaction flips the phase. The position is recorded as a segment point in both phases so the
+				# result shows every interaction (a straight pass adds a collinear point, harmless for drawing).
+				segments[-1].append(pos)
+				var bit: int = 1 << int(phase_bit[pos])
+				var in_phase := GridTypes.PHASE_B if (phase_mask & bit) != 0 else GridTypes.PHASE_A
+				if in_phase == GridTypes.PHASE_B:
+					dir = GridTypes.reflect(dir, tile_orientations.get(pos, GridTypes.MirrorOrientation.SLASH))
+				phase_mask ^= bit
+				phase_hits[pos] = int(phase_hits.get(pos, 0)) + 1
+				if not phase_in_states.has(pos):
+					phase_in_states[pos] = []
+				phase_in_states[pos].append(in_phase)
+				continue
+
 			if mirrors.has(pos):
 				segments[-1].append(pos)
 				var orientation: int = tile_orientations.get(pos, GridTypes.MirrorOrientation.SLASH)
@@ -417,6 +450,11 @@ static func simulate(level_data: LevelData, tile_orientations: Dictionary, gate_
 		if fused >= 0:
 			fusion_colors[fpos] = fused
 
+	# End-of-pass phase per Phase Shifter = the behaviour the NEXT beam entering it would get (what the tile displays).
+	var phase_final: Dictionary = {}
+	for ppos in phase_bit:
+		phase_final[ppos] = GridTypes.PHASE_B if (phase_mask & (1 << int(phase_bit[ppos]))) != 0 else GridTypes.PHASE_A
+
 	var hazard_hit: bool = hit_hazard_positions.size() > 0
 	var solved: bool = required_count > 0 and required_activated >= required_count and not hazard_hit
 
@@ -438,6 +476,9 @@ static func simulate(level_data: LevelData, tile_orientations: Dictionary, gate_
 		"fusion_input_sides": fusion_inputs,
 		"fusion_states": fusion_states.duplicate(),
 		"selector_hits": selector_hits,
+		"phase_hits": phase_hits,
+		"phase_in_states": phase_in_states,
+		"phase_final": phase_final,
 	}
 
 

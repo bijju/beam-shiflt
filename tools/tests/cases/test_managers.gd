@@ -98,6 +98,7 @@ func test_level_manager_gating() -> void:
 		ok(LevelManager.is_tutorial_level_selectable(12), "QA build opens Era 2 tutorials")
 		ok(LevelManager.is_fusion_tutorial_selectable(LevelManager.FUSION_TUTORIAL_FIRST + 1))
 		ok(LevelManager.is_selector_tutorial_selectable(LevelManager.SELECTOR_TUTORIAL_FIRST + 1))
+		ok(LevelManager.is_phase_tutorial_selectable(LevelManager.PHASE_TUTORIAL_FIRST + 1))
 		return
 	ok(LevelManager.is_tutorial_level_selectable(1))
 	ok(not LevelManager.is_tutorial_level_selectable(5))
@@ -118,6 +119,12 @@ func test_level_manager_gating() -> void:
 	ok(LevelManager.is_selector_tutorial_selectable(LevelManager.SELECTOR_TUTORIAL_FIRST))
 	ok(LevelManager.is_tutorial_level_selectable(LevelManager.SELECTOR_TUTORIAL_FIRST))
 	ok(not LevelManager.is_selector_tutorial_selectable(LevelManager.SELECTOR_TUTORIAL_FIRST + 1))
+	SaveManager.procedural_current_level = LevelManager.PHASE_TUTORIAL_UNLOCK_PROCEDURAL_LEVEL - 1
+	ok(not LevelManager.is_phase_tutorial_selectable(LevelManager.PHASE_TUTORIAL_FIRST), "T35 closed at 679")
+	SaveManager.procedural_current_level = LevelManager.PHASE_TUTORIAL_UNLOCK_PROCEDURAL_LEVEL
+	ok(LevelManager.is_phase_tutorial_selectable(LevelManager.PHASE_TUTORIAL_FIRST), "T35 opens at 680")
+	ok(LevelManager.is_tutorial_level_selectable(LevelManager.PHASE_TUTORIAL_FIRST))
+	ok(not LevelManager.is_phase_tutorial_selectable(LevelManager.PHASE_TUTORIAL_FIRST + 1), "T36 is sequential")
 	SaveManager.fusion_tutorial_nudge_seen = false
 	SaveManager.procedural_current_level = 1
 	ok(not LevelManager.should_show_fusion_tutorial_nudge())
@@ -136,8 +143,8 @@ func test_level_manager_gating() -> void:
 	eq(LevelManager.get_continue_level_id(), 2)
 	ok(LevelManager.is_campaign_level_selectable(1))
 	ok(not LevelManager.is_campaign_level_selectable(60))
-	ok(LevelManager.procedural_generator_version_for_new_play(5) in [2, 3, 4])
-	eq(LevelManager.procedural_generator_version_for_new_play(2001), ProceduralLevelGenerator.GENERATOR_VERSION_V5)
+	eq(LevelManager.procedural_generator_version_for_new_play(5), ProceduralLevelGenerator.GENERATOR_VERSION_V6, "new play is generator V6 (D125)")
+	eq(LevelManager.procedural_generator_version_for_new_play(2001), ProceduralLevelGenerator.GENERATOR_VERSION_V6)
 	eq(LevelManager.get_procedural_level_count(), ProceduralLevelGenerator.MAX_LEVEL)
 	var a := LevelManager.get_procedural_generation_result(2, 2)
 	var b := LevelManager.get_procedural_generation_result(2, 2)

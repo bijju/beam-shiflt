@@ -109,6 +109,12 @@ func hint_requires_ad() -> bool:
 	return is_supported() and not AdConfig.QA_BYPASS_REWARDED
 
 
+## True when a repeated Reset must go through a rewarded ad. Owners of No Forced Ads never
+## see an ad wall on Reset (a core control); the rewarded Hint is unaffected by that.
+func reset_requires_ad() -> bool:
+	return hint_requires_ad() and not forced_ads_removed()
+
+
 func is_rewarded_ready() -> bool:
 	return _sdk_ready and _rewarded_ready
 
@@ -144,6 +150,12 @@ func load_interstitial() -> void:
 ## Returns "started", "busy" (another full-screen ad is up / double tap) or "not_ready"
 ## (a reload was started; the caller keeps the hint unavailable this attempt).
 func show_rewarded_hint(on_result: Callable) -> String:
+	return show_rewarded_action(on_result)
+
+
+## Generic player-initiated rewarded action (Hint, repeated Reset). Same contract as above;
+## it never touches the interstitial counters.
+func show_rewarded_action(on_result: Callable) -> String:
 	if state != State.IDLE:
 		return "busy"
 	if not _sdk_ready or not _rewarded_ready or not _backend.has_rewarded():

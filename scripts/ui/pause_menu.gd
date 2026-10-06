@@ -45,3 +45,9 @@ func _ready() -> void:
 ## Main Menu under a second label. game.gd calls this once per level load.
 func set_level_select_visible(is_visible: bool) -> void:
 	_level_select_button.visible = is_visible
+
+
+## Tutorial sessions: this button's callback goes to Tutorial Select, so the
+## label must say so (it stays "LEVEL SELECT" in the QA campaign path).
+func set_level_select_label(text: String) -> void:
+	_level_select_button.text = text

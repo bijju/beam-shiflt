@@ -35,10 +35,11 @@ const _SPECIAL_KINDS := {
 	GridTypes.TileType.ONE_WAY_REFLECTOR: "one_way",
 	GridTypes.TileType.FUSION: "fusion",
 	GridTypes.TileType.SPLITTER_SELECTOR: "selector",
+	GridTypes.TileType.PHASE_SHIFTER: "phase",
 }
 
 ## Tiles a player can rotate. FUSION is 4-state (one tap = one clockwise step); the rest are two-state.
-const _ROTATABLE_KINDS := [GridTypes.TileType.MIRROR, GridTypes.TileType.SPLITTER, GridTypes.TileType.ONE_WAY_REFLECTOR, GridTypes.TileType.FUSION, GridTypes.TileType.SPLITTER_SELECTOR]
+const _ROTATABLE_KINDS := [GridTypes.TileType.MIRROR, GridTypes.TileType.SPLITTER, GridTypes.TileType.ONE_WAY_REFLECTOR, GridTypes.TileType.FUSION, GridTypes.TileType.SPLITTER_SELECTOR, GridTypes.TileType.PHASE_SHIFTER]
 
 
 ## One player tap on a rotatable tile: a two-state flip, or a Fusion Node's clockwise quarter-turn.
@@ -91,7 +92,7 @@ static func analyze(level: LevelData, solution_orientations: Dictionary, solver_
 		"color_dependency_count": 0, "gate_switch_dependency_count": 0,
 		"portal_dependency_count": 0, "receiver_remote_dependency_count": 0,
 		"prism_branch_count": 0, "one_way_dependency_count": 0,
-		"splitter_dependency_count": 0, "fusion_dependency_count": 0, "selector_dependency_count": 0, "prerequisite_chains": 0,
+		"splitter_dependency_count": 0, "fusion_dependency_count": 0, "selector_dependency_count": 0, "phase_dependency_count": 0, "prerequisite_chains": 0,
 		"selector_count": 0, "selector_load_bearing_count": 0, "selector_interaction_count": 0,
 		"selector_equivalent_state_count": 0, "selector_downstream_depth": 0, "selector": {},
 		"convergence_count": 0, "independent_route_count": 0,
@@ -199,6 +200,8 @@ static func analyze(level: LevelData, solution_orientations: Dictionary, solver_
 				m["fusion_dependency_count"] += 1
 			"selector":
 				m["selector_dependency_count"] += 1
+			"phase":
+				m["phase_dependency_count"] += 1
 		for k in unit_kinds:
 			kinds_all[k] = true
 		for tp in unit["lost"]:
@@ -277,7 +280,7 @@ static func analyze(level: LevelData, solution_orientations: Dictionary, solver_
 	m["meaningful_dependency_count"] = (
 		m["gate_switch_dependency_count"] + m["receiver_remote_dependency_count"]
 		+ m["portal_dependency_count"] + m["color_dependency_count"]
-		+ m["one_way_dependency_count"] + m["splitter_dependency_count"] + m["fusion_dependency_count"] + m["selector_dependency_count"]
+		+ m["one_way_dependency_count"] + m["splitter_dependency_count"] + m["fusion_dependency_count"] + m["selector_dependency_count"] + m["phase_dependency_count"]
 		+ m["shared_resource_count"] + m["convergence_count"]
 	)
 
@@ -381,7 +384,7 @@ static func _progress_score(level: LevelData, r: Dictionary) -> int:
 			special[c] = true
 	var reached := 0
 	for t in level.tiles:
-		if t.tile_type in [GridTypes.TileType.FILTER, GridTypes.TileType.PORTAL, GridTypes.TileType.PRISM, GridTypes.TileType.SPLITTER, GridTypes.TileType.ONE_WAY_REFLECTOR, GridTypes.TileType.GATE, GridTypes.TileType.FUSION, GridTypes.TileType.SPLITTER_SELECTOR] and special.has(t.position):
+		if t.tile_type in [GridTypes.TileType.FILTER, GridTypes.TileType.PORTAL, GridTypes.TileType.PRISM, GridTypes.TileType.SPLITTER, GridTypes.TileType.ONE_WAY_REFLECTOR, GridTypes.TileType.GATE, GridTypes.TileType.FUSION, GridTypes.TileType.SPLITTER_SELECTOR, GridTypes.TileType.PHASE_SHIFTER] and special.has(t.position):
 			reached += 1
 	return (r["activated_targets"].size() * 100 + (r["activated_switch_positions"].size() + r["activated_receiver_positions"].size()) * 10
 		+ reached * 3 + special.size())

@@ -34,7 +34,7 @@ const GROUP_TRIES := 3
 const FEEDER_TRIES := 6
 const CHILD_TRIES := 3
 const ROOT_TRIES := 10
-const _STRAIGHT := ["filter", "gate", "portal", "splitter", "hold", "target", "switch", "hop", "prism", "fusion"]
+const _STRAIGHT := ["filter", "gate", "portal", "splitter", "hold", "target", "switch", "hop", "prism", "fusion", "phase"]
 
 var board: ProceduralBoardV3
 var rng: RandomNumberGenerator
@@ -307,7 +307,7 @@ static func _straight_need(tokens: Array, j: int) -> int:
 		if not _STRAIGHT.has(t["t"]):
 			break
 		n += 1
-		if t["t"] == "portal" or t["t"] == "switch" or t["t"] == "hop" or t["t"] == "prism" or t["t"] == "fusion":
+		if t["t"] == "portal" or t["t"] == "switch" or t["t"] == "hop" or t["t"] == "prism" or t["t"] == "fusion" or t["t"] == "phase":
 			break
 		if t["t"] == "target" and not t.get("mid", false):
 			break
@@ -320,7 +320,7 @@ static func _run_has_hold(tokens: Array, j: int) -> bool:
 	while k < tokens.size() and _STRAIGHT.has(tokens[k]["t"]):
 		if tokens[k]["t"] == "hold":
 			return true
-		if tokens[k]["t"] in ["portal", "switch", "hop", "prism", "fusion"]:
+		if tokens[k]["t"] in ["portal", "switch", "hop", "prism", "fusion", "phase"]:
 			break
 		k += 1
 	return false
@@ -408,9 +408,9 @@ func _group(tokens: Array, i: int, cur: ProceduralBoardV3.Cursor, color_in: int)
 		run.append(tokens[k])
 		var tt_name: String = tokens[k]["t"]
 		k += 1
-		if tt_name in ["portal", "switch", "hop", "prism", "fusion"] or (tt_name == "target" and not run[-1].get("mid", false)):
+		if tt_name in ["portal", "switch", "hop", "prism", "fusion", "phase"] or (tt_name == "target" and not run[-1].get("mid", false)):
 			break
-	var ends: bool = run[-1]["t"] in ["switch", "hop", "prism", "fusion"] or (run[-1]["t"] == "target" and not run[-1].get("mid", false))
+	var ends: bool = run[-1]["t"] in ["switch", "hop", "prism", "fusion", "phase"] or (run[-1]["t"] == "target" and not run[-1].get("mid", false))
 	var cells := _pick_cells(cur, run.size(), ends, _run_needs_tail(tokens, i), run[-1]["t"] == "fusion")
 	if cells.is_empty():
 		_note("cells run=%d" % run.size())
@@ -462,6 +462,12 @@ func _group(tokens: Array, i: int, cur: ProceduralBoardV3.Cursor, color_in: int)
 					return fail
 				for f in tk["feeders"]:
 					deferred.append({"kind": "emitter_line", "line": f})
+			"phase":
+				var exit_cursor := _place_phase(cur, cell, tk)
+				if exit_cursor == null:
+					_note("phase")
+					return fail
+				deferred.append({"kind": "line", "line": tk["after"], "cursor": exit_cursor, "color": color})
 	if board.failure != "":
 		return fail
 	for job in deferred:
@@ -475,7 +481,7 @@ func _group(tokens: Array, i: int, cur: ProceduralBoardV3.Cursor, color_in: int)
 			return fail
 	var last: Dictionary = run[-1]
 	if ends:
-		if last["t"] != "prism" and last["t"] != "fusion":
+		if last["t"] != "prism" and last["t"] != "fusion" and last["t"] != "phase":
 			_cap(cur)
 		if last["t"] == "fusion" and not last["feeders"].is_empty() and int(fusions[last["fid"]]["pending"]) != 0:
 			board.fail("fusion did not receive all its inputs")
@@ -720,6 +726,80 @@ func _place_splitter(cur: ProceduralBoardV3.Cursor, cell: Vector2i, id: String, 
 		_cap_wrong(cell, _opp(bd))
 		return b if board.failure == "" else null
 	return null
+
+
+## Phase gadget (generator V6, D125). The beam arrives along cur.dir. A FIXED splitter S lands at `cell`, a
+## rotatable Phase Shifter P lies `m` cells further on, and two FIXED mirrors carry S's branch round a loop of
+## height `h` to P's side (the geometry of tutorial T38). Simulation order (the documented LIFO contract): the
+## splitter's straight beam runs first, crosses P in PHASE A (straight; P flips to B) and ends on a blocker; the
+## branch then reaches P from the loop side in PHASE B and is reflected back along the shared corridor into S's
+## far side, which turns it away from the loop - that exit beam is the route the rest of the line continues on.
+## P's PHASE B orientation is the one required tap; the other orientation sends the branch into the end blocker.
+## Returns the cursor of the exit route (at S, facing away from the loop) or null (nothing placed).
+func _place_phase(cur: ProceduralBoardV3.Cursor, cell: Vector2i, tk: Dictionary) -> ProceduralBoardV3.Cursor:
+	var d := cur.dir
+	var sides: Array = _perp(d)
+	_shuffle(sides)
+	var shapes: Array = []
+	for m in [1, 2, 3, 4]:
+		for hh in [1, 2, 3]:
+			shapes.append([m, hh])
+	_shuffle(shapes)
+	for u in sides:
+		for sh in shapes:
+			ops += 1
+			if _exhausted():
+				return null
+			if not _phase_fits(cell, d, u, int(sh[0]), int(sh[1])):
+				continue
+			var s := _snap()
+			var c := ProceduralBoardV3.Cursor.new(board, cur.pos, cur.dir)
+			var exit_cursor := _build_phase(c, cell, d, u, int(sh[0]), int(sh[1]), tk)
+			if exit_cursor != null and board.failure == "":
+				cur.pos = c.pos
+				cur.dir = c.dir
+				return exit_cursor
+			_rollback(s)
+	return null
+
+
+## Every cell the gadget needs (tiles, loop and corridor beam cells, the end cap) is free, and the exit route has room.
+func _phase_fits(s_cell: Vector2i, d: int, u: int, m: int, hh: int) -> bool:
+	var p_cell := s_cell + _vec(d) * m
+	var need: Array[Vector2i] = [p_cell, s_cell + _vec(u) * hh, p_cell + _vec(u) * hh]
+	for k in range(1, m):
+		need.append(s_cell + _vec(d) * k)
+		need.append(s_cell + _vec(u) * hh + _vec(d) * k)
+	for k in range(1, hh):
+		need.append(s_cell + _vec(u) * k)
+		need.append(p_cell + _vec(u) * k)
+	for c in need:
+		if not _free_cell(c):
+			return false
+	var cap := p_cell + _vec(d)
+	if _in(cap) and (board.tile_cells.has(cap) or board.path_cells.has(cap)):
+		return false
+	return not _land_list(s_cell, _opp(u)).is_empty()
+
+
+func _build_phase(c: ProceduralBoardV3.Cursor, s_cell: Vector2i, d: int, u: int, m: int, hh: int, tk: Dictionary) -> ProceduralBoardV3.Cursor:
+	var branch := c.to_splitter(s_cell, u, tk["sid"], false)
+	if board.failure != "":
+		return null
+	var p_cell := s_cell + _vec(d) * m
+	var arrive := _opp(u)
+	var o_phase := ProceduralBoardV3.orientation_for(board.pdir(arrive), board.pdir(_opp(d)))
+	if o_phase < 0:
+		board.fail("phase reflection impossible")
+		return null
+	c.to_phase(p_cell, o_phase, tk["pid"])
+	_cap(c)
+	branch.to_turn(s_cell + _vec(u) * hh, d, false)
+	branch.to_turn(p_cell + _vec(u) * hh, arrive, false)
+	branch._approach(p_cell, "phase arrival")
+	if board.failure != "":
+		return null
+	return ProceduralBoardV3.Cursor.new(board, s_cell, _opp(u))
 
 
 func _place_prism(cur: ProceduralBoardV3.Cursor, cell: Vector2i, tk: Dictionary, color: int) -> bool:
@@ -975,7 +1055,7 @@ static func _run_needs_tail(tokens: Array, j: int) -> bool:
 	var last := ""
 	while k < tokens.size() and _STRAIGHT.has(tokens[k]["t"]):
 		last = tokens[k]["t"]
-		if last in ["portal", "switch", "hop", "prism", "fusion"] or (last == "target" and not tokens[k].get("mid", false)):
+		if last in ["portal", "switch", "hop", "prism", "fusion", "phase"] or (last == "target" and not tokens[k].get("mid", false)):
 			return false
 		k += 1
 	return last != ""
@@ -991,7 +1071,7 @@ static func _run_needs_tail(tokens: Array, j: int) -> bool:
 ## that cell, so the intended solution is unchanged). Returns
 ## {hazards, repaired, unrepaired}.
 static func harden(board: ProceduralBoardV3) -> Dictionary:
-	var out := {"hazards": 0, "repaired": 0, "unrepaired": 0, "cross_line": 0, "same_line": 0, "path_overlap": 0}
+	var out := {"hazards": 0, "repaired": 0, "unrepaired": 0, "cross_line": 0, "same_line": 0, "path_overlap": 0, "fixes": []}
 	var level := board.to_level_data(board.w, board.h)
 	var solved: Dictionary = level.get_initial_tile_orientations()
 	for p in board.solution:
@@ -1029,6 +1109,7 @@ static func harden(board: ProceduralBoardV3) -> Dictionary:
 					board.tiles.append(TilePlacement.make_blocker(fx))
 					board.tile_cells[fx] = "blocker"
 					out["repaired"] += 1
+					out["fixes"].append(fx)
 					continue
 				out["unrepaired"] += 1
 				if hz["kind"] == "path":

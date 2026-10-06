@@ -6,6 +6,9 @@ extends Node
 ## nothing is uploaded or synced anywhere, and a failed/cancelled/unavailable sign-in
 ## never blocks play. Android and iOS progression are intentionally separate.
 ##
+## Android + Families: Play Games never starts until the player chose an age range on the neutral age
+## screen, and never for "12 or younger" (AgeGroup.play_games_allowed). Gameplay never depends on it.
+##
 ## Apple has no "sign out" API: signing out only forgets the stored Apple identity here.
 
 signal changed
@@ -24,6 +27,9 @@ var busy := false
 ## Short, player-safe text for the last failed attempt ("" when none).
 var last_message := ""
 
+## How many times the Play Games startup path ran (tests assert it stays 0 until the age range allows it).
+var play_games_setup_attempts := 0
+
 var _sign_in: PlayGamesSignInClient
 var _players: PlayGamesPlayersClient
 var _apple_auth: Object = null
@@ -34,7 +40,7 @@ func _ready() -> void:
 	match OS.get_name():
 		"Android":
 			platform = Platform.ANDROID
-			_setup_play_games()
+			apply_age_group()
 		"iOS":
 			platform = Platform.IOS
 			_load_apple_session()
@@ -42,7 +48,17 @@ func _ready() -> void:
 
 ## True when this platform has a native identity to offer at all.
 func is_supported() -> bool:
+	if platform == Platform.ANDROID:
+		return AgeGroup.play_games_allowed(SaveManager.age_group)
 	return platform != Platform.NONE
+
+
+## Called at launch and right after the age screen: starts Play Games (silent check) only when the
+## saved age range allows it. A no-op for UNKNOWN / 12-or-younger, and when already started.
+func apply_age_group() -> void:
+	if platform == Platform.ANDROID and AgeGroup.play_games_allowed(SaveManager.age_group) and play_games_setup_attempts == 0:
+		_setup_play_games()
+	changed.emit()
 
 
 func service_name() -> String:
@@ -57,6 +73,8 @@ func service_name() -> String:
 ## Connect (Android) / Sign in (iOS). Always safe to call; failures only set last_message.
 func sign_in() -> void:
 	if busy or connected:
+		return
+	if not is_supported():
 		return
 	last_message = ""
 	match platform:
@@ -88,6 +106,7 @@ func sign_out() -> void:
 ## ---- Android: Play Games ----
 
 func _setup_play_games() -> void:
+	play_games_setup_attempts += 1
 	if GodotPlayGameServices.initialize() != GodotPlayGameServices.PlayGamesPluginError.OK:
 		return
 	_sign_in = PlayGamesSignInClient.new()

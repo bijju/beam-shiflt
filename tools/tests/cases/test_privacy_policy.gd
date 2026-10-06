@@ -27,12 +27,66 @@ func test_canonical_text_facts() -> void:
 	ok(PrivacyPolicyText.SECTIONS[13]["heading"].begins_with("14. Contact"))
 
 
+func _section_text(prefix: String) -> String:
+	for s: Dictionary in PrivacyPolicyText.SECTIONS:
+		if String(s["heading"]).begins_with(prefix):
+			var t := ""
+			for b: Variant in s["blocks"]:
+				t += (b if b is String else (b["sub"] if b is Dictionary else "\n".join(b))) + "\n"
+			return t.to_lower()
+	return ""
+
+
+func _has_all(text: String, parts: Array) -> bool:
+	for p: String in parts:
+		if not text.contains(p.to_lower()):
+			return false
+	return true
+
+
+## Families pass: the policy must describe the age screen, Play Games gating and the rewarded-hint
+## confirmation as implemented (concepts, not exact paragraphs - wording may be polished).
+func test_policy_covers_age_screen_play_games_and_rewarded_hint() -> void:
+	var children := _section_text("10.")
+	ok(_has_all(children, ["android", "select an age range", "first time", "12 or younger", "13–17", "18 or older"]), "age selection + ranges")
+	ok(_has_all(children, ["stored only on your device", "exact age", "date of birth"]), "local range, no exact age / DOB")
+	ok(children.contains("does not send it to any beamshift server"), "not sent to BeamShift services")
+	ok(children.contains("child-directed for every player"), "ads child-directed for all")
+	ok(children.contains("not used to personalise ads"), "range never personalises ads")
+	ok(not children.contains("clear app") and not children.contains("clear the app"), "no technical clear-data instructions here")
+	var accounts := _section_text("3.")
+	ok(_has_all(accounts, ["12 or younger", "does not start google play games sign-in", "does not offer"]), "under-13: BeamShift does not start/offer Play Games")
+	ok(_has_all(accounts, ["13–17", "18 or older", "optional"]), "13+: optional")
+	ok(_has_all(accounts, ["never require google play games", "leaderboards", "achievements", "cloud save"]), "Play Games not required / not used for cloud save, leaderboards, achievements")
+	ok(accounts.contains("library") and accounts.contains("may run its own checks"), "provider-initiated startup behaviour is distinguished")
+	ok(not accounts.contains("never initializes") and not accounts.contains("never initialises"), "no absolute Play Games claim")
+	var ads := _section_text("5.")
+	ok(_has_all(ads, ["rewarded hint", "confirm", "cancel", "watch ad", "reward requirement"]), "rewarded confirmation + reward wording")
+	ok(not ads.contains("hint is always given"), "no unconditional hint promise")
+	ok(_has_all(ads, ["child-directed for every player", "maximum content rating g", "not used for advertising"]), "ads child-directed, rating G, age range unused")
+	ok(ads.contains("does not remove these optional ads"), "No Forced Ads keeps rewarded")
+	ok(ads.contains("does not read the android advertising id"), "advertising-ID wording is about BeamShift's own code")
+	ok(not ads.contains("belongs to") and not ads.contains("collects your advertising"), "no claim that BeamShift collects the advertising ID")
+	ok(_section_text("6.").contains("does not remove the optional rewarded hint ads"), "purchase section agrees")
+	var local := _section_text("2.")
+	ok(_has_all(local, ["age range you selected", "never your exact age or date of birth"]), "local list includes the age range")
+	ok(_has_all(_section_text("1."), ["12 or younger", "13–17", "18 or older", "does not use it to personalise ads"]), "summary mentions the age range")
+	ok(_section_text("4.").contains("connectivity-check"), "internet requirement disclosure preserved")
+
+
 func test_web_copy_matches_canonical_text() -> void:
 	var html := FileAccess.get_file_as_string(Builder.OUT)
 	ok(html != "", "docs/privacy-policy/index.html exists")
 	ok(html == Builder.build_html(), "web copy is stale: run tools/privacy/build_policy_html.gd")
 	ok(not html.contains("<script"), "no scripts on the policy page")
 	ok(not html.contains("http://") and not html.contains("src="), "no external dependencies")
+
+
+func test_public_policy_url_constant() -> void:
+	eq(StoreConfig.PRIVACY_POLICY_URL, "https://abhilashdeva.github.io/beamshift-privacy/")
+	ok(StoreConfig.PRIVACY_POLICY_URL.begins_with("https://"), "HTTPS")
+	var src := FileAccess.get_file_as_string("res://scripts/ui/settings_menu.gd") + FileAccess.get_file_as_string("res://scripts/ui/privacy_policy_screen.gd")
+	ok(not src.contains("shell_open"), "no external browser launch from the policy UI")
 
 
 func test_screen_renders_all_sections_and_scrolls() -> void:

@@ -9,7 +9,7 @@
 param(
 	[string]$Godot = "D:\Godot_v4.7.1-stable_win64.exe",
 	[string]$Filter = "",
-	[string]$QaFilter = "ui_screens,game_session,game_flow,managers",
+	[string]$QaFilter = "ui_screens,game_session,game_flow,managers,production_leak",
 	[int]$TimeoutSec = 2400,
 	[switch]$SkipQa
 )

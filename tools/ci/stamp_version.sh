@@ -2,11 +2,19 @@
 # Stamp one release version everywhere it must agree. Run by the release
 # workflow; usable by hand:  tools/ci/stamp_version.sh 1.0.6
 #
-# Derives a monotonic build number from the version (major*10000 +
-# minor*100 + patch, so 1.0.6 -> 10006) and rewrites:
-#   export_presets.cfg  both Android presets  version/name + version/code
+# Rewrites:
+#   export_presets.cfg  both Android presets  version/name (+ version/code, see below)
 #   export_presets.cfg  iOS preset            application/short_version + application/version
 #   project.godot                             config/version (the credits screen reads it)
+#
+# Android versionCode is NOT derived from the version name (1.0.2 would give
+# 10002, below an already-used 10006). It is an independent monotonic counter:
+#   ANDROID_VERSION_CODE=10007 tools/ci/stamp_version.sh 1.0.3   -> sets 10007
+#   tools/ci/stamp_version.sh 1.0.3                              -> keeps the preset's code
+# The value must be an integer, >= the code already in the presets (never
+# lower), and both Android presets must currently agree.
+# iOS CFBundleVersion still derives from the version (major*10000 + minor*100
+# + patch), as before.
 #
 # Optional env, set by the workflow when the Apple secrets exist:
 #   IOS_BUILD_RUN     -> "RUN.ATTEMPT" (GitHub run_number.run_attempt); makes the iOS
@@ -32,24 +40,41 @@ if (( minor > 99 || patch > 99 )); then
   echo "minor and patch must stay below 100 to keep build codes monotonic" >&2
   exit 2
 fi
-code=$(( major * 10000 + minor * 100 + patch ))
+ios_code=$(( major * 10000 + minor * 100 + patch ))
 
 # iOS CFBundleVersion: 1-3 period-separated integers. "CODE.RUN.ATTEMPT" is numeric,
 # App Store compatible, deterministic per (version, run) and strictly increases for
 # a given marketing version because run_number only ever grows.
-ios_build="$code"
+ios_build="$ios_code"
 run_suffix="${IOS_BUILD_RUN:-}"
 if [ -n "$run_suffix" ]; then
   if ! [[ "$run_suffix" =~ ^[0-9]+\.[0-9]+$ ]]; then
     echo "stamp failed: IOS_BUILD_RUN must be RUN.ATTEMPT (got '$run_suffix')" >&2
     exit 2
   fi
-  ios_build="$code.$run_suffix"
+  ios_build="$ios_code.$run_suffix"
 fi
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 presets="$root/export_presets.cfg"
 project="$root/project.godot"
+
+# Android versionCode: explicit override, else keep what the presets already carry.
+current_codes=$(grep -E '^version/code=[0-9]+$' "$presets" | cut -d= -f2 | sort -u)
+if [ "$(printf '%s
+' "$current_codes" | grep -c .)" != 1 ]; then
+  echo "stamp failed: the Android presets must carry one identical version/code (found: $(echo $current_codes))" >&2
+  exit 1
+fi
+code="${ANDROID_VERSION_CODE:-$current_codes}"
+if ! [[ "$code" =~ ^[0-9]+$ ]] || (( code > 2100000000 )); then
+  echo "stamp failed: ANDROID_VERSION_CODE must be an integer <= 2100000000 (got '$code')" >&2
+  exit 2
+fi
+if (( code < current_codes )); then
+  echo "stamp failed: android versionCode $code is lower than the current $current_codes (must never decrease)" >&2
+  exit 1
+fi
 
 # sub FILE PATTERN REPLACEMENT EXPECTED_COUNT LABEL
 sub() {
@@ -92,4 +117,4 @@ if [ -n "$pname" ]; then
       "application/provisioning_profile_specifier_release=\"$esc\"" 1 "ios profile name"
 fi
 
-echo "stamped version=$version build_code=$code ios_build=$ios_build team=${team:--} profile=${uuid:--} profile_name=${pname:--}"
+echo "stamped version=$version android_code=$code ios_build=$ios_build team=${team:--} profile=${uuid:--} profile_name=${pname:--}"

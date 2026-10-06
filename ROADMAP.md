@@ -676,3 +676,16 @@ Phase 3 (D101): the Fusion tutorial pack T21-T28, generator-V4 fragment variants
 ## Procedural Levels 2001-3000 (generator V5, Selector Phase S3, 2026-09-25)
 
 Built (uncommitted): generator V5 = the V4 pipeline + Splitter Selector fragments, bands G-K continuing the late-V4 curve (Level 2001 must feel like progression after 2000, never a reset), `MAX_LEVEL` = 3000 (the CURRENT certification boundary, not a permanent ceiling), T29 available before the introduction (unlock at procedural Level 1900). Difficulty grows through dependency/interaction complexity, never tile size (`MAX_COLUMNS` 8), padding or clutter; exact optimality is UNKNOWN on large state spaces. Status: S3 implemented / NOT certified; S3.1 pass 1 added S-M and reduced bounded J/K demotion, but full certification remains. Next: finish S3.1 (full J/K windows or lower generation cost, remaining families S-I/S-K/S-O, fair decoy routes, stronger minimality/shortcut screens), then manual play review of the V5 TEST levels, then S4 (Android build; measure on-device generation time). See `NEXT_AI_PROMPT.md`. Not planned without a request: Levels 3001+, chained Fusion, Selector families S-I/S-K/S-O.
+
+
+## Phase Shifter + 4000-level progression (D124) - Stages A+B done, C-E planned
+
+Done: Phase Shifter mechanic, tile, tests, T35-T39, unlock at procedural Level 680. Planned (not started): V6 generator + new 1-4000 difficulty curve (Medium at Level 50),
+`MAX_LEVEL` 3000 -> 4000, Phase generation from ~Level 701, Grandmaster bands 3001-4000, Level 4000 master puzzle, bulk QA. See `DECISIONS.md` D124.
+
+
+## Stages C-E (generator V6, D125) - 2026-10-06, UNCOMMITTED, no APK/AAB, Android verification PENDING
+
+- V6 (`ProceduralContractV6`) generates all new procedural play, Levels 1-4000; V1-V5 frozen (387/387 historical fingerprints identical); `MAX_LEVEL` 4000; Medium starts at 50; Phase from 701, Selector from 2001, Grandmaster 3001-3999, Level 4000 Master Puzzle; Phase gadget composer; archetypes / complexity budget / challenge / relief; tutorial unlocks Fusion 380 / Phase 680 / Selector 1980.
+- Bulk QA of all 4000 levels: 0 fallbacks, 0 validation failures; avg 1.6 s per level desktop (max 12.5 s). 22% of levels sit below their band move floor (tile budget); Grandmaster boards are dense; Selector share below policy. See DECISIONS.md D125 and PROCEDURAL_GENERATION.md section 21.
+- Not verified: any physical device, phone generation time, APK export contents, visual review on a real screen.

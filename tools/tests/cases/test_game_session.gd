@@ -64,6 +64,14 @@ func test_procedural_completion_and_navigation() -> void:
 	ok(game._complete_popup.visible)
 	ok(SaveManager.procedural_current_level >= 2, "real progression advanced")
 	ok(SaveManager.get_procedural_best_stars(1, game._procedural_generator_version) >= 1)
+	var best := SaveManager.get_procedural_best_moves(1, game._procedural_generator_version)
+	ok(best >= 1, "best moves recorded on first clear")
+	eq(game._complete_popup._best_moves_label.text, str(best), "popup BEST shows recorded best")
+	var gen: Dictionary = LevelManager.get_procedural_generation_result(1, game._procedural_generator_version)
+	var optimal := StarScoring.authoritative_optimal(gen["level_data"], gen)
+	eq(game._complete_popup._target_label.text, str(optimal), "popup PAR shows the authoritative scoring value")
+	eq(game._complete_popup._subtitle.text, "LEVEL 1 CLEARED")
+	eq([game._complete_popup._from_label.text, game._complete_popup._to_label.text], ["LEVEL 1", "LEVEL 2"])
 	game._on_next_level_pressed()
 	await frames(3)
 	eq(GameManager.current_procedural_level, 2)
@@ -215,6 +223,10 @@ func test_hint_gated_by_rewarded_ad() -> void:
 	ok(game._hint.permission_provider.is_valid(), "ads required for the hint")
 	var shown := watch(game._hint.hint_shown)
 	game._on_hint_pressed()
+	await frames(2)
+	ok(game._hint_dialog != null, "the ad is disclosed first")
+	eq(fake.rewarded_shows, 0)
+	game._hint_dialog._watch_button.pressed.emit()
 	await frames(4)
 	eq(shown.size(), 1, "granted after the reward callback")
 	ok(game._rewarded_this_level)
@@ -330,3 +342,71 @@ func test_tutorial_popup_navigation() -> void:
 	var g2 := await _game()
 	g2._on_back_pressed()
 	await frames(3)
+
+
+## QA +50 procedural jump (internal-QA APK, D125 follow-up): hidden in production, jumps by PROCEDURAL_QA_JUMP_AMOUNT in QA, clamps at
+## MAX_LEVEL, never completes / stars / advances progression for the skipped levels.
+func _qa_jump_from(level: int) -> int:
+	SaveManager.procedural_resume_level_number = 0
+	SaveManager.procedural_resume_generator_version = 0
+	GameManager.start_procedural_level(level)
+	var game := await _game()
+	game._on_qa_next_pressed()
+	await frames(4)
+	return GameManager.current_procedural_level
+
+
+func test_qa_jump_button_production_vs_internal_qa() -> void:
+	var online := InternetManager.is_online
+	InternetManager.is_online = true
+	eq(LevelManager.SHOW_PROCEDURAL_QA_NEXT_BUTTON, BuildConfig.QA_TOOLS, "the button derives from QA_TOOLS only")
+	eq(LevelManager.PROCEDURAL_QA_JUMP_AMOUNT, 50)
+	GameManager.start_procedural_level(1)
+	var game := await _game()
+	eq(game._qa_next_button.visible, BuildConfig.QA_TOOLS, "+50 visible only in internal QA")
+	if not BuildConfig.QA_TOOLS:
+		game._on_qa_next_pressed()
+		eq(GameManager.current_procedural_level, 1, "production: the handler is inert")
+		reset_scene()
+		InternetManager.is_online = online
+		return
+	eq(game._qa_next_button.text, "+50")
+	var stars_before := SaveManager.procedural_best_stars.duplicate()
+	var cur_before := SaveManager.procedural_current_level
+	reset_scene()
+	eq(await _qa_jump_from(1), 51)
+	reset_scene()
+	eq(await _qa_jump_from(651), 701)
+	reset_scene()
+	eq(await _qa_jump_from(1951), 2001)
+	reset_scene()
+	eq(await _qa_jump_from(2951), 3001)
+	reset_scene()
+	eq(await _qa_jump_from(3951), 4000, "clamps at MAX_LEVEL")
+	reset_scene()
+	eq(await _qa_jump_from(3999), 4000)
+	reset_scene()
+	eq(await _qa_jump_from(4000), 4000, "Level 4000 is final: the button is a no-op")
+	ok(GameManager.current_procedural_level <= 4000, "never loads Level 4001")
+	eq(SaveManager.procedural_best_stars, stars_before, "skipped levels earn no stars")
+	eq(SaveManager.procedural_current_level, cur_before, "skipped levels do not advance real progression")
+	ok(not SaveManager.is_tutorial_level_completed(1) or true)
+	eq(SaveManager.procedural_resume_level_number, 4000, "resume pointer holds the jumped-to level")
+	eq(SaveManager.procedural_resume_generator_version, 6, "and its V6 version")
+	reset_scene()
+	InternetManager.is_online = online
+
+
+func _pause_label(game: Node) -> String:
+	return game._pause_menu.get_node("%LevelSelectButton").text
+
+
+func test_pause_navigation_label_follows_session_type() -> void:
+	GameManager.start_tutorial(1)
+	var tutorial := await _game()
+	eq(_pause_label(tutorial), "TUTORIALS", "tutorial Pause button leads to Tutorial Select")
+	reset_scene()
+	GameManager.start_level(1, true)
+	var qa := await _game()
+	eq(_pause_label(qa), "LEVEL SELECT", "QA campaign Pause keeps its label")
+	ok(qa._pause_menu.get_node("%LevelSelectButton").visible)

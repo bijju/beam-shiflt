@@ -443,3 +443,19 @@ T29 ("Select Path") unlocks at procedural Level 1900 (`LevelManager.SELECTOR_TUT
 Status (2026-09-25): T29-T34 are COMPLETE and unchanged by S3/S3.1; T29 unlocks at procedural Level 1900, T30-T34 sequential, tutorials are ad-free, QA builds unlock all, hint entries are hand-authored.
 
 External-test status (2026-09-26): with `BuildConfig.BUILD_MODE = MODE_EXTERNAL_TEST`, QA unlock-all is off. T29 still unlocks from real procedural progression at Level 1900 or normal tutorial sequential progress; T30-T34 remain sequential. No QA tutorial labels or tutorial debug overlay are visible because `BuildConfig.QA_TOOLS` is false.
+
+
+## 16. Phase Shifter tutorial pack T35-T39 (Phase Shifter Stage B, `DECISIONS.md` D124)
+
+One idea each, existing step types only (MESSAGE, REQUIRE_TILE_TAP, WAIT_FOR_PUZZLE_SOLVED), hint entries hand-authored in `levels/hint_solutions.json` (the builder skips ids >= 21).
+T35 Phase Pass (PHASE A passes straight; the shifter is locked, one mirror tap) - T36 Phase Reflect (the beam loops back and meets PHASE B; a RED filter on the return path makes
+only the returning beam light the RED target) - T37 Phase Cycle (splitter + rectangular loop: visits A, B, A; the shifter is required - removing it leaves the target dark) - T38 Split Phase (Phase + Splitter: the straight beam flips the tile first,
+the branch meets PHASE B) - T39 Phase Trial (Phase + Splitter + Switch + Gate, free play, 2 taps). `test_phase_tutorials.gd` brute-forces every orientation combination:
+exactly one solution each, equal to the hint entry; forced taps never solve early. Unlock: T35 at procedural Level 680 (`LevelManager.PHASE_TUTORIAL_UNLOCK_PROCEDURAL_LEVEL`) or via
+`tutorial_highest_unlocked_level`, T36-T39 sequential, QA flag opens all, never a hard gate. The displayed core is the END-OF-PASS phase, so after a beam passes once the tile reads PHASE B;
+T35's message says so. Do not create T40+ without being asked.
+
+
+## Tutorial unlock alignment under generator V6 (D125)
+
+Fusion pack T21-T28 now opens at procedural Level 380 (was 150), Selector pack T29-T34 at 1980 (was 1900), Phase pack T35-T39 stays at 680; each opens ~20 levels before the mechanic is a main procedural mechanic (401 / 2001 / 701). Saves that earned a pack under the old thresholds keep it (SaveManager._apply_data); completed tutorial history is untouched; tutorials never gate procedural levels. T37 was re-rendered (tools/ui_shots `only=t37_seq`): text fits above the board, the board stays visible, the A->B->A explanation says the second visit reflects, nothing implies the third visit lights the target - no change needed.

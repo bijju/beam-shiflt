@@ -15,7 +15,6 @@ var _root: Control
 var _title: Label
 var _status: Label
 var _retry_button: Button
-var _quit_button: Button
 
 
 func _ready() -> void:
@@ -79,10 +78,6 @@ func _refresh_status() -> void:
 func _on_retry_pressed() -> void:
 	AudioManager.play_ui_button_press()
 	InternetManager.retry()
-
-
-func _on_quit_pressed() -> void:
-	get_tree().quit()
 
 
 func _build_ui() -> void:
@@ -151,14 +146,5 @@ func _build_ui() -> void:
 	_retry_button.pressed.connect(_on_retry_pressed)
 	box.add_child(_retry_button)
 	var buttons: Array = [_retry_button]
-
-	if not OS.has_feature("mobile"):
-		_quit_button = Button.new()
-		_quit_button.text = "QUIT"
-		_quit_button.theme_type_variation = &"SecondaryButton"
-		_quit_button.custom_minimum_size = Vector2(0, BeamUI.BUTTON_HEIGHT_COMPACT)
-		_quit_button.pressed.connect(_on_quit_pressed)
-		box.add_child(_quit_button)
-		buttons.append(_quit_button)
 
 	BeamUI.bind_dialog_button_fonts(_root, buttons)

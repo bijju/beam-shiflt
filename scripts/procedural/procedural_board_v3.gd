@@ -256,6 +256,8 @@ static func ascii(level: LevelData) -> String:
 				c = "@"
 			GridTypes.TileType.SPLITTER_SELECTOR:
 				c = "&"
+			GridTypes.TileType.PHASE_SHIFTER:
+				c = "Z" if slash else "z"
 			GridTypes.TileType.BEAM_RECEIVER:
 				c = "R"
 			GridTypes.TileType.BLOCKER:
@@ -359,7 +361,7 @@ class Cursor extends RefCounted:
 		dir = new_dir
 		return self
 
-	func to_splitter(cell: Vector2i, branch_dir: int, node: String = "") -> Cursor:
+	func to_splitter(cell: Vector2i, branch_dir: int, node: String = "", rotatable: bool = true) -> Cursor:
 		var o := ProceduralBoardV3.orientation_for(board.pdir(dir), board.pdir(branch_dir))
 		if o < 0:
 			board.fail("splitter at %s cannot branch dir %d to %d" % [cell, dir, branch_dir])
@@ -367,12 +369,31 @@ class Cursor extends RefCounted:
 		if not _land(cell, "splitter"):
 			return Cursor.new(board, cell, branch_dir)
 		var pp := board.phys(cell)
-		board.solution[pp] = o
-		board.start[pp] = ProceduralBoardV3.opposite(o)
-		board.tiles.append(TilePlacement.make_splitter(pp, ProceduralBoardV3.opposite(o), true))
+		if rotatable:
+			board.solution[pp] = o
+			board.start[pp] = ProceduralBoardV3.opposite(o)
+			board.tiles.append(TilePlacement.make_splitter(pp, ProceduralBoardV3.opposite(o), true))
+		else:
+			# Generator V6 Phase gadget: a FIXED splitter in its solved orientation (a rotatable one would let the
+			# straight beam feed the loop's exit route directly - a shortcut around the Phase Shifter).
+			board.tiles.append(TilePlacement.make_splitter(pp, o, false))
 		board.tile_cells[pp] = "splitter"
 		board._register(node, pp)
 		return Cursor.new(board, cell, branch_dir) # this cursor continues straight
+
+	## Phase Shifter on the beam's ray (generator V6). PHASE A passes the beam straight, so the cursor does not
+	## turn; `solved_o` (a PHYSICAL orientation) is the reflection the tile needs in PHASE B. One required tap:
+	## it starts in the other orientation. The tile never joins the keep-correct pool (its decision is the point).
+	func to_phase(cell: Vector2i, solved_o: int, node: String = "") -> Cursor:
+		if not _land(cell, "phase shifter"):
+			return self
+		var pp := board.phys(cell)
+		board.solution[pp] = solved_o
+		board.start[pp] = ProceduralBoardV3.opposite(solved_o)
+		board.tiles.append(TilePlacement.make_phase_shifter(pp, ProceduralBoardV3.opposite(solved_o), true))
+		board.tile_cells[pp] = "phase"
+		board._register(node, pp)
+		return self
 
 	## One-way reflector used as a turn (the beam reflects). Shared cells
 	## behave like shared mirrors.

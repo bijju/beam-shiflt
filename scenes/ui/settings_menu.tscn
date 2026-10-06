@@ -9,8 +9,25 @@
 [ext_resource type="Texture2D" path="res://assets/ui/settings/bs_btn_account.png" id="9"]
 [ext_resource type="Texture2D" path="res://assets/ui/settings/bs_btn_restore_purchases.png" id="10"]
 [ext_resource type="Texture2D" path="res://assets/ui/settings/bs_btn_about_us.png" id="11"]
-[ext_resource type="Texture2D" path="res://assets/ui/settings/bs_btn_no_forced_ads.png" id="12"]
+[ext_resource type="Texture2D" path="res://assets/ui/settings/bs_btn_ad_free.png" id="12"]
 [ext_resource type="Texture2D" path="res://assets/ui/branding/bs_logo_main_menu_portrait.png" id="5"]
+[ext_resource type="Script" path="res://scripts/ui/settings_section_frame.gd" id="13"]
+[ext_resource type="Texture2D" path="res://assets/ui/settings/settings_icon_sound_effects.png" id="14"]
+[ext_resource type="Texture2D" path="res://assets/ui/settings/settings_icon_music.png" id="15"]
+[ext_resource type="Texture2D" path="res://assets/ui/settings/settings_icon_privacy.png" id="16"]
+[ext_resource type="Texture2D" path="res://assets/ui/settings/settings_icon_chevron_right.png" id="17"]
+
+[sub_resource type="StyleBoxFlat" id="AboutIconBox"]
+bg_color = Color(0.03, 0.12, 0.24, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.3, 0.86, 1, 1)
+corner_radius_top_left = 40
+corner_radius_top_right = 40
+corner_radius_bottom_right = 40
+corner_radius_bottom_left = 40
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_logo"]
 atlas = ExtResource("5")
@@ -95,39 +112,53 @@ horizontal_scroll_mode = 0
 [node name="Sections" type="VBoxContainer" parent="SafeMargin/Layout/Scroll"]
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_vertical = 3
-theme_override_constants/separation = 26
+theme_override_constants/separation = 30
 
 [node name="AudioPanel" type="PanelContainer" parent="SafeMargin/Layout/Scroll/Sections"]
 layout_mode = 2
-size_flags_vertical = 3
+script = ExtResource("13")
 
-[node name="Box" type="VBoxContainer" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel"]
+[node name="Content" type="MarginContainer" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel"]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_constants/margin_left = 84
+theme_override_constants/margin_top = 28
+theme_override_constants/margin_right = 84
+theme_override_constants/margin_bottom = 64
 
-[node name="AudioHeading" type="Label" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Box"]
+[node name="Box" type="VBoxContainer" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Content"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="AudioHeading" type="Label" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Content/Box"]
+custom_minimum_size = Vector2(0, 60)
 layout_mode = 2
 theme_type_variation = &"SectionLabel"
+theme_override_colors/font_color = Color(0.93, 0.97, 1, 1)
+theme_override_font_sizes/font_size = 40
 text = "AUDIO"
+vertical_alignment = 1
 
-[node name="Body" type="VBoxContainer" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Box"]
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/separation = 24
-alignment = 1
-
-[node name="SoundRow" type="HBoxContainer" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Box/Body"]
+[node name="SoundRow" type="HBoxContainer" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Content/Box"]
 layout_mode = 2
 theme_override_constants/separation = 24
 
-[node name="SoundLabel" type="Label" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Box/Body/SoundRow"]
+[node name="SoundIcon" type="TextureRect" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Content/Box/SoundRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(84, 84)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+texture = ExtResource("14")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="SoundLabel" type="Label" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Content/Box/SoundRow"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 44
+theme_override_font_sizes/font_size = 40
 text = "Sound effects"
 
-[node name="SoundToggle" type="Button" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Box/Body/SoundRow"]
+[node name="SoundToggle" type="Button" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Content/Box/SoundRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 4
@@ -135,24 +166,34 @@ toggle_mode = true
 script = ExtResource("6")
 art = ExtResource("8")
 content_rect = Rect2(0.1087, 0.0387, 0.7762, 0.9337)
-display_width = 250.0
+display_width = 230.0
 
-[node name="Rule" type="ColorRect" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Box/Body"]
+[node name="Rule" type="ColorRect" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Content/Box"]
 custom_minimum_size = Vector2(0, 2)
 layout_mode = 2
 color = Color(0.3, 0.86, 1, 0.22)
 
-[node name="MusicRow" type="HBoxContainer" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Box/Body"]
+[node name="MusicRow" type="HBoxContainer" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Content/Box"]
 layout_mode = 2
 theme_override_constants/separation = 24
 
-[node name="MusicLabel" type="Label" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Box/Body/MusicRow"]
+[node name="MusicIcon" type="TextureRect" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Content/Box/MusicRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(84, 84)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+texture = ExtResource("15")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="MusicLabel" type="Label" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Content/Box/MusicRow"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 44
+theme_override_font_sizes/font_size = 40
 text = "Music"
 
-[node name="MusicToggle" type="Button" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Box/Body/MusicRow"]
+[node name="MusicToggle" type="Button" parent="SafeMargin/Layout/Scroll/Sections/AudioPanel/Content/Box/MusicRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 4
@@ -160,74 +201,92 @@ toggle_mode = true
 script = ExtResource("6")
 art = ExtResource("8")
 content_rect = Rect2(0.1087, 0.0387, 0.7762, 0.9337)
-display_width = 250.0
+display_width = 230.0
 
 [node name="CloudSection" type="PanelContainer" parent="SafeMargin/Layout/Scroll/Sections"]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_vertical = 3
+script = ExtResource("13")
 
-[node name="Box" type="VBoxContainer" parent="SafeMargin/Layout/Scroll/Sections/CloudSection"]
+[node name="Content" type="MarginContainer" parent="SafeMargin/Layout/Scroll/Sections/CloudSection"]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_constants/margin_left = 84
+theme_override_constants/margin_top = 28
+theme_override_constants/margin_right = 84
+theme_override_constants/margin_bottom = 64
 
-[node name="AccountHeading" type="Label" parent="SafeMargin/Layout/Scroll/Sections/CloudSection/Box"]
+[node name="Box" type="VBoxContainer" parent="SafeMargin/Layout/Scroll/Sections/CloudSection/Content"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="AccountHeading" type="Label" parent="SafeMargin/Layout/Scroll/Sections/CloudSection/Content/Box"]
+custom_minimum_size = Vector2(0, 60)
 layout_mode = 2
 theme_type_variation = &"SectionLabel"
+theme_override_colors/font_color = Color(0.93, 0.97, 1, 1)
+theme_override_font_sizes/font_size = 40
 text = "ACCOUNT"
+vertical_alignment = 1
 
-[node name="Body" type="VBoxContainer" parent="SafeMargin/Layout/Scroll/Sections/CloudSection/Box"]
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/separation = 24
-alignment = 1
-
-[node name="CloudStatusLabel" type="Label" parent="SafeMargin/Layout/Scroll/Sections/CloudSection/Box/Body"]
+[node name="CloudNameLabel" type="Label" parent="SafeMargin/Layout/Scroll/Sections/CloudSection/Content/Box"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 42
+horizontal_alignment = 1
+
+[node name="CloudStatusLabel" type="Label" parent="SafeMargin/Layout/Scroll/Sections/CloudSection/Content/Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"DimLabel"
+theme_override_font_sizes/font_size = 30
+horizontal_alignment = 1
 autowrap_mode = 3
 
-[node name="CloudSignInButton" type="Button" parent="SafeMargin/Layout/Scroll/Sections/CloudSection/Box/Body"]
+[node name="CloudSignInButton" type="Button" parent="SafeMargin/Layout/Scroll/Sections/CloudSection/Content/Box"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 4
 script = ExtResource("6")
 art = ExtResource("9")
 content_rect = Rect2(0.0055, 0.2293, 0.989, 0.5691)
-display_width = 640.0
+display_width = 560.0
 
 [node name="StoreSection" type="PanelContainer" parent="SafeMargin/Layout/Scroll/Sections"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
-size_flags_vertical = 3
+script = ExtResource("13")
 
-[node name="Box" type="VBoxContainer" parent="SafeMargin/Layout/Scroll/Sections/StoreSection"]
+[node name="Content" type="MarginContainer" parent="SafeMargin/Layout/Scroll/Sections/StoreSection"]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_constants/margin_left = 84
+theme_override_constants/margin_top = 28
+theme_override_constants/margin_right = 84
+theme_override_constants/margin_bottom = 64
 
-[node name="StoreHeading" type="Label" parent="SafeMargin/Layout/Scroll/Sections/StoreSection/Box"]
+[node name="Box" type="VBoxContainer" parent="SafeMargin/Layout/Scroll/Sections/StoreSection/Content"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="StoreHeading" type="Label" parent="SafeMargin/Layout/Scroll/Sections/StoreSection/Content/Box"]
+custom_minimum_size = Vector2(0, 60)
 layout_mode = 2
 theme_type_variation = &"SectionLabel"
+theme_override_colors/font_color = Color(0.93, 0.97, 1, 1)
+theme_override_font_sizes/font_size = 40
 text = "ADS & PURCHASES"
+vertical_alignment = 1
 
-[node name="Body" type="VBoxContainer" parent="SafeMargin/Layout/Scroll/Sections/StoreSection/Box"]
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/separation = 24
-alignment = 1
-
-[node name="BuyNoForcedAdsButton" type="Button" parent="SafeMargin/Layout/Scroll/Sections/StoreSection/Box/Body"]
+[node name="BuyNoForcedAdsButton" type="Button" parent="SafeMargin/Layout/Scroll/Sections/StoreSection/Content/Box"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 4
 script = ExtResource("6")
 art = ExtResource("12")
-content_rect = Rect2(0.0046, 0.2155, 0.9908, 0.5912)
+content_rect = Rect2(0.0101, 0.1519, 0.9797, 0.6547)
 display_width = 700.0
 
-[node name="PriceLabel" type="Label" parent="SafeMargin/Layout/Scroll/Sections/StoreSection/Box/Body/BuyNoForcedAdsButton"]
+[node name="PriceLabel" type="Label" parent="SafeMargin/Layout/Scroll/Sections/StoreSection/Content/Box/BuyNoForcedAdsButton"]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
@@ -242,7 +301,7 @@ theme_override_font_sizes/font_size = 44
 horizontal_alignment = 2
 vertical_alignment = 1
 
-[node name="StoreStatusLabel" type="Label" parent="SafeMargin/Layout/Scroll/Sections/StoreSection/Box/Body"]
+[node name="StoreStatusLabel" type="Label" parent="SafeMargin/Layout/Scroll/Sections/StoreSection/Content/Box"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
@@ -250,7 +309,7 @@ theme_override_font_sizes/font_size = 30
 horizontal_alignment = 1
 autowrap_mode = 3
 
-[node name="RestorePurchasesButton" type="Button" parent="SafeMargin/Layout/Scroll/Sections/StoreSection/Box/Body"]
+[node name="RestorePurchasesButton" type="Button" parent="SafeMargin/Layout/Scroll/Sections/StoreSection/Content/Box"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 4
@@ -259,11 +318,31 @@ art = ExtResource("10")
 content_rect = Rect2(0.0046, 0.1934, 0.9908, 0.6243)
 display_width = 600.0
 
-[node name="LegalRow" type="VBoxContainer" parent="SafeMargin/Layout/Scroll/Sections"]
+[node name="PrivacyPanel" type="PanelContainer" parent="SafeMargin/Layout/Scroll/Sections"]
 layout_mode = 2
-theme_override_constants/separation = 18
+script = ExtResource("13")
 
-[node name="PrivacyOptionsButton" type="Button" parent="SafeMargin/Layout/Scroll/Sections/LegalRow"]
+[node name="Content" type="MarginContainer" parent="SafeMargin/Layout/Scroll/Sections/PrivacyPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 84
+theme_override_constants/margin_top = 28
+theme_override_constants/margin_right = 84
+theme_override_constants/margin_bottom = 64
+
+[node name="Box" type="VBoxContainer" parent="SafeMargin/Layout/Scroll/Sections/PrivacyPanel/Content"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="PrivacyHeading" type="Label" parent="SafeMargin/Layout/Scroll/Sections/PrivacyPanel/Content/Box"]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+theme_type_variation = &"SectionLabel"
+theme_override_colors/font_color = Color(0.93, 0.97, 1, 1)
+theme_override_font_sizes/font_size = 40
+text = "PRIVACY & INFO"
+vertical_alignment = 1
+
+[node name="PrivacyOptionsButton" type="Button" parent="SafeMargin/Layout/Scroll/Sections/PrivacyPanel/Content/Box"]
 unique_name_in_owner = true
 visible = false
 custom_minimum_size = Vector2(0, 100)
@@ -272,15 +351,108 @@ theme_type_variation = &"GhostButton"
 theme_override_font_sizes/font_size = 34
 text = "PRIVACY OPTIONS"
 
-[node name="PrivacyPolicyButton" type="Button" parent="SafeMargin/Layout/Scroll/Sections/LegalRow"]
+[node name="PrivacyPolicyButton" type="Button" parent="SafeMargin/Layout/Scroll/Sections/PrivacyPanel/Content/Box"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 100)
+custom_minimum_size = Vector2(0, 116)
 layout_mode = 2
 theme_type_variation = &"GhostButton"
-theme_override_font_sizes/font_size = 34
-text = "PRIVACY POLICY"
 
-[node name="StoreMessageLabel" type="Label" parent="SafeMargin/Layout/Scroll/Sections/LegalRow"]
+[node name="Row" type="HBoxContainer" parent="SafeMargin/Layout/Scroll/Sections/PrivacyPanel/Content/Box/PrivacyPolicyButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_right = -24.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 24
+
+[node name="PrivacyIcon" type="TextureRect" parent="SafeMargin/Layout/Scroll/Sections/PrivacyPanel/Content/Box/PrivacyPolicyButton/Row"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(76, 76)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+texture = ExtResource("16")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="SafeMargin/Layout/Scroll/Sections/PrivacyPanel/Content/Box/PrivacyPolicyButton/Row"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_font_sizes/font_size = 38
+text = "PRIVACY POLICY"
+vertical_alignment = 1
+
+[node name="PrivacyChevron" type="TextureRect" parent="SafeMargin/Layout/Scroll/Sections/PrivacyPanel/Content/Box/PrivacyPolicyButton/Row"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(48, 48)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+texture = ExtResource("17")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="AboutButton" type="Button" parent="SafeMargin/Layout/Scroll/Sections/PrivacyPanel/Content/Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 116)
+layout_mode = 2
+theme_type_variation = &"GhostButton"
+
+[node name="Row" type="HBoxContainer" parent="SafeMargin/Layout/Scroll/Sections/PrivacyPanel/Content/Box/AboutButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_right = -24.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 24
+
+[node name="AboutIcon" type="Panel" parent="SafeMargin/Layout/Scroll/Sections/PrivacyPanel/Content/Box/AboutButton/Row"]
+custom_minimum_size = Vector2(60, 60)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+theme_override_styles/panel = SubResource("AboutIconBox")
+
+[node name="I" type="Label" parent="SafeMargin/Layout/Scroll/Sections/PrivacyPanel/Content/Box/AboutButton/Row/AboutIcon"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.62, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 40
+text = "i"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Label" type="Label" parent="SafeMargin/Layout/Scroll/Sections/PrivacyPanel/Content/Box/AboutButton/Row"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_font_sizes/font_size = 38
+text = "ABOUT US"
+vertical_alignment = 1
+
+[node name="AboutChevron" type="TextureRect" parent="SafeMargin/Layout/Scroll/Sections/PrivacyPanel/Content/Box/AboutButton/Row"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(48, 48)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+texture = ExtResource("17")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="StoreMessageLabel" type="Label" parent="SafeMargin/Layout/Scroll/Sections/PrivacyPanel/Content/Box"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
@@ -291,19 +463,10 @@ autowrap_mode = 3
 [node name="Footer" type="VBoxContainer" parent="SafeMargin/Layout"]
 layout_mode = 2
 size_flags_vertical = 8
-theme_override_constants/separation = 14
-
-[node name="AboutButton" type="Button" parent="SafeMargin/Layout/Footer"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 4
-script = ExtResource("6")
-art = ExtResource("11")
-content_rect = Rect2(0.0055, 0.1961, 0.9871, 0.6133)
-display_width = 520.0
+theme_override_constants/separation = 10
 
 [node name="Logo" type="TextureRect" parent="SafeMargin/Layout/Footer"]
-custom_minimum_size = Vector2(0, 220)
+custom_minimum_size = Vector2(0, 330)
 layout_mode = 2
 mouse_filter = 2
 texture = SubResource("AtlasTexture_logo")

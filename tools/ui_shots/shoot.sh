@@ -6,4 +6,4 @@ SRC="$(pwd -W)"; DST="$(cygpath -w "${TEMP:-/tmp}")\bs_shots"
 MSYS2_ARG_CONV_EXCL="*" robocopy "$SRC" "$DST" /MIR /XD android builds .git .claude /NFL /NDL /NJH /NJS /NP > /dev/null
 sed -i 's|^config/name="BeamShift"$|config/name="BeamShift"\nconfig/use_custom_user_dir=true\nconfig/custom_user_dir_name="BeamShiftShotsTmp"|' "$(cygpath -u "$DST")/project.godot"
 rm -rf "$APPDATA/BeamShiftShotsTmp"
-/d/Godot_v4.7.1-stable_win64.exe --path "$DST" --resolution "$1" res://tools/ui_shots/ui_shots.tscn -- out="$2" $3 2>&1 | grep -i "error\|MGLOW" | grep -v "BUG: Unref\|leaked\|PagedAlloc" | head -30
+/d/Godot_v4.7.1-stable_win64.exe --path "$DST" --resolution "$1" res://tools/ui_shots/ui_shots.tscn -- out="$2" $3 2>&1 | grep -i "error\|MGLOW|PEAK" | grep -v "BUG: Unref\|leaked\|PagedAlloc" | head -30

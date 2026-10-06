@@ -115,8 +115,8 @@ and the app is NOT in the Kids category. Changing `CHILD_DIRECTED` is a policy d
 
 `AdBackendAdMob` now hands the plugin **named methods only** (inline lambdas stored in the plugin's static slots crash iOS on swipe-away under Godot
 4.7), `release()` empties those slots from `AdManager._exit_tree()`, and a **consent watchdog** (`AdConfig.CONSENT_TIMEOUT_SECONDS = 8`) starts the SDK
-if UMP never calls back. The Settings screen has the PRIVACY OPTIONS entry (visible only when required) and a PRIVACY POLICY link
-(`StoreConfig.PRIVACY_POLICY_URL`, hidden while empty - must be filled before release).
+if UMP never calls back. The Settings screen has the PRIVACY OPTIONS entry (visible only when required) and a PRIVACY POLICY entry (native screen)
+(opens the native screen; `StoreConfig.PRIVACY_POLICY_URL` is the live public URL for store consoles).
 
 ### 6c. No Forced Ads (IAP)
 
@@ -191,3 +191,9 @@ AdMob rules, ids and switches are untouched. Normal procedural levels that conta
 ## Android production ids / test devices (2026-09-26)
 
 Production Android ids are stamped from environment by `tools/ci/stamp_store_config.sh android` (ADMOB_ANDROID_APP_ID / _REWARDED_ID / _INTERSTITIAL_ID); a production build never falls back to Google sample ids (missing ids => ads off, hints free). AdMob shows the app as "Requires review" - expected, limited serving until approved. Developer test devices: put AdMob hashed device ids (from logcat after the first run: "Use RequestConfiguration.Builder().setTestDeviceIds(...)") as a JSON array in gitignored `config/ad_test_devices.local.json`; `AdBackendAdMob` passes them to `RequestConfiguration`. Register your device before tapping live ads (invalid-traffic risk).
+
+## Rewarded-Hint confirmation + age range (2026-10-03)
+
+- **Rewarded Hint now asks first.** `game.gd._hint_permission` opens `HintAdDialog` ("GET A HINT?" / "Watch a short ad to reveal a hint." / CANCEL / WATCH AD) only when a rewarded ad is READY and none is showing. WATCH AD runs the existing `AdManager.show_rewarded_hint` (no second implementation); CANCEL and Android Back change nothing. When no ad could start (not ready / busy) the previous feedback is kept without a dialog; tutorials, V*/QA sessions and desktop have no permission provider and no dialog. "No Forced Ads" does not remove the dialog or the rewarded hint (interstitials only).
+- **Age range never changes ads.** The Android age screen (`AgeGroup`) only decides whether optional Play Games may start. `AdConfig.CHILD_DIRECTED` stays `true` for every group (TFCD + TFUA + max rating G); ad scripts must not reference `AgeGroup` (tested in `test_families.gd`). No personalised / adult-targeted path exists.
+- The privacy policy states this (section 5) without promising an ad frequency. Deprecated TFCD/TFUA calls are still documented as functional by Google (replacement `setAgeRestrictedTreatment`, not exposed by Poing 5.1.0).

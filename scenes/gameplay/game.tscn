@@ -8,7 +8,8 @@
 [ext_resource type="Texture2D" path="res://assets/backgrounds/gameplay/bs_bg_gameplay.png" id="6"]
 [ext_resource type="Texture2D" path="res://assets/ui/hud/bs_hud_top_portrait.png" id="7"]
 [ext_resource type="Texture2D" path="res://assets/ui/hud/bs_hud_bottom_portrait.png" id="8"]
-[ext_resource type="Texture2D" path="res://assets/ui/icons/bs_ui_icon_back_runtime.png" id="9"]
+[ext_resource type="Texture2D" path="res://assets/ui/settings/bs_btn_settings_back.png" id="9"]
+[ext_resource type="Script" path="res://scripts/ui/settings_art_button.gd" id="bsab"]
 [ext_resource type="Texture2D" path="res://assets/ui/icons/bs_ui_icon_reset_runtime.png" id="10"]
 [ext_resource type="Texture2D" path="res://assets/ui/icons/bs_ui_icon_pause_runtime.png" id="11"]
 [ext_resource type="Texture2D" path="res://assets/ui/icons/bs_ui_icon_hint_runtime.png" id="12"]
@@ -91,35 +92,19 @@ layout_mode = 1
 anchors_preset = 4
 anchor_top = 0.5
 anchor_bottom = 0.5
-offset_left = 18.0
-offset_top = -56.0
-offset_right = 130.0
-offset_bottom = 56.0
+offset_left = 14.0
+offset_top = -60.0
+offset_right = 224.0
+offset_bottom = 60.0
 grow_vertical = 2
-theme_type_variation = &"IconButton"
-text = ""
-
-[node name="BackIcon" type="TextureRect" parent="SafeMargin/Layout/TopBar/BackButton"]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -32.0
-offset_top = -32.0
-offset_right = 32.0
-offset_bottom = 32.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-texture = ExtResource("9")
-expand_mode = 1
-stretch_mode = 5
+script = ExtResource("bsab")
+art = ExtResource("9")
+content_rect = Rect2(0.035, 0.0304, 0.9249, 0.9669)
+display_width = 210.0
 
 [node name="LeftSlot" type="Control" parent="SafeMargin/Layout/TopBar"]
 layout_mode = 1
-anchor_left = 0.16
+anchor_left = 0.25
 anchor_right = 0.62
 anchor_bottom = 1.0
 grow_horizontal = 2
@@ -214,10 +199,10 @@ anchor_left = 0.18
 anchor_top = 0.5
 anchor_right = 0.18
 anchor_bottom = 0.5
-offset_left = -72.0
-offset_top = -72.0
-offset_right = 72.0
-offset_bottom = 72.0
+offset_left = -75.0
+offset_top = -85.0
+offset_right = 75.0
+offset_bottom = 85.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_type_variation = &"IconButton"
@@ -230,16 +215,36 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -42.0
-offset_top = -42.0
-offset_right = 42.0
-offset_bottom = 42.0
+offset_left = -54.0
+offset_top = -78.0
+offset_right = 54.0
+offset_bottom = 30.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 texture = ExtResource("12")
 expand_mode = 1
 stretch_mode = 5
+
+[node name="HintLabel" type="Label" parent="SafeMargin/Layout/BottomBar/HintButton"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -70.0
+offset_top = -50.0
+offset_right = 70.0
+offset_bottom = -8.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.72, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 26
+text = "HINT"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="ResetButton" type="Button" parent="SafeMargin/Layout/BottomBar"]
 unique_name_in_owner = true
@@ -250,10 +255,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -72.0
-offset_top = -72.0
-offset_right = 72.0
-offset_bottom = 72.0
+offset_left = -75.0
+offset_top = -85.0
+offset_right = 75.0
+offset_bottom = 85.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_type_variation = &"IconButton"
@@ -266,16 +271,36 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -42.0
-offset_top = -42.0
-offset_right = 42.0
-offset_bottom = 42.0
+offset_left = -54.0
+offset_top = -78.0
+offset_right = 54.0
+offset_bottom = 30.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 texture = ExtResource("10")
 expand_mode = 1
 stretch_mode = 5
+
+[node name="ResetLabel" type="Label" parent="SafeMargin/Layout/BottomBar/ResetButton"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -70.0
+offset_top = -50.0
+offset_right = 70.0
+offset_bottom = -8.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.72, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 26
+text = "RESET"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="PauseButton" type="Button" parent="SafeMargin/Layout/BottomBar"]
 unique_name_in_owner = true
@@ -286,10 +311,10 @@ anchor_left = 0.82
 anchor_top = 0.5
 anchor_right = 0.82
 anchor_bottom = 0.5
-offset_left = -72.0
-offset_top = -72.0
-offset_right = 72.0
-offset_bottom = 72.0
+offset_left = -75.0
+offset_top = -85.0
+offset_right = 75.0
+offset_bottom = 85.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_type_variation = &"IconButton"
@@ -302,16 +327,36 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -42.0
-offset_top = -42.0
-offset_right = 42.0
-offset_bottom = 42.0
+offset_left = -54.0
+offset_top = -78.0
+offset_right = 54.0
+offset_bottom = 30.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 texture = ExtResource("11")
 expand_mode = 1
 stretch_mode = 5
+
+[node name="PauseLabel" type="Label" parent="SafeMargin/Layout/BottomBar/PauseButton"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -70.0
+offset_top = -50.0
+offset_right = 70.0
+offset_bottom = -8.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.72, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 26
+text = "PAUSE"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="QANextButton" type="Button" parent="SafeMargin/Layout/BottomBar"]
 unique_name_in_owner = true

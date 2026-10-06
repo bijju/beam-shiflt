@@ -57,7 +57,6 @@ const BOTTOM_BREATHING := 28.0
 ## BaseButton (the common ancestor of Button/TextureButton) so this
 ## reference works regardless of which control type the scene uses.
 @onready var _settings_button: MenuArtButton = %SettingsButton
-@onready var _quit_button: Button = %QuitButton
 @onready var _about_button: MenuArtButton = %AboutButton
 @onready var _footer_row: HBoxContainer = %FooterRow
 @onready var _qa_spacer: Control = %QASpacer
@@ -71,14 +70,13 @@ func _ready() -> void:
 	_continue_button.pressed.connect(func() -> void: GameManager.continue_game())
 	_tutorial_button.pressed.connect(func() -> void: GameManager.go_to_tutorial_select())
 	_settings_button.pressed.connect(func() -> void: GameManager.go_to_settings())
-	_quit_button.pressed.connect(func() -> void: GameManager.quit_game())
 	_about_button.pressed.connect(func() -> void: GameManager.go_to_about())
 	_qa_level_select_button.pressed.connect(func() -> void: GameManager.go_to_level_select())
 
 	# Centralized UI SFX (see AUDIO_SYSTEM.md): one extra signal connection
 	# per button, calling AudioManager directly - never a second navigation
 	# path, never a duplicated AudioStreamPlayer.
-	for button in [_play_button, _continue_button, _tutorial_button, _settings_button, _about_button, _quit_button, _qa_level_select_button]:
+	for button in [_play_button, _continue_button, _tutorial_button, _settings_button, _about_button, _qa_level_select_button]:
 		button.pressed.connect(AudioManager.play_ui_button_press)
 
 	# Phase 3 (Procedural Generator V1, see PROCEDURAL_GENERATION.md):
@@ -89,10 +87,6 @@ func _ready() -> void:
 	_continue_button.disabled = not SaveManager.has_resumable_procedural_game()
 	for b in [_continue_button, _play_button, _tutorial_button, _about_button, _settings_button]:
 		BeamButtonGlow.attach(b)
-
-	# Godot's quit() call is intended for desktop; on mobile the OS back
-	# gesture/button is the platform-expected way to leave the app.
-	_quit_button.visible = not OS.has_feature("mobile")
 
 	# Level Select is QA/dev-only now (Phase 2) - reuses the same "QA
 	# build" signal UNLOCK_ALL_CAMPAIGN_LEVELS_FOR_TESTING already gates

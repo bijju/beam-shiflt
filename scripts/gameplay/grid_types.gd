@@ -15,7 +15,15 @@ enum TileType {
 	FUSION,
 	## Splitter Selector (Selector Phase S1): appended, existing values keep their identity.
 	SPLITTER_SELECTOR,
+	## Phase Shifter (Phase Shifter Stage A): appended, existing values keep their identity.
+	PHASE_SHIFTER,
 }
+
+## Phase Shifter simulation phase (runtime only, never stored in level data or saves): a beam passes
+## STRAIGHT in PHASE_A, is reflected by the tile's MirrorOrientation in PHASE_B; every interaction
+## flips the phase. Every simulate() pass starts every Phase Shifter in PHASE_A.
+const PHASE_A := 0
+const PHASE_B := 1
 
 enum Direction { UP, RIGHT, DOWN, LEFT }
 

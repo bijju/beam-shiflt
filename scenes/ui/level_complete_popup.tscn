@@ -2,7 +2,10 @@
 
 [ext_resource type="Script" path="res://scripts/ui/level_complete_popup.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/ui/safe_area_margin.gd" id="2"]
-[ext_resource type="Texture2D" path="res://assets/ui/level_select/bs_ui_star_unearned_runtime.png" id="4"]
+[ext_resource type="Texture2D" path="res://assets/ui/level_complete/level_complete_star_gold.png" id="4"]
+[ext_resource type="Script" path="res://scripts/ui/hslice_texture.gd" id="9"]
+[ext_resource type="Texture2D" path="res://assets/ui/level_complete/level_complete_result_badge.png" id="10"]
+[ext_resource type="Texture2D" path="res://assets/ui/level_complete/level_complete_stats_panel.png" id="11"]
 [ext_resource type="Script" path="res://scripts/ui/settings_art_button.gd" id="5"]
 [ext_resource type="Texture2D" path="res://assets/ui/level_complete/bs_btn_complete_next_level.png" id="6"]
 [ext_resource type="Texture2D" path="res://assets/ui/level_complete/bs_btn_complete_retry.png" id="7"]
@@ -36,7 +39,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("2")
 horizontal_margin_override = 44.0
-vertical_margin_override = 140.0
+vertical_margin_override = 90.0
 
 [node name="Panel" type="PanelContainer" parent="SafeMargin"]
 unique_name_in_owner = true
@@ -45,113 +48,328 @@ theme_type_variation = &"DialogPanel"
 
 [node name="VBox" type="VBoxContainer" parent="SafeMargin/Panel"]
 layout_mode = 2
-theme_override_constants/separation = 30
+theme_override_constants/separation = 14
 
 [node name="Title" type="Label" parent="SafeMargin/Panel/VBox"]
+unique_name_in_owner = true
 layout_mode = 2
 theme_type_variation = &"TitleLabel"
 text = "LEVEL COMPLETE"
 horizontal_alignment = 1
+
+[node name="SubtitleLabel" type="Label" parent="SafeMargin/Panel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.86, 1, 1)
+theme_override_font_sizes/font_size = 38
+text = "LEVEL 1 CLEARED"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="Rule" type="ColorRect" parent="SafeMargin/Panel/VBox"]
 custom_minimum_size = Vector2(0, 3)
 layout_mode = 2
 color = Color(0.3, 0.86, 1, 0.45)
 
-[node name="StarsRow" type="HBoxContainer" parent="SafeMargin/Panel/VBox"]
+[node name="StarsHolder" type="Control" parent="SafeMargin/Panel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 308)
+layout_mode = 2
+clip_contents = true
+
+[node name="BackFx" type="Control" parent="SafeMargin/Panel/VBox/StarsHolder"]
+unique_name_in_owner = true
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="StarsRow" type="HBoxContainer" parent="SafeMargin/Panel/VBox/StarsHolder"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+alignment = 1
+theme_override_constants/separation = 0
+
+[node name="Slot1" type="Control" parent="SafeMargin/Panel/VBox/StarsHolder/StarsRow"]
+custom_minimum_size = Vector2(304, 300)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Center1" type="CenterContainer" parent="SafeMargin/Panel/VBox/StarsHolder/StarsRow/Slot1"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Star1" type="TextureRect" parent="SafeMargin/Panel/VBox/StarsHolder/StarsRow/Slot1/Center1"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(236, 226)
+layout_mode = 2
+mouse_filter = 2
+texture = ExtResource("4")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Slot2" type="Control" parent="SafeMargin/Panel/VBox/StarsHolder/StarsRow"]
+custom_minimum_size = Vector2(304, 300)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Center2" type="CenterContainer" parent="SafeMargin/Panel/VBox/StarsHolder/StarsRow/Slot2"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Star2" type="TextureRect" parent="SafeMargin/Panel/VBox/StarsHolder/StarsRow/Slot2/Center2"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(236, 226)
+layout_mode = 2
+mouse_filter = 2
+texture = ExtResource("4")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Slot3" type="Control" parent="SafeMargin/Panel/VBox/StarsHolder/StarsRow"]
+custom_minimum_size = Vector2(304, 300)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Center3" type="CenterContainer" parent="SafeMargin/Panel/VBox/StarsHolder/StarsRow/Slot3"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Star3" type="TextureRect" parent="SafeMargin/Panel/VBox/StarsHolder/StarsRow/Slot3/Center3"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(236, 226)
+layout_mode = 2
+mouse_filter = 2
+texture = ExtResource("4")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="FrontFx" type="Control" parent="SafeMargin/Panel/VBox/StarsHolder"]
+unique_name_in_owner = true
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="BadgeHolder" type="Control" parent="SafeMargin/Panel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 220)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="BadgeArt" type="Control" parent="SafeMargin/Panel/VBox/BadgeHolder"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("9")
+texture = ExtResource("10")
+cap_src = 780.0
+src_y = 80.0
+src_h = 540.0
+
+[node name="BadgeFx" type="Control" parent="SafeMargin/Panel/VBox/BadgeHolder"]
+unique_name_in_owner = true
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+clip_contents = true
+
+[node name="BadgeText" type="VBoxContainer" parent="SafeMargin/Panel/VBox/BadgeHolder"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+alignment = 1
+theme_override_constants/separation = 0
+
+[node name="ResultLabel" type="Label" parent="SafeMargin/Panel/VBox/BadgeHolder/BadgeText"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.83, 0.3, 1)
+theme_override_font_sizes/font_size = 66
+text = "PERFECT CLEAR!"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ResultSubLabel" type="Label" parent="SafeMargin/Panel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.93, 1, 1)
+theme_override_font_sizes/font_size = 32
+text = "3 STAR CLEAR"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="HintUsedLabel" type="Label" parent="SafeMargin/Panel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"SectionLabel"
+theme_override_font_sizes/font_size = 28
+visible = false
+text = "HINT USED - MAX 2 STARS THIS RUN"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="EraTransitionLabel" type="Label" parent="SafeMargin/Panel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.75, 1, 1)
+theme_override_font_sizes/font_size = 30
+visible = false
+autowrap_mode = 2
+text = "ERA 2 — REFRACTIONS UNLOCKED
+New tutorials (T11–T20) are now available."
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="StatsHolder" type="Control" parent="SafeMargin/Panel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 270)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="StatsArt" type="Control" parent="SafeMargin/Panel/VBox/StatsHolder"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("9")
+texture = ExtResource("11")
+cap_src = 730.0
+src_y = 100.0
+src_h = 560.0
+arrange_columns = true
+
+[node name="MovesCol" type="VBoxContainer" parent="SafeMargin/Panel/VBox/StatsHolder/StatsArt"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+alignment = 1
+theme_override_constants/separation = 0
+
+[node name="MovesCaption" type="Label" parent="SafeMargin/Panel/VBox/StatsHolder/StatsArt/MovesCol"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 26
+text = "MOVES USED"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="MovesValueLabel" type="Label" parent="SafeMargin/Panel/VBox/StatsHolder/StatsArt/MovesCol"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.98, 1, 1)
+theme_override_font_sizes/font_size = 64
+text = "--"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="TargetCol" type="VBoxContainer" parent="SafeMargin/Panel/VBox/StatsHolder/StatsArt"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+alignment = 1
+theme_override_constants/separation = 0
+
+[node name="TargetCaption" type="Label" parent="SafeMargin/Panel/VBox/StatsHolder/StatsArt/TargetCol"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 26
+text = "PAR"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="TargetValueLabel" type="Label" parent="SafeMargin/Panel/VBox/StatsHolder/StatsArt/TargetCol"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.98, 1, 1)
+theme_override_font_sizes/font_size = 64
+text = "--"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BestCol" type="VBoxContainer" parent="SafeMargin/Panel/VBox/StatsHolder/StatsArt"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+alignment = 1
+theme_override_constants/separation = 0
+
+[node name="BestCaption" type="Label" parent="SafeMargin/Panel/VBox/StatsHolder/StatsArt/BestCol"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 26
+text = "BEST"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BestMovesValueLabel" type="Label" parent="SafeMargin/Panel/VBox/StatsHolder/StatsArt/BestCol"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.98, 1, 1)
+theme_override_font_sizes/font_size = 64
+text = "--"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ProgressRow" type="HBoxContainer" parent="SafeMargin/Panel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 24
+
+[node name="FromLabel" type="Label" parent="SafeMargin/Panel/VBox/ProgressRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.98, 1, 1)
+theme_override_font_sizes/font_size = 40
+text = "LEVEL 1"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ArrowLabel" type="Label" parent="SafeMargin/Panel/VBox/ProgressRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 44
+text = "→"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ToLabel" type="Label" parent="SafeMargin/Panel/VBox/ProgressRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.83, 0.3, 1)
+theme_override_font_sizes/font_size = 40
+text = "LEVEL 2"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ButtonRow" type="VBoxContainer" parent="SafeMargin/Panel/VBox"]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 alignment = 1
 theme_override_constants/separation = 20
-
-[node name="Star1" type="TextureRect" parent="SafeMargin/Panel/VBox/StarsRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(190, 190)
-layout_mode = 2
-texture = ExtResource("4")
-expand_mode = 1
-stretch_mode = 5
-
-[node name="Star2" type="TextureRect" parent="SafeMargin/Panel/VBox/StarsRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(190, 190)
-layout_mode = 2
-size_flags_vertical = 4
-texture = ExtResource("4")
-expand_mode = 1
-stretch_mode = 5
-
-[node name="Star3" type="TextureRect" parent="SafeMargin/Panel/VBox/StarsRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(190, 190)
-layout_mode = 2
-texture = ExtResource("4")
-expand_mode = 1
-stretch_mode = 5
-
-[node name="EraTransitionLabel" type="Label" parent="SafeMargin/Panel/VBox"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
-theme_override_colors/font_color = Color(0.4, 0.75, 1, 1)
-theme_override_font_sizes/font_size = 30
-text = "ERA 2 — REFRACTIONS UNLOCKED
-New tutorials (T11–T20) are now available."
-horizontal_alignment = 1
-autowrap_mode = 2
-
-[node name="HintUsedLabel" type="Label" parent="SafeMargin/Panel/VBox"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
-theme_type_variation = &"SectionLabel"
-text = "HINT USED"
-horizontal_alignment = 1
-
-[node name="StatsCard" type="PanelContainer" parent="SafeMargin/Panel/VBox"]
-layout_mode = 2
-theme_type_variation = &"CardPanel"
-
-[node name="Stats" type="VBoxContainer" parent="SafeMargin/Panel/VBox/StatsCard"]
-layout_mode = 2
-theme_override_constants/separation = 14
-
-[node name="MovesRow" type="HBoxContainer" parent="SafeMargin/Panel/VBox/StatsCard/Stats"]
-layout_mode = 2
-
-[node name="MovesLabel" type="Label" parent="SafeMargin/Panel/VBox/StatsCard/Stats/MovesRow"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 42
-text = "Moves used"
-
-[node name="MovesValueLabel" type="Label" parent="SafeMargin/Panel/VBox/StatsCard/Stats/MovesRow"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_type_variation = &"SectionLabel"
-theme_override_font_sizes/font_size = 48
-text = "0"
-
-[node name="BestMovesRow" type="HBoxContainer" parent="SafeMargin/Panel/VBox/StatsCard/Stats"]
-unique_name_in_owner = true
-layout_mode = 2
-
-[node name="BestMovesLabel" type="Label" parent="SafeMargin/Panel/VBox/StatsCard/Stats/BestMovesRow"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 36
-text = "Best moves"
-
-[node name="BestMovesValueLabel" type="Label" parent="SafeMargin/Panel/VBox/StatsCard/Stats/BestMovesRow"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_type_variation = &"DimLabel"
-theme_override_font_sizes/font_size = 40
-text = "0"
-
-[node name="ButtonRow" type="VBoxContainer" parent="SafeMargin/Panel/VBox"]
-layout_mode = 2
-theme_override_constants/separation = 10
 
 [node name="NextLevelButton" type="Button" parent="SafeMargin/Panel/VBox/ButtonRow"]
 unique_name_in_owner = true
@@ -160,7 +378,7 @@ size_flags_horizontal = 4
 script = ExtResource("5")
 art = ExtResource("6")
 content_rect = Rect2(0.0092, 0.1367, 0.9820, 0.7238)
-display_width = 760.0
+display_width = 880.0
 
 [node name="RetryButton" type="Button" parent="SafeMargin/Panel/VBox/ButtonRow"]
 unique_name_in_owner = true
@@ -169,7 +387,7 @@ size_flags_horizontal = 4
 script = ExtResource("5")
 art = ExtResource("7")
 content_rect = Rect2(0.0078, 0.1326, 0.9848, 0.7334)
-display_width = 760.0
+display_width = 705.0
 
 [node name="LevelSelectButton" type="Button" parent="SafeMargin/Panel/VBox/ButtonRow"]
 unique_name_in_owner = true
@@ -178,4 +396,5 @@ size_flags_horizontal = 4
 script = ExtResource("5")
 art = ExtResource("8")
 content_rect = Rect2(0.0083, 0.1285, 0.9839, 0.7403)
-display_width = 760.0
+display_width = 620.0
+

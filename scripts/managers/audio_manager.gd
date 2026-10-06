@@ -142,7 +142,7 @@ func set_sfx_volume_linear(volume: float) -> void:
 	AudioServer.set_bus_volume_db(_ui_bus_idx, db)
 
 
-func _play(key: String) -> void:
+func _play(key: String, pitch: float = 1.0) -> void:
 	if not _streams.has(key):
 		return
 	var config: Dictionary = SFX_TABLE[key]
@@ -151,6 +151,7 @@ func _play(key: String) -> void:
 	player.stream = _streams[key]
 	player.bus = config["bus"]
 	player.volume_db = config["gain_db"]
+	player.pitch_scale = pitch
 	player.play()
 
 
@@ -253,12 +254,10 @@ func play_level_complete() -> void:
 	_play("level_complete")
 
 
-## Registered and playable, but not currently called - LevelCompletePopup
-## reveals all 3 star icons at once (show_result()), never one at a time,
-## so there is no real per-star reveal event to hook. See
+## Played once per earned star by LevelCompletePopup's reveal sequence; `pitch` rises per star. See
 ## AUDIO_SYSTEM.md.
-func play_star_appear() -> void:
-	_play("star_appear")
+func play_star_appear(pitch: float = 1.0) -> void:
+	_play("star_appear", pitch)
 
 
 func play_tutorial_step() -> void:

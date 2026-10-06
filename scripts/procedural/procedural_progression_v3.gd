@@ -28,6 +28,12 @@ const GENERATOR_VERSION_FUSION := 4
 ## Selector-capable progression (Selector Phase S3, D110): the V4 pipeline + Splitter Selector fragments, Levels
 ## 2001-3000. A NEW version (not a mutation of V4): V1-V4 stay frozen and a saved puzzle regenerates under its own.
 const GENERATOR_VERSION_SELECTOR := 5
+## V6 (Stages C-E, D125): Levels 1-4000 on the V6 contract (ProceduralContractV6) - the same pipeline + the Phase gadget, new curve, archetypes, budget.
+const GENERATOR_VERSION_V6 := 6
+## rng stream index of the once-per-level Phase roll.
+const PHASE_ROLL_STREAM := 92
+## Level 4000 gets a much wider search window than any other level (its full profile is required, see generate()).
+const MASTER_MAX_ATTEMPTS := 192
 ## V5 boards carry up to ~34 required moves on 8x11/8x12, so more placement attempts are allowed than in V3/V4.
 const MAX_ATTEMPTS_V5 := 64
 ## Attempts that keep trying the level's rolled Selector family before falling back to an ordinary V5 recipe
@@ -75,12 +81,18 @@ static func generate(level_number: int, version: int = GENERATOR_VERSION) -> Dic
 	# The level's ONE Fusion roll (dedicated rng stream, never re-rolled per attempt). The recipe is tried for
 	# the first FUSION_ATTEMPTS attempts; if it cannot be placed/accepted the level falls back to an ordinary
 	# recipe rather than to V2 (the realised Fusion share is reported by fusion_progression_sample).
+	var v6 := version >= GENERATOR_VERSION_V6
+	var v6_ctx: Dictionary = _v6_context(level_number, version) if v6 else {}
 	var fusion_recipe: Array[String] = []
-	if fusion_enabled:
+	if v6:
+		fusion_recipe.assign(v6_ctx["fusion_recipe"])
+	elif fusion_enabled:
 		fusion_recipe = ProceduralFragmentsV3.roll_fusion_recipe(level_number, ProceduralSeed.rng_for_attempt(level_number, version, FUSION_ROLL_STREAM))
 	# Generator V5 (D110): the level's ONE Selector roll (dedicated stream). A Fusion family forces a Fusion recipe.
 	var selector_spec: Dictionary = {}
-	if version >= GENERATOR_VERSION_SELECTOR:
+	if v6:
+		selector_spec = v6_ctx["selector_spec"] # V6 rolls Fusion / Selector / Phase together (_v6_context) so the combination rules hold
+	elif version >= GENERATOR_VERSION_SELECTOR:
 		selector_spec = ProceduralFragmentsV3.roll_selector(level_number, ProceduralSeed.rng_for_attempt(level_number, version, ProceduralFragmentsV3.SELECTOR_ROLL_STREAM), not fusion_recipe.is_empty())
 		if not selector_spec.is_empty() and selector_spec["fusion"] and fusion_recipe.is_empty():
 			fusion_recipe = ProceduralFragmentsV3.roll_fusion_recipe(level_number, ProceduralSeed.rng_for_attempt(level_number, version, FUSION_ROLL_STREAM + 1), true)
@@ -94,8 +106,10 @@ static func generate(level_number: int, version: int = GENERATOR_VERSION) -> Dic
 	if level_number >= 2801:
 		demote_at = V5_DEMOTE_AFTER_K
 	var min_downstream := int(ProceduralDifficultyContract.selector_policy(level_number)["min_downstream_depth"])
+	if v6:
+		min_downstream = int(ProceduralContractV6.selector_policy(level_number)["min_downstream_depth"])
 	var no_fusion: Array[String] = []
-	var req := ProceduralDifficultyContract.get_difficulty_requirements(level_number)
+	var req: Dictionary = v6_ctx["req"] if v6 else ProceduralDifficultyContract.get_difficulty_requirements(level_number)
 	req["min_required_branches"] = 1
 	req["band_min_moves"] = req["min_optimal_moves"]
 	var rejections: Array = []
@@ -103,6 +117,14 @@ static func generate(level_number: int, version: int = GENERATOR_VERSION) -> Dic
 	var soft_pick: Dictionary = {} # first candidate that passed every hard gate but was greedy-solvable
 
 	var max_attempts := MAX_ATTEMPTS_V5 if version >= GENERATOR_VERSION_SELECTOR else (MAX_ATTEMPTS_LATE if (level_number >= 1301 or (fusion_enabled and level_number >= 1001)) else MAX_ATTEMPTS)
+	# Level 4000 (the Master Puzzle, D125): the full requested profile (Phase + Selectors) is the whole point, so its window is wide, it never demotes,
+	# and a candidate that dropped its Phase / Selector is rejected rather than accepted.
+	var master := v6 and level_number == ProceduralContractV6.MASTER_LEVEL
+	if master:
+		max_attempts = MASTER_MAX_ATTEMPTS
+		selector_attempts = max_attempts
+		fusion_attempts = max_attempts
+		demote_at = max_attempts + 1
 	for attempt in range(max_attempts):
 		var rng := ProceduralSeed.rng_for_attempt(level_number, version, _ATTEMPT_SEED_OFFSET + attempt)
 		var t0 := Time.get_ticks_usec()
@@ -118,7 +140,7 @@ static func generate(level_number: int, version: int = GENERATOR_VERSION) -> Dic
 				# Last resort before the V2 fallback: the REASONING floors of the band below (never the Selector rules), so the
 				# level is still a real V5 puzzle - flagged `band_demoted`, counted and reported, never silent.
 				demoted = true
-				var lower := ProceduralDifficultyContract.get_difficulty_requirements(ProceduralDifficultyContract.band_start(level_number) - 1)
+				var lower: Dictionary = ProceduralContractV6.requirements(maxi(1, ProceduralContractV6.band_start(level_number) - 1)) if v6 else ProceduralDifficultyContract.get_difficulty_requirements(ProceduralDifficultyContract.band_start(level_number) - 1)
 				for key in ["min_optimal_moves", "max_optimal_moves", "min_meaningful_dependencies", "min_dependency_depth", "min_mechanic_interactions", "min_distinct_mechanics"]:
 					ra[key] = lower[key]
 				ra["band_min_moves"] = lower["min_optimal_moves"]
@@ -130,13 +152,15 @@ static func generate(level_number: int, version: int = GENERATOR_VERSION) -> Dic
 		_tick("compose", t0)
 		if not composed["ok"]:
 			rejections.append({"attempt": attempt, "stage": "plan", "reasons": [composed["reason"]]})
+			if v6 and not (composed["reason"] as String).begins_with("no atom recipe"):
+				layout_failures += 1 # V6: a plan the slots cannot hold also relaxes the MOVE floor (never the reasoning floors), counted as moves_below_band
 			continue
 		if version >= GENERATOR_VERSION_SELECTOR:
 			ra = ra.duplicate()
 			ra["min_optimal_moves"] = int(composed["min_moves"])
 		var plan: ProceduralPlanV3 = composed["plan"]
 		var boards: Array = req["preferred_board_profiles"]
-		var size := _board_for(level_number, attempt, boards)
+		var size: Vector2i = boards[(level_number + attempt) % boards.size()] if v6 else _board_for(level_number, attempt, boards)
 		t0 = Time.get_ticks_usec()
 		var board := ProceduralComposerV3.build(plan, rng, size.x, size.y)
 		_tick("build", t0)
@@ -150,6 +174,8 @@ static func generate(level_number: int, version: int = GENERATOR_VERSION) -> Dic
 		t0 = Time.get_ticks_usec()
 		var hardened := ProceduralComposerV3.harden(board)
 		_tick("harden", t0)
+		if v6:
+			_v6_hazards(board, hardened, v6_ctx["hazard_frac"], rng)
 		board.apply_keep_correct(rng, mini(int(composed["keep"]), maxi(0, board.solution.size() - int(ra["min_optimal_moves"]))))
 		var level := board.to_level_data(board.w, board.h)
 		var tiles_used := board.tiles.size()
@@ -263,15 +289,20 @@ static func generate(level_number: int, version: int = GENERATOR_VERSION) -> Dic
 		result["moves_below_band"] = int(metrics["intended_move_count"]) < int(req["min_optimal_moves"])
 		result["layout_failures"] = layout_failures
 		result["band_demoted"] = demoted
+		if v6:
+			_v6_annotate(result, level, v6_ctx, composed)
 		if demoted:
 			band_demoted_count += 1
 		result["selector_fragment"] = str(composed["selectors"].get("fragment", ""))
 		result["selector_info"] = composed["selectors"]
 		result["selector_dropped"] = not selector_spec.is_empty() and not bool(result["selector_present"])
+		if master and (bool(result["selector_dropped"]) or int(result["phase_count"]) == 0):
+			rejections.append({"attempt": attempt, "stage": "master", "reasons": ["master profile incomplete (Selector or Phase dropped)"], "board": size})
+			continue
 		if result["selector_dropped"]:
 			selector_dropped_count += 1
 		if greedy_solved and (policy == "prefer_reject" or policy == "reject"):
-			if soft_pick.is_empty() and (version < GENERATOR_VERSION_SELECTOR or level_number <= 2200):
+			if soft_pick.is_empty() and (version < GENERATOR_VERSION_SELECTOR or level_number <= 2200 or v6):
 				soft_pick = result
 			continue
 		return result
@@ -282,7 +313,7 @@ static func generate(level_number: int, version: int = GENERATOR_VERSION) -> Dic
 		return soft_pick
 
 	fallback_count += 1
-	push_warning("%s level %d (%d attempts) - V2 fallback used" % ["V5_GENERATION_FAILED" if version >= GENERATOR_VERSION_SELECTOR else "V3_GENERATION_FAILED", level_number, max_attempts])
+	push_warning("%s level %d (%d attempts) - V2 fallback used" % ["V6_GENERATION_FAILED" if v6 else ("V5_GENERATION_FAILED" if version >= GENERATOR_VERSION_SELECTOR else "V3_GENERATION_FAILED"), level_number, max_attempts])
 	var fallback := ProceduralLevelGenerator.generate(level_number, 2)
 	fallback["fallback_used"] = true
 	fallback["v3_generation_failed"] = true
@@ -370,7 +401,7 @@ static func _board_for(level_number: int, attempt: int, boards: Array) -> Vector
 ## A pure mirror route (the first Foundation levels) has no mechanic for a move to
 ## depend on, so the meaningful/independent ratios cannot apply to it.
 static func _req_for(req: Dictionary, composed: Dictionary) -> Dictionary:
-	if not composed["atoms"].is_empty():
+	if not composed["atoms"].is_empty() and not (req.has("v6") and _only_target_continuation(composed["atoms"])):
 		return req
 	var r := req.duplicate()
 	r["min_meaningful_move_fraction"] = 0.0
@@ -384,3 +415,106 @@ static var phase_us: Dictionary = {}
 
 static func _tick(phase: String, t0: int) -> void:
 	phase_us[phase] = int(phase_us.get(phase, 0)) + (Time.get_ticks_usec() - t0)
+
+
+# --- Generator V6 (Stages C-E, D125) ----------------------------------------------------------------
+
+## Everything V6 decides ONCE per level before the attempt loop (all from dedicated rng streams / the contract's
+## deterministic sequences, never from the attempt): the Fusion / Selector / Phase rolls with the combination rules,
+## and the requirement dictionary (ProceduralContractV6.requirements + the "v6_*" keys the fragment planner reads).
+## Combination rules (the user's curve): Selector + Fusion only from Level 2601 (SELECTOR_FUSION_FIRST), Selector + Phase
+## only from 2401 (SELECTOR_PHASE_FIRST), Selector + Phase + Fusion only from 2801; Phase + Fusion only where the band's
+## phase row says so; on Phase bands without that flag Phase wins and the Fusion roll is dropped.
+static func _v6_context(level_number: int, version: int) -> Dictionary:
+	var prof := ProceduralContractV6.profile(level_number)
+	var sel_pol: Dictionary = prof["selector"]
+	var phase_pol: Dictionary = prof["phase"]
+	var fusion_pol: Dictionary = prof["fusion"]
+	var fusion_recipe: Array[String] = []
+	var suppress_fusion: bool = bool(sel_pol["has_selector"]) and level_number < ProceduralContractV6.SELECTOR_FUSION_FIRST
+	if not suppress_fusion and not (fusion_pol["fragments"] as Array).is_empty():
+		fusion_recipe = ProceduralFragmentsV3.roll_fusion_recipe(level_number, ProceduralSeed.rng_for_attempt(level_number, version, FUSION_ROLL_STREAM), false, fusion_pol)
+	var selector_spec: Dictionary = {}
+	if bool(sel_pol["has_selector"]):
+		selector_spec = ProceduralFragmentsV3.roll_selector(level_number, ProceduralSeed.rng_for_attempt(level_number, version, ProceduralFragmentsV3.SELECTOR_ROLL_STREAM), not fusion_recipe.is_empty(), sel_pol)
+		if not selector_spec.is_empty() and selector_spec["fusion"] and fusion_recipe.is_empty():
+			var forced_pol := {"fragments": ["F1", "F2", "F3", "F4", "F5", "F6", "F7"], "probability": 1.0}
+			if not (fusion_pol["fragments"] as Array).is_empty():
+				forced_pol = fusion_pol
+			fusion_recipe = ProceduralFragmentsV3.roll_fusion_recipe(level_number, ProceduralSeed.rng_for_attempt(level_number, version, FUSION_ROLL_STREAM + 1), true, forced_pol)
+	var phase_roll := false
+	if float(phase_pol["probability"]) > 0.0:
+		phase_roll = ProceduralSeed.rng_for_attempt(level_number, version, PHASE_ROLL_STREAM).randf() < float(phase_pol["probability"])
+		var has_sel := not selector_spec.is_empty() or bool(sel_pol["has_selector"])
+		var has_fusion := not fusion_recipe.is_empty()
+		if phase_roll and has_sel and level_number < ProceduralContractV6.SELECTOR_PHASE_FIRST:
+			phase_roll = false
+		if phase_roll and has_sel and has_fusion and level_number < 2801:
+			phase_roll = false
+		if phase_roll and has_fusion and not bool(phase_pol["with_fusion"]):
+			if not has_sel and level_number < ProceduralContractV6.SELECTOR_FIRST_LEVEL:
+				fusion_recipe = [] # on a Phase band the Phase level wins
+			else:
+				phase_roll = false
+	var req := ProceduralContractV6.requirements(level_number)
+	req["v6_allowed"] = prof["allowed_atoms"]
+	req["v6_cores"] = prof["cores"]
+	req["v6_fallback_cores"] = ProceduralContractV6.fallback_cores(level_number)
+	req["v6_budget"] = prof["budget"]
+	req["v6_target_moves"] = prof["target_moves"]
+	req["v6_phase_roll"] = phase_roll
+	req["v6_phase_max"] = int(phase_pol["max_count"])
+	return {
+		"profile": prof, "req": req, "fusion_recipe": fusion_recipe, "selector_spec": selector_spec, "phase_roll": phase_roll,
+		"hazard_frac": float(prof["bias"]["hazard_frac"]) if ProceduralContractV6.mechanic_available(level_number, "hazard") else 0.0,
+	}
+
+
+## Constraint levels (hazards, from Level 76): a share of the blockers hardening placed on wrong-state rays become
+## hazards instead. The SOLVED beams never touch those cells (they are the first free cell of a WRONG ray), so the
+## intended solution is unchanged - the real LaserSystem still verifies it in the gate that follows.
+static func _v6_hazards(board: ProceduralBoardV3, hardened: Dictionary, frac: float, rng: RandomNumberGenerator) -> void:
+	if frac <= 0.0:
+		return
+	for fx in hardened.get("fixes", []):
+		if rng.randf() >= frac:
+			continue
+		for i in range(board.tiles.size()):
+			var t: TilePlacement = board.tiles[i]
+			if t.position == fx and t.tile_type == GridTypes.TileType.BLOCKER:
+				board.tiles[i] = TilePlacement.make_hazard(fx)
+				board.tile_cells[fx] = "hazard"
+				break
+
+
+## V6 report fields (QA, tests, the HUD tag): profile, archetype, challenge / relief, budget use, Phase presence.
+static func _v6_annotate(result: Dictionary, level: LevelData, ctx: Dictionary, composed: Dictionary) -> void:
+	var prof: Dictionary = ctx["profile"]
+	var phase_count := 0
+	var hazard_count := 0
+	for t in level.tiles:
+		if t.tile_type == GridTypes.TileType.PHASE_SHIFTER:
+			phase_count += 1
+		elif t.tile_type == GridTypes.TileType.HAZARD:
+			hazard_count += 1
+	result["v6_archetype"] = prof["archetype"]
+	result["v6_challenge"] = prof["challenge"]
+	result["v6_milestone"] = prof["milestone"]
+	result["v6_relief"] = prof["relief"]
+	result["v6_budget"] = prof["budget"]
+	result["v6_target_moves"] = prof["target_moves"]
+	result["v6_stage"] = prof["stage"]
+	result["v6_tier"] = prof["tier"]
+	result["phase_rolled"] = ctx["phase_roll"]
+	result["phase_count"] = phase_count
+	result["phase_dropped"] = bool(ctx["phase_roll"]) and phase_count == 0
+	result["hazard_count"] = hazard_count
+	result["budget_points"] = ProceduralContractV6.points_of_kinds(ProceduralFragmentsV3.predict(composed["atoms"], (composed["selectors"].get("ids", []) as Array).size())["kind_set"])
+
+
+## V6: a Foundation route with only a mid-route target has no mechanic a move could depend on (like a pure mirror route).
+static func _only_target_continuation(atoms: Array) -> bool:
+	for a in atoms:
+		if a != "TM":
+			return false
+	return true

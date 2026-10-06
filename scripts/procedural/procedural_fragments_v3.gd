@@ -61,6 +61,9 @@ const ATOMS := {
 	"FUK": {"nodes": 3, "kinds": ["fusion", "switch", "gate"], "deps": 2, "fixed": 1, "min_level": 701},
 	"PF": {"nodes": 2, "kinds": ["prism", "fusion"], "deps": 2, "fixed": 1, "min_level": 1301},
 	"FU3": {"nodes": 1, "kinds": ["fusion"], "deps": 1, "fixed": 1, "min_level": 1601},
+	# Phase gadget (generator V6 only, never in IMPLEMENTED): a FIXED splitter + a rotatable Phase Shifter + a fixed loop (see
+	# ProceduralComposerV3._place_phase). Both the Phase Shifter and its splitter are load-bearing; one required tap.
+	"PH": {"nodes": 2, "kinds": ["phase", "splitter"], "deps": 2, "fixed": 1, "min_level": 701},
 }
 
 ## Atoms the composer can currently realise. Everything else is skipped by the
@@ -113,7 +116,7 @@ static var v5_walk_budget: int = 120
 ## Returns {ok, reason, plan, atoms, predicted, moves, keep, plain_fraction}.
 static func compose(level_number: int, req: Dictionary, rng: RandomNumberGenerator, layout_failures: int = 0, fusion_recipe: Array[String] = [], selector_spec: Dictionary = {}) -> Dictionary:
 	var atoms := choose_atoms(level_number, req, rng, fusion_recipe, selector_spec)
-	if atoms.is_empty() and level_number > 8:
+	if atoms.is_empty() and ((level_number > 8 and not req.has("v6")) or (req.has("v6") and level_number > 20)):
 		return {"ok": false, "reason": "no atom recipe satisfies the band"}
 	# Dense late puzzles can physically not fit the top of the move window on an 8-column
 	# portrait board; every layout failure lowers the target by 2 (never below the band floor).
@@ -140,7 +143,7 @@ static func compose(level_number: int, req: Dictionary, rng: RandomNumberGenerat
 	# redrawn (cheap), otherwise the move target (and floor) shrinks to what fits - moves are the least meaningful
 	# metric and are never padded.
 	var min_moves := int(req["min_optimal_moves"])
-	if level_number > 2000:
+	if level_number > 2000 or (req.has("v6") and level_number > 400):
 		var cost := 0
 		for a in atoms:
 			cost += int(TILE_COST[a])
@@ -174,6 +177,13 @@ static func compose(level_number: int, req: Dictionary, rng: RandomNumberGenerat
 	# share of the interior turns can ever be a plain MOVE.
 	var required_share := float(moves) / float(maxi(moves + keep - fixed, 1))
 	var distributed := _distribute(slots, turn_budget, moves, plain_cap, required_share, max_slot, rng)
+	# Generator V6 (D125): a target the slots cannot hold within the plain-move cap is lowered one move at a time (never below the
+	# floor) instead of burning the whole attempt; V1-V5 keep their exact behaviour.
+	while not distributed and req.has("v6") and moves > min_moves and turn_budget - 1 >= min_turns:
+		moves -= 1
+		turn_budget = moves + keep - fixed
+		required_share = float(moves) / float(maxi(moves + keep - fixed, 1))
+		distributed = _distribute(slots, turn_budget, moves, plain_cap, required_share, max_slot, rng)
 	if not distributed:
 		return {"ok": false, "reason": "turn budget %d cannot be spread within the plain-move cap" % turn_budget}
 	var plain := 0
@@ -184,7 +194,7 @@ static func compose(level_number: int, req: Dictionary, rng: RandomNumberGenerat
 	plan.params["keep_correct"] = keep
 	# Hop-length bias: sparse early boards spread out, dense late boards pack tight.
 	plan.params["alpha"] = 0.3 if level_number <= 400 else (0.6 if level_number <= 1000 else 1.0)
-	if level_number > 2000:
+	if level_number > 2000 or (req.has("v6") and level_number > 400):
 		# Generator V5 (D110): dense boards get a larger placement search (dev-tunable statics, see v5_sample.gd).
 		plan.params["restarts"] = v5_restarts
 		plan.params["op_budget"] = v5_op_budget
@@ -249,7 +259,16 @@ static func _cores_for(level_number: int) -> Array:
 
 
 static func choose_atoms(level_number: int, req: Dictionary, rng: RandomNumberGenerator, fusion_recipe: Array[String] = [], selector_spec: Dictionary = {}) -> Array[String]:
-	var avail := _available(level_number)
+	# Generator V6 (D125): the contract (ProceduralContractV6) supplies the allowed atoms, the cores, the complexity budget and the
+	# Phase roll through `req` ("v6_*" keys); V1-V5 requirement dictionaries carry none of them, so their draws are untouched.
+	var v6 := req.has("v6")
+	var avail: Array[String] = []
+	if v6:
+		avail.assign(req["v6_allowed"])
+	else:
+		avail = _available(level_number)
+	var phase_roll := v6 and bool(req.get("v6_phase_roll", false))
+	var budget := int(req.get("v6_budget", 99))
 	var sel_n := int(selector_spec.get("count", 0))
 	var sel_need: Array = selector_spec.get("need", [])
 	# Fusion (generator V4+): `fusion_recipe` is the level's ONE Fusion roll (see roll_fusion_recipe), passed
@@ -268,18 +287,32 @@ static func choose_atoms(level_number: int, req: Dictionary, rng: RandomNumberGe
 	# Start from a core recipe whose predicted cost already respects the band's ceilings.
 	var usable: Array = []
 	if fusion_core.is_empty():
-		for core in _cores_for(level_number):
-			var filtered: Array[String] = []
-			for a in core:
-				if avail.has(a):
-					filtered.append(a)
-			if _within_caps(predict(filtered, sel_n), max_depth, max_deps):
-				usable.append(filtered)
+		var core_source: Array = req["v6_cores"] if v6 else _cores_for(level_number)
+		for pass_i in range(2):
+			for core in core_source:
+				var filtered: Array[String] = []
+				for a in core:
+					if avail.has(a):
+						filtered.append(a)
+				if v6 and not phase_roll and filtered.has("PH"):
+					continue # a level that did not roll Phase never starts from a Phase core
+				if _within_caps(predict(filtered, sel_n), max_depth, max_deps) and _budget_ok(predict(filtered, sel_n), budget):
+					usable.append(filtered)
+			if not usable.is_empty() or not v6:
+				break
+			core_source = req["v6_fallback_cores"] # every stage core needs Phase: use the band's plain cores
 		if usable.is_empty():
 			return []
 	var atoms: Array[String] = []
 	if fusion_core.is_empty():
 		var pool: Array = usable
+		if phase_roll:
+			var with_phase: Array = []
+			for core in usable:
+				if core.has("PH"):
+					with_phase.append(core)
+			if not with_phase.is_empty():
+				pool = with_phase
 		if not sel_need.is_empty():
 			# Selector fragment (V5): prefer cores that already hold the mechanics its sites need.
 			var fitting: Array = []
@@ -301,6 +334,24 @@ static func choose_atoms(level_number: int, req: Dictionary, rng: RandomNumberGe
 		atoms.assign(fusion_core)
 		if not _within_caps(predict(atoms, sel_n), max_depth, max_deps):
 			return []
+	if v6:
+		# Phase (V6): a level that rolled Phase carries at least one gadget (added when the budget allows it),
+		# never more than the band's cap.
+		if phase_roll and not atoms.has("PH"):
+			var with_ph: Array[String] = atoms.duplicate()
+			with_ph.append("PH")
+			if _budget_ok(predict(with_ph, sel_n), budget) and _within_caps(predict(with_ph, sel_n), max_depth, max_deps):
+				atoms = with_ph
+		var ph_max := int(req.get("v6_phase_max", 0))
+		var ph_n := 0
+		var capped: Array[String] = []
+		for a in atoms:
+			if a == "PH":
+				ph_n += 1
+				if ph_n > ph_max:
+					continue
+			capped.append(a)
+		atoms = capped
 
 	for _i in range(12):
 		var p := predict(atoms, sel_n)
@@ -313,6 +364,13 @@ static func choose_atoms(level_number: int, req: Dictionary, rng: RandomNumberGe
 		for a in avail:
 			if a == "TM" or a == "OH" or a == "F2" or not _can_add(atoms, a):
 				continue
+			if v6 and a == "PH":
+				continue # Phase gadgets come from the cores / the Phase roll only, never from escalation
+			if v6:
+				var grown: Array[String] = atoms.duplicate()
+				grown.append(a)
+				if not _budget_ok(predict(grown, sel_n), budget):
+					continue
 			# A Filter after a Fusion node would recolour (erase) the fused colour, and a second Prism/mid-route
 			# target has no WHITE/primary beam to work with: Fusion recipes never escalate with them.
 			if not fusion_core.is_empty() and (a == "F" or a == "PR" or a == "PG"):
@@ -354,7 +412,7 @@ static func choose_atoms(level_number: int, req: Dictionary, rng: RandomNumberGe
 	var final := predict(atoms, sel_n)
 	if final["depth"] < min_depth or final["kinds"] < min_kinds or final["deps"] < min_deps:
 		return []
-	if not _within_caps(final, max_depth, max_deps):
+	if not _within_caps(final, max_depth, max_deps) or not _budget_ok(final, budget):
 		return []
 	# Prisms must see a WHITE beam, so they lead; the first filter precedes a
 	# mid-route target, the second follows it. Keyed sort (index tie-break) so
@@ -368,14 +426,16 @@ static func choose_atoms(level_number: int, req: Dictionary, rng: RandomNumberGe
 	var sorted: Array[String] = []
 	for k in keyed:
 		sorted.append(k[1])
+	if v6 and not _phase_chain_ok(sorted):
+		return []
 	return sorted
 
 
 ## The Fusion recipe this level rolls ONCE (or [] = an ordinary V3-style recipe). Deterministic: one draw for
 ## the yes/no and one for the fragment, both from the level's own dedicated rng (never re-rolled per attempt, so a
 ## fragment that is hard to place does not silently lower the band's Fusion frequency).
-static func roll_fusion_recipe(level_number: int, rng: RandomNumberGenerator, force: bool = false) -> Array[String]:
-	var policy := ProceduralDifficultyContract.fusion_policy(level_number)
+static func roll_fusion_recipe(level_number: int, rng: RandomNumberGenerator, force: bool = false, policy_override: Dictionary = {}) -> Array[String]:
+	var policy := policy_override if not policy_override.is_empty() else ProceduralDifficultyContract.fusion_policy(level_number)
 	var fragments: Array = policy["fragments"]
 	var out: Array[String] = []
 	if fragments.is_empty() or (not force and rng.randf() >= float(policy["probability"])):
@@ -428,6 +488,12 @@ static func _can_add(atoms: Array, atom: String) -> bool:
 	return true
 
 
+## Complexity budget (generator V6): the points of the predicted mechanic kinds must not exceed the level's budget.
+## V1-V5 pass the default (99), which no recipe reaches.
+static func _budget_ok(p: Dictionary, budget: int) -> bool:
+	return ProceduralContractV6.points_of_kinds(p["kind_set"]) <= budget
+
+
 static func _within_caps(p: Dictionary, max_depth: int, max_deps: int) -> bool:
 	if max_depth != ProceduralDifficultyContract.UNBOUNDED and p["depth"] > max_depth:
 		return false
@@ -455,7 +521,7 @@ static func _order(atom: String, has_tm: bool, has_fu3: bool = false, portal_fir
 			return 10
 		"P":
 			return 19 if portal_first else 20 # family SJ needs the Portal BEFORE the Receiver hop
-		"G", "GG", "OW", "OH", "H":
+		"G", "GG", "OW", "OH", "H", "PH":
 			return 20
 		"F":
 			return 29 if has_tm else 40
@@ -557,6 +623,17 @@ static func _apply_atom(b: _B, atom: String, atoms: Array, rng: RandomNumberGene
 			var id := b.nid("p")
 			b.stage(id, "portal", true)
 			b.tok(cur, {"t": "portal", "id": id})
+		"PH":
+			# Phase gadget (generator V6): the exit route (the beam the Phase Shifter reflects back through the
+			# splitter) is a new line; every later atom / the final target continues on it.
+			b.slot(cur)
+			var sid := b.nid("ps")
+			var pid := b.nid("ph")
+			b.stage(sid, "splitter", true)
+			b.stage(pid, "phase", true)
+			var nxt := b.line("phase_exit")
+			b.tok(cur, {"t": "phase", "sid": sid, "pid": pid, "after": nxt})
+			b.cur = nxt
 		"OW":
 			b.slot(cur)
 			var id := b.nid("ow")
@@ -821,6 +898,9 @@ static func _distribute(slots: Array, turn_budget: int, moves: int, plain_cap: f
 static func _draw_moves(level_number: int, req: Dictionary, rng: RandomNumberGenerator) -> int:
 	var lo: int = req["min_optimal_moves"]
 	var hi: int = req["max_optimal_moves"]
+	if req.has("v6_target_moves"):
+		# Generator V6 (D125): the contract fixes the target (archetype quantile + challenge / relief); rng only adds +-1.
+		return clampi(int(req["v6_target_moves"]) + rng.randi_range(-1, 1), lo, hi)
 	if level_number <= 20:
 		# Foundation ramps from the floor to the ceiling (Level 1 = 3 moves, Level 20 = 5)
 		# so the very first puzzles are as gentle as the band allows.
@@ -840,7 +920,7 @@ static func _draw_moves(level_number: int, req: Dictionary, rng: RandomNumberGen
 const TILE_COST := {
 	"F": 1, "F2": 1, "P": 2, "SB": 3, "TM": 1, "G": 5, "SG": 5, "PR": 3, "PG": 5,
 	"H": 4, "OW": 1, "OH": 1, "SH": 5, "SO": 5, "GG": 10,
-	"FU": 4, "FUF": 6, "FUP": 6, "FUG": 7, "FUK": 7, "PF": 5, "FU3": 7,
+	"FU": 4, "FUF": 6, "FUP": 6, "FUG": 7, "FUK": 7, "PF": 5, "FU3": 7, "PH": 5,
 }
 const BASE_TILE_COST := 4 # root emitter + blocker behind it + final target + end cap
 
@@ -907,10 +987,10 @@ static var dev_disable_selector := false
 static var dev_force_family := ""
 
 
-static func roll_selector(level_number: int, rng: RandomNumberGenerator, fusion_rolled: bool) -> Dictionary:
+static func roll_selector(level_number: int, rng: RandomNumberGenerator, fusion_rolled: bool, policy_override: Dictionary = {}) -> Dictionary:
 	if dev_disable_selector:
 		return {}
-	var pol := ProceduralDifficultyContract.selector_policy(level_number)
+	var pol := policy_override.duplicate(true) if not policy_override.is_empty() else ProceduralDifficultyContract.selector_policy(level_number)
 	if dev_force_family != "":
 		pol["has_selector"] = true
 		pol["fragments"] = [dev_force_family]
@@ -986,6 +1066,8 @@ static func _collect_sites(line: Dictionary, out: Array) -> void:
 				_collect_sites(t["main"], out)
 				for f in t["feeders"]:
 					_collect_sites(f, out)
+			"phase":
+				_collect_sites(t["after"], out) # generator V6: the Phase gadget's exit route carries the rest of the line
 			"hop":
 				_collect_sites(t["next"], out)
 			"fusion":
@@ -1066,3 +1148,18 @@ static func _apply_selectors(plan: ProceduralPlanV3, spec: Dictionary, rng: Rand
 	plan.params["sel_taps"] = taps
 	plan.params["selector_fragment"] = spec["fragment"]
 	return {"ok": true, "reason": "", "extra_taps": extra_taps, "ids": ids, "taps": taps, "sites": kinds_used, "fragment": spec["fragment"]}
+
+
+## Generator V6: two Phase gadgets on ONE line chain would retrace into each other (the reflected beam re-enters the earlier
+## gadget's splitter and cycles), so consecutive "PH" atoms must be separated by a receiver -> remote hop (a new line that
+## starts at its own emitter, where the retrace dead-ends).
+static func _phase_chain_ok(sorted: Array) -> bool:
+	var since_hop_has_ph := false
+	for a in sorted:
+		if a == "H":
+			since_hop_has_ph = false
+		elif a == "PH":
+			if since_hop_has_ph:
+				return false
+			since_hop_has_ph = true
+	return true

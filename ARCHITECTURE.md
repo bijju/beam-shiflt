@@ -2228,3 +2228,18 @@ Firebase security rule change; no Android file touched (`git diff --stat` confir
 diff on anything Android-specific). See `DECISIONS.md` D117 and `STORE_RELEASE.md` section
 19 for the full writeup, and `references/ci-cd.md` for the exact approval-gated sequencing
 of the first real signed build.
+
+
+## Phase Shifter (Phase Shifter Stages A+B, D124)
+
+`TileType.PHASE_SHIFTER`, rule only in `LaserSystem.simulate()`: a per-pass bitmask `phase_mask` (bit per Phase Shifter, tile-array order) starts at 0 (all PHASE_A).
+A beam entering a tile with its bit clear continues straight; with the bit set it is reflected by `tile_orientations[pos]` through `GridTypes.reflect()`; either way the
+bit flips and the position is appended to the segment. The visited-state key gains `|mask` only when the level has a Phase Shifter. Ordering contract: LIFO
+work list seeded emitters (tile order) -> remote emitters -> fusion nodes; branches run to completion before the next pop. Result keys `phase_hits`, `phase_in_states`,
+`phase_final`. `GridManager` instantiates `phase_shifter.tscn`, registers it as an orientable node (`_orientable_nodes`) and `_phase_nodes`, and after every simulation calls
+`PhaseShifterTile.apply_result(final_phase, hits, pulse)` (pulse only on a player move). Visual layers: base, core A/B, orientation glyph, energy ring.
+
+
+## Generator V6 (D125)
+
+V6 is a version-gated layer over the V3-V5 composition pipeline: `ProceduralContractV6` supplies bands / policies / budget / archetypes through `req["v6_*"]` keys; shared code branches only on `req.has("v6")`. Phase gadget = `ProceduralComposerV3._place_phase`. New-play routing lives only in `LevelManager.procedural_generator_version_for_new_play()`. See DECISIONS.md D125 and PROCEDURAL_GENERATION.md section 21.

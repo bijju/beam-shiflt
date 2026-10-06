@@ -20,6 +20,7 @@ const RECT_TOGGLE_OFF := Rect2(0.0192, 0.0328, 0.9612, 0.9483)
 @onready var _store_status: Label = %StoreStatusLabel
 @onready var _restore_button: Button = %RestorePurchasesButton
 @onready var _cloud_section: Control = %CloudSection
+@onready var _cloud_name: Label = %CloudNameLabel
 @onready var _cloud_status: Label = %CloudStatusLabel
 @onready var _cloud_sign_in: Button = %CloudSignInButton
 @onready var _privacy_options: Button = %PrivacyOptionsButton
@@ -40,7 +41,7 @@ const PRICE_MIN_FONT_SIZE := 22
 func _ready() -> void:
 	_ready_audio_rows()
 	_ready_store_rows()
-	for b in [_back_button, _cloud_sign_in, _buy_button, _restore_button, _about]:
+	for b in [_back_button, _cloud_sign_in, _buy_button, _restore_button]:
 		BeamButtonGlow.attach(b)
 
 
@@ -121,6 +122,7 @@ func _hide_message(shown: String) -> void:
 
 
 func _refresh_cloud() -> void:
+	_cloud_name.text = PlatformAccount.display_name if PlatformAccount.is_supported() and PlatformAccount.connected and PlatformAccount.display_name != "" else "Guest Player"
 	if not PlatformAccount.is_supported():
 		_cloud_status.text = "Game progress is stored locally on this device."
 	elif PlatformAccount.connected:

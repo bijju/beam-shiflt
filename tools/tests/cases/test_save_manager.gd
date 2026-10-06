@@ -123,7 +123,15 @@ func test_procedural_progress_and_new_game() -> void:
 	SaveManager.tutorial_highest_unlocked_level = 1
 	ok(SaveManager.reset_main_progress_for_new_game())
 	eq(SaveManager.procedural_current_level, 1)
-	eq(SaveManager.tutorial_highest_unlocked_level, LevelManager.SELECTOR_TUTORIAL_FIRST)
+	eq(SaveManager.tutorial_highest_unlocked_level, LevelManager.PHASE_TUTORIAL_FIRST, "reaching 1900 also earned the Phase pack (680)")
+	SaveManager.procedural_current_level = LevelManager.PHASE_TUTORIAL_UNLOCK_PROCEDURAL_LEVEL - 1
+	SaveManager.tutorial_highest_unlocked_level = 1
+	ok(SaveManager.reset_main_progress_for_new_game())
+	eq(SaveManager.tutorial_highest_unlocked_level, LevelManager.FUSION_TUTORIAL_FIRST, "679 earns Fusion only")
+	SaveManager.procedural_current_level = LevelManager.PHASE_TUTORIAL_UNLOCK_PROCEDURAL_LEVEL
+	SaveManager.tutorial_highest_unlocked_level = 1
+	ok(SaveManager.reset_main_progress_for_new_game())
+	eq(SaveManager.tutorial_highest_unlocked_level, LevelManager.PHASE_TUTORIAL_FIRST, "680 earns the Phase pack")
 	SaveManager.procedural_current_level = LevelManager.FUSION_TUTORIAL_UNLOCK_PROCEDURAL_LEVEL
 	SaveManager.tutorial_highest_unlocked_level = 1
 	ok(SaveManager.reset_main_progress_for_new_game())
@@ -131,6 +139,36 @@ func test_procedural_progress_and_new_game() -> void:
 	ok(not SaveManager.has_meaningful_main_progress())
 	SaveManager.procedural_best_stars = {"1|2": 1}
 	ok(SaveManager.has_meaningful_main_progress())
+
+
+func test_procedural_best_moves() -> void:
+	SaveManager._apply_data({"version": 5})  # old save without the field
+	eq(SaveManager.procedural_best_moves.size(), 0)
+	eq(SaveManager.get_procedural_best_moves(5, 2), -1, "missing = -1")
+	SaveManager.record_procedural_best_moves(5, 2, 8)
+	eq(SaveManager.get_procedural_best_moves(5, 2), 8, "first clear")
+	SaveManager.record_procedural_best_moves(5, 2, 7)
+	eq(SaveManager.get_procedural_best_moves(5, 2), 7, "better replay")
+	SaveManager.record_procedural_best_moves(5, 2, 10)
+	eq(SaveManager.get_procedural_best_moves(5, 2), 7, "worse replay keeps best")
+	SaveManager.record_procedural_best_moves(5, 2, 0)
+	SaveManager.record_procedural_best_moves(5, 2, -3)
+	eq(SaveManager.get_procedural_best_moves(5, 2), 7, "invalid ignored")
+	eq(SaveManager.get_procedural_best_moves(5, 4), -1, "generator version isolated")
+	eq(SaveManager.get_procedural_best_moves(6, 2), -1, "level isolated")
+	SaveManager.record_campaign_level_result(5, 3, 3, LevelManager.get_campaign_level_count())
+	eq(SaveManager.get_procedural_best_moves(5, 2), 7, "campaign does not touch procedural")
+	SaveManager.record_procedural_stars(5, 2, 2)
+	eq(SaveManager.get_procedural_best_stars(5, 2), 2, "stars unchanged")
+	var round_trip: Dictionary = JSON.parse_string(JSON.stringify(SaveManager.to_dict()))
+	SaveManager._apply_data(round_trip)
+	eq(SaveManager.get_procedural_best_moves(5, 2), 7, "round trip")
+	eq(SaveManager.get_procedural_best_stars(5, 2), 2)
+	SaveManager._apply_data({"procedural_best_moves": 3})  # corrupt type
+	eq(SaveManager.procedural_best_moves.size(), 0)
+	SaveManager.record_procedural_best_moves(5, 2, 7)
+	ok(SaveManager.reset_main_progress_for_new_game())
+	eq(SaveManager.get_procedural_best_moves(5, 2), -1, "NEW GAME clears like best stars")
 
 
 func test_unwritable_save_is_reported() -> void:

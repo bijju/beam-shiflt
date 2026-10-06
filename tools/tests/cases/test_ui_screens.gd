@@ -219,6 +219,7 @@ func test_popups() -> void:
 	p.set_era_panel(load("res://assets/ui/backgrounds/bs_bg_main_menu_v2.png"), PackedFloat32Array([10, 10, 10, 10]))
 	p.set_era_panel(null, PackedFloat32Array())
 	p._next_button.show()
+	p.skip_presentation()
 	press_all(p)
 	eq([got.size(), got2.size(), got3.size()], [1, 1, 1])
 	p.queue_free()

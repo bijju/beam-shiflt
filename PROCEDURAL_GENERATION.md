@@ -1263,3 +1263,72 @@ Replaying an intended solution through a real GridManager showed the puzzle SOLV
 
 ### 20.9 Known weaknesses (do not hide)
 Difficulty is measured by proxies (ablation depth, consequence, coupling, greedy failure), never by human play - manual review of the V5 TEST levels is required before any claim. S3.1 pass 1 reduced bounded J/K demotion samples (J 3/36, K 0/37 under a 90s QA budget) but full 50-level windows still exceed budget. Residual minimality/shortcut leaks (~1-4% of Interlock-Mastery). Non-fusion Selector families SC/SL/SM are placed less often than the rest. Boards are dense (Mastery 38-57 tiles of 88); readability on a phone is unverified. Generation time on device is unmeasured. Selector start states are varied but the intermediate states between start and solution are not designed. No decoy/bait builder (S-K etc.).
+
+
+## 21. Phase Shifter and the planned V6 (D124) - NOT a generator change yet
+
+The Phase Shifter exists as a mechanic (simulation, visual, tutorials T35-T39) but NO generator produces it. V1-V5 are untouched (their output must stay identical; there
+are no committed fingerprint goldens - capture a before/after driver run when touching shared code). The 4000-level direction (Medium at 50, Fusion at 401, Phase at 701, Selector at 2001,
+Grandmaster 3001-4000, Level 4000 master profile, `MAX_LEVEL` 4000) needs a NEW generator version (V6, the next free number) with its own version-gated difficulty contract: the shared
+level-keyed tables in `ProceduralDifficultyContract` are read by V3/V4/V5 and must not change. Required work list is in `DECISIONS.md` D124 "Not built / plan".
+
+
+## 21. Generator V6 (Stages C-E, DECISIONS.md D125): Levels 1-4000
+
+Read DECISIONS.md D125 first (architecture, routing, curve, Phase gadget, Level 4000, fingerprints). This section keeps the measured evidence.
+
+**Files**: `scripts/procedural/procedural_contract_v6.gd` (contract), hooks in `procedural_progression_v3.gd` (`_v6_context`, `_v6_hazards`, `_v6_annotate`), `procedural_fragments_v3.gd` (atom `PH`, `v6_*` req keys, budget, `_phase_chain_ok`), `procedural_composer_v3.gd` (`_place_phase`), `procedural_board_v3.gd` (`to_phase`, fixed splitter), `procedural_complexity.gd` (Phase kind). Dev tools: `generator_fingerprint.tscn`, `v6_sample.tscn` (`from= to= stride= levels= hist=1 perf=1 json=`; its static `validate()` is the independent per-level validator).
+
+**Bulk QA, all 4000 levels (final tuning), per band** (`board` = average columns x rows, `rot` = rotatable tiles, `below` = intended moves under the band floor, `demoted` = reasoning floors of the band below, `fb` = V2 fallback, `fail` = validation failures):
+
+| band | levels | n | avg board | rot | moves | Phase% (avg#) | Selector% | Fusion% | 2+emit% | hazard% | att avg/max | below | demoted | greedy-acc | ms avg | fb | fail |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| FND | 1-10 | 10 | 5.2x7.7 | 4.3 | 3.9 | 0% (0.00) | 0% | 0% | 0% | 0% | 0.0/0 | 0 | 0 | 0 | 5 | 0 | 0 |
+| RTG | 11-20 | 10 | 5.7x8.2 | 5.1 | 4.5 | 0% (0.00) | 0% | 0% | 0% | 0% | 0.0/0 | 0 | 0 | 0 | 5 | 0 | 0 |
+| SPL | 21-30 | 10 | 5.7x8.4 | 5.9 | 5.4 | 0% (0.00) | 0% | 0% | 0% | 0% | 0.0/0 | 0 | 0 | 0 | 12 | 0 | 0 |
+| CLR | 31-40 | 10 | 5.6x8.3 | 6.4 | 5.9 | 0% (0.00) | 0% | 0% | 0% | 0% | 0.0/0 | 0 | 0 | 0 | 12 | 0 | 0 |
+| PTL | 41-49 | 9 | 5.6x9.3 | 6.8 | 6.4 | 0% (0.00) | 0% | 0% | 0% | 0% | 0.1/1 | 0 | 0 | 0 | 16 | 0 | 0 |
+| SWG | 50-75 | 26 | 5.7x9.3 | 8.6 | 7.4 | 0% (0.00) | 0% | 0% | 92% | 0% | 0.1/1 | 0 | 0 | 0 | 52 | 0 | 0 |
+| CST | 76-100 | 25 | 6.4x9.4 | 10.0 | 8.7 | 0% (0.00) | 0% | 0% | 52% | 0% | 0.1/2 | 0 | 0 | 0 | 91 | 0 | 0 |
+| PRM | 101-150 | 50 | 6.3x9.3 | 10.2 | 8.8 | 0% (0.00) | 0% | 0% | 22% | 0% | 0.7/5 | 7 | 0 | 0 | 92 | 0 | 0 |
+| DIR | 151-200 | 50 | 6.7x9.6 | 10.6 | 9.3 | 0% (0.00) | 0% | 0% | 18% | 10% | 0.1/2 | 0 | 0 | 0 | 89 | 0 | 0 |
+| RCV | 201-275 | 75 | 6.7x9.6 | 10.5 | 8.7 | 0% (0.00) | 0% | 0% | 100% | 9% | 5.8/35 | 27 | 9 | 0 | 162 | 0 | 0 |
+| RMT | 276-350 | 75 | 6.6x10.2 | 13.1 | 10.7 | 0% (0.00) | 0% | 0% | 100% | 9% | 1.5/11 | 4 | 0 | 0 | 334 | 0 | 0 |
+| MEM | 351-400 | 50 | 7.0x10.3 | 13.6 | 11.2 | 0% (0.00) | 0% | 0% | 100% | 10% | 2.4/8 | 1 | 0 | 0 | 506 | 0 | 0 |
+| FSI | 401-500 | 100 | 7.0x10.4 | 13.8 | 11.4 | 0% (0.00) | 0% | 46% | 92% | 6% | 0.8/5 | 2 | 0 | 0 | 563 | 0 | 0 |
+| FSC | 501-600 | 100 | 7.0x10.5 | 14.8 | 12.4 | 0% (0.00) | 0% | 55% | 70% | 10% | 1.0/8 | 0 | 0 | 0 | 743 | 0 | 0 |
+| FSA | 601-700 | 100 | 7.4x10.2 | 16.1 | 13.6 | 0% (0.00) | 0% | 51% | 100% | 13% | 1.1/15 | 0 | 0 | 0 | 1100 | 0 | 0 |
+| PHI | 701-720 | 20 | 6.3x9.3 | 6.5 | 5.5 | 100% (1.00) | 0% | 0% | 10% | 0% | 0.2/1 | 0 | 0 | 0 | 33 | 0 | 0 |
+| PHP | 721-760 | 40 | 6.4x9.3 | 7.4 | 6.4 | 85% (1.06) | 0% | 0% | 20% | 2% | 0.0/1 | 0 | 0 | 0 | 38 | 0 | 0 |
+| PHB | 761-800 | 40 | 6.7x9.7 | 8.7 | 7.7 | 85% (1.06) | 0% | 0% | 50% | 0% | 7.4/32 | 0 | 8 | 0 | 119 | 0 | 0 |
+| PHR | 801-900 | 100 | 7.0x10.4 | 11.0 | 9.7 | 79% (1.14) | 0% | 4% | 27% | 11% | 0.2/2 | 0 | 0 | 0 | 136 | 0 | 0 |
+| PHD | 901-1000 | 100 | 7.4x10.3 | 12.1 | 10.7 | 71% (1.00) | 0% | 7% | 92% | 9% | 0.6/5 | 1 | 0 | 0 | 265 | 0 | 0 |
+| PHX | 1001-1200 | 200 | 7.5x10.5 | 14.5 | 12.8 | 85% (1.49) | 0% | 3% | 92% | 12% | 0.9/7 | 0 | 0 | 0 | 487 | 0 | 0 |
+| PHF | 1201-1400 | 200 | 7.4x10.6 | 15.8 | 13.3 | 66% (1.00) | 0% | 28% | 87% | 12% | 2.6/13 | 8 | 0 | 0 | 943 | 0 | 0 |
+| PHM | 1401-1600 | 200 | 7.7x10.6 | 16.7 | 14.2 | 87% (1.01) | 0% | 1% | 96% | 14% | 2.4/20 | 9 | 0 | 0 | 1201 | 0 | 0 |
+| CPX | 1601-1800 | 200 | 7.7x10.7 | 18.1 | 15.2 | 63% (1.00) | 0% | 9% | 100% | 14% | 1.6/13 | 4 | 0 | 0 | 1254 | 0 | 0 |
+| PSM | 1801-2000 | 200 | 8.0x10.5 | 20.1 | 16.9 | 57% (1.00) | 0% | 15% | 97% | 16% | 5.5/47 | 33 | 2 | 1 | 1905 | 0 | 0 |
+| SEL | 2001-2200 | 200 | 8.0x10.5 | 21.5 | 18.3 | 14% (1.00) | 50% | 10% | 71% | 15% | 3.6/33 | 17 | 3 | 0 | 1470 | 0 | 0 |
+| SRT | 2201-2400 | 200 | 8.0x10.5 | 22.6 | 19.5 | 13% (1.00) | 60% | 8% | 79% | 16% | 2.8/30 | 15 | 0 | 0 | 1570 | 0 | 0 |
+| SPH | 2401-2600 | 200 | 8.0x10.5 | 19.9 | 17.5 | 76% (1.00) | 41% | 6% | 96% | 19% | 13.6/42 | 103 | 28 | 0 | 2040 | 0 | 0 |
+| SFU | 2601-2800 | 200 | 8.0x10.4 | 22.9 | 20.3 | 21% (1.00) | 56% | 47% | 94% | 14% | 10.3/34 | 60 | 7 | 0 | 2250 | 0 | 0 |
+| SMS | 2801-3000 | 200 | 8.0x10.5 | 23.0 | 20.4 | 46% (1.00) | 49% | 27% | 91% | 18% | 14.4/37 | 91 | 0 | 0 | 2740 | 0 | 0 |
+| GM1 | 3001-3200 | 200 | 8.0x10.5 | 22.4 | 19.6 | 65% (1.00) | 42% | 18% | 97% | 19% | 13.5/35 | 80 | 0 | 0 | 2613 | 0 | 0 |
+| GM2 | 3201-3400 | 200 | 8.0x10.5 | 22.4 | 19.7 | 74% (1.00) | 49% | 17% | 100% | 21% | 13.4/37 | 70 | 0 | 0 | 2814 | 0 | 0 |
+| GM3 | 3401-3600 | 200 | 8.0x10.5 | 22.1 | 19.5 | 69% (1.00) | 40% | 26% | 99% | 19% | 16.6/38 | 123 | 0 | 0 | 3309 | 0 | 0 |
+| XTR | 3601-3800 | 200 | 8.0x10.5 | 23.6 | 20.8 | 78% (1.00) | 49% | 13% | 100% | 24% | 15.6/39 | 110 | 0 | 0 | 3396 | 0 | 0 |
+| BSM | 3801-3999 | 199 | 8.0x10.5 | 22.7 | 20.2 | 78% (1.00) | 49% | 11% | 100% | 18% | 16.9/43 | 121 | 0 | 0 | 3119 | 0 | 0 |
+| MST | 4000-4000 | 1 | 8.0x11.0 | 26.0 | 23.0 | 100% (1.00) | 100% | 0% | 100% | 100% | 12.0/12 | 1 | 0 | 0 | 1296 | 0 | 0 |
+
+TOTAL n=4000 fallback=0 validation_failures=0 retry_cap_hits(attempt>=63)=0 attempts avg=7.04 max=47 moves_below_band=887 demoted=57 greedy_accepted=1 ms avg=1646 max=12538 (L3535)
+ARCHETYPES { "ROUTING": 367, "PRECISION": 697, "COMPACT_TRICK": 634, "MULTI_BEAM": 368, "COLOR": 393, "DEPENDENCY": 349, "CONSTRAINT": 345, "GRAND": 514, "PHASE": 333 }
+MOST TILES: L2700(58 tiles,27 mv), L3400(58 tiles,26 mv), L3816(57 tiles,26 mv), L3921(57 tiles,22 mv), L3311(56 tiles,25 mv)
+MOST MOVES: L3900(28), L3715(28), L3777(28), L3703(27), L2650(27)
+SLOWEST: L3535(12538ms,a18), L3740(9694ms,a36), L3827(9632ms,a38), L3782(9512ms,a37), L3707(8814ms,a23)
+FEWEST MOVES: L5(3), L1(3), L7(3), L9(3), L719(4)
+
+**Phase counts**: 701-800 one gadget (85-100% of levels, 0 on relief/non-roll levels), 801-1000 mostly 1, 1001-1200 up to 2 (avg 1.49 per Phase level), later bands 1 (a second gadget needs a receiver->remote hop and rarely fits the tile budget; the caps of 3 are never reached - disclosed, not hidden).
+
+**Performance (desktop, headless, ms)**: L701 17; L1000 425; L1400 467; L2001 1593 (4 attempts); L2800 692; L3200 981; L3600 2271 (15 attempts); L3999 2136 (31 attempts); L4000 1184 (13 attempts). Dominant phases: final shortcut probe and minimality (both budgeted), then composer placement on dense late boards; Phase adds no measurable cost. `LaserSystem.MAX_STEPS` untouched.
+
+**Honest limits**: not proof of optimality; Selector realised share is below policy (a rolled Selector that cannot be placed is dropped, `selector_dropped`); 22% of levels sit below their band move floor; Grandmaster boards are 50-58 tiles on 8x11 (the V5 tile budget of 56 plus hardening blockers) - difficulty is dependency structure, not size, but density needs an Android readability review.

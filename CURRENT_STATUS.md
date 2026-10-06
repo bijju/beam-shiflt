@@ -25,6 +25,10 @@
 Fast snapshot. If this disagrees with `CHANGELOG.md`/`ARCHITECTURE.md`,
 trust the code, then fix whichever doc is stale.
 
+> **Final pre-AAB UI pass (2026-10-06, uncommitted, NO BUILD):** Settings purchase button now uses `assets/ui/settings/bs_btn_ad_free.png` ("AD FREE" baked in, NO price in the art; `content_rect` re-measured). The price is still the live `StoreManager.price_text()` -> `PriceLabel` (shrinks, never clips). Product id stays `beamshift_no_forced_ads`. The old `bs_btn_no_forced_ads.png` is now unreferenced. The button was missing from desktop screenshots only because the store section is hidden when `StoreManager.has_store()` is false; `tools/ui_shots` now injects the fake store backend for `settings`/`settings_long` (tool-only). PERFECT CLEAR/GREAT CLEAR/LEVEL CLEARED rendered centered at 1080x1920: no change. Versions 1.0.2 / 10006. Tests: production 251 tests / 14144 assertions / 0 failures, 90.61% coverage (93.55% excl. scripts/tools); internal-QA 41 tests / 269 assertions / 0 failures. No AAB built.
+
+> **Phase Shifter (2026-10-06, D124, uncommitted, no build):** Phase Shifter mechanic + tutorials T35-T39 are implemented and tested (desktop only). `MAX_LEVEL` is still 3000; generator V6 / the 4000-level curve is NOT built yet (Stages C-E). Nothing committed, no APK/AAB.
+
 ## CURRENT STATUS (authoritative — read this section for "what's true right now")
 
 Everything below this section (from "## MILESTONE HISTORY" onward) is
@@ -2393,3 +2397,17 @@ The recovered upload keystore (`D:/4Sagez/GodotGames/Keys/BeamShift/beamshift-si
 ## Tutorial Select header fix (2026-09-30, desktop-RENDERED only; Android NOT validated)
 
 `scenes/ui/tutorial_select.tscn`: the old `TopBar` HBox (theme-styled 144x144 "Back" Button, whose 70px StyleBoxTexture end caps squashed the art; 32px "TUTORIAL" label centered in the space left after the Back button) was replaced by a 144px-high `Header` Control. `BackButton` is a flat 144x144 touch target with a 96x96 aspect-preserving `BackIcon` (`bs_ui_icon_back_runtime.png`, same as gameplay's back button); `TitleLabel` ("TUTORIALS", 72px, outline+shadow, no wrap/clip) spans the full header width so it is centered on the screen, not on the leftover space. Layout separation 20 -> 28. Grid/cards/logic untouched; header sits inside the existing `SafeAreaMargin`. Rendered-checked at 1080x1920, 1080x2400, 1080x2115. Android APK not built or tested.
+
+
+## Stages C-E (generator V6, D125) - 2026-10-06, UNCOMMITTED, no APK/AAB, Android verification PENDING
+
+- V6 (`ProceduralContractV6`) generates all new procedural play, Levels 1-4000; V1-V5 frozen (387/387 historical fingerprints identical); `MAX_LEVEL` 4000; Medium starts at 50; Phase from 701, Selector from 2001, Grandmaster 3001-3999, Level 4000 Master Puzzle; Phase gadget composer; archetypes / complexity budget / challenge / relief; tutorial unlocks Fusion 380 / Phase 680 / Selector 1980.
+- Bulk QA of all 4000 levels: 0 fallbacks, 0 validation failures; avg 1.6 s per level desktop (max 12.5 s). 22% of levels sit below their band move floor (tile budget); Grandmaster boards are dense; Selector share below policy. See DECISIONS.md D125 and PROCEDURAL_GENERATION.md section 21.
+- Not verified: any physical device, phone generation time, APK export contents, visual review on a real screen.
+
+## Production-readiness audit (2026-10-06) - NO AAB BUILT, NOTHING COMMITTED
+
+- Owner reported the V6 QA APK visually good on device. Source tree is `BuildConfig.BUILD_MODE = MODE_PRODUCTION` (`QA_TOOLS = false`); every QA control (+50, Level Select (QA), V3/FUSION/SELECTOR/V5 TEST, generator HUD tags, tutorial QA overlay, unlock-all) derives from that one flag and is hidden/inert in production. QA tooling is kept for internal-QA builds.
+- This pass changed only tests/docs: new `tools/tests/cases/test_production_leak.gd` (production QA-leak guard, also run in the internal-QA pass), `tools/tests/run_coverage.ps1` (QA pass now includes `production_leak`), this section. No game code changed.
+- Release facts: Android preset versionCode 10004 / "1.0.1", `project.godot` config/version 1.0.0, iOS 1.0.0/10000 - not reconciled (CI `stamp_version.sh` stamps at release; owner decides the version).
+- Remaining: device-only checks (Play Billing, rewarded/interstitial ads with production ids, Play Games sign-in, notch safe area), Play Console actions (Families declaration, Data safety, AD_ID permission posture, Game ID), final AAB build + commit + push only after explicit owner approval.

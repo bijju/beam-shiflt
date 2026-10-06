@@ -17,8 +17,8 @@ const FALLBACK_PRICES := {
 
 ## Hosted web copy of the privacy policy (docs/privacy-policy/, GitHub Pages) for the Play Console
 ## and App Store Connect listings. NOT opened in-game: Settings > Privacy Policy shows the native
-## screen (privacy_policy_screen.gd) built from PrivacyPolicyText. Empty until Pages is verified live.
-const PRIVACY_POLICY_URL := ""
+## screen (privacy_policy_screen.gd) built from PrivacyPolicyText. Live; verified byte-identical to docs/privacy-policy/index.html.
+const PRIVACY_POLICY_URL := "https://abhilashdeva.github.io/beamshift-privacy/"
 
 
 static func product_ids() -> PackedStringArray:

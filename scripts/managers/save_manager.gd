@@ -104,6 +104,8 @@ var campaign_resume_hint_used: bool = false
 ## Phase 4 (D102): best stars per PROCEDURAL puzzle identity, "<level>|<generator_version>" -> 1..3 (a sparse dictionary,
 ## never a fixed 2000-entry structure). Additive; old saves default to {}.
 var procedural_best_stars: Dictionary = {}
+## "<level>|<generator_version>" -> lowest move count (same identity as procedural_best_stars).
+var procedural_best_moves: Dictionary = {}
 
 ## Phase 4 (D102): the one-time "NEW TUTORIAL: FUSION" nudge has been shown. Additive; default false.
 var fusion_tutorial_nudge_seen: bool = false
@@ -117,6 +119,9 @@ var ad_last_counted_level: int = 0
 ## Store release (STORE_RELEASE.md): owned store products, product_id -> true. The store is
 ## the authority - StoreManager re-checks at every launch.
 var entitlements: Dictionary = {}
+## Neutral age screen (Families): a self-selected RANGE (AgeGroup), local only, never transmitted, never
+## reset by NEW GAME. Additive; old saves default to AgeGroup.UNKNOWN (Android asks once).
+var age_group: int = AgeGroup.UNKNOWN
 ## Seconds of real gameplay (a level on screen, not paused); menu time never counts.
 var play_time_seconds: float = 0.0
 ## ISO-8601 UTC stamp of the last write.
@@ -157,11 +162,13 @@ func _default_data() -> Dictionary:
 		"procedural_resume_hint_used": false,
 		"campaign_resume_hint_used": false,
 		"procedural_best_stars": {},
+		"procedural_best_moves": {},
 		"fusion_tutorial_nudge_seen": false,
 		"ad_completions_since_interstitial": 0,
 		"ad_last_interstitial_unix": 0,
 		"ad_last_counted_level": 0,
 		"entitlements": {},
+		"age_group": AgeGroup.UNKNOWN,
 		"play_time_seconds": 0.0,
 		"saved_at": "",
 	}
@@ -224,14 +231,26 @@ func _apply_data(data: Dictionary) -> void:
 	procedural_resume_hint_used = bool(data.get("procedural_resume_hint_used", false))
 	campaign_resume_hint_used = bool(data.get("campaign_resume_hint_used", false))
 	procedural_best_stars = data.get("procedural_best_stars", {})
+	# Additive field (no SAVE_VERSION bump): absent in older saves = no best yet.
+	var best_moves_data: Variant = data.get("procedural_best_moves", {})
+	procedural_best_moves = best_moves_data if typeof(best_moves_data) == TYPE_DICTIONARY else {}
 	fusion_tutorial_nudge_seen = bool(data.get("fusion_tutorial_nudge_seen", false))
 	ad_completions_since_interstitial = int(data.get("ad_completions_since_interstitial", 0))
 	ad_last_interstitial_unix = int(data.get("ad_last_interstitial_unix", 0))
 	ad_last_counted_level = int(data.get("ad_last_counted_level", 0))
 	var owned: Variant = data.get("entitlements", {})
 	entitlements = owned if typeof(owned) == TYPE_DICTIONARY else {}
+	age_group = AgeGroup.sanitize(int(data.get("age_group", AgeGroup.UNKNOWN)))
 	play_time_seconds = float(data.get("play_time_seconds", 0.0))
 	saved_at = str(data.get("saved_at", ""))
+
+
+	# V6 (D125) moved the Fusion / Selector tutorial unlock thresholds later (380 / 1980) to match the new curve. A save that already
+	# EARNED a pack under the old thresholds (150 / 1900) keeps it: the earned unlock is materialised here, additively, never revoked.
+	if procedural_current_level >= LevelManager.LEGACY_FUSION_TUTORIAL_UNLOCK_PROCEDURAL_LEVEL and tutorial_highest_unlocked_level < LevelManager.FUSION_TUTORIAL_FIRST:
+		tutorial_highest_unlocked_level = LevelManager.FUSION_TUTORIAL_FIRST
+	if procedural_current_level >= LevelManager.LEGACY_SELECTOR_TUTORIAL_UNLOCK_PROCEDURAL_LEVEL and tutorial_highest_unlocked_level < LevelManager.SELECTOR_TUTORIAL_FIRST:
+		tutorial_highest_unlocked_level = LevelManager.SELECTOR_TUTORIAL_FIRST
 
 
 func save_game() -> bool:
@@ -274,14 +293,25 @@ func to_dict() -> Dictionary:
 		"procedural_resume_hint_used": procedural_resume_hint_used,
 		"campaign_resume_hint_used": campaign_resume_hint_used,
 		"procedural_best_stars": procedural_best_stars,
+		"procedural_best_moves": procedural_best_moves,
 		"fusion_tutorial_nudge_seen": fusion_tutorial_nudge_seen,
 		"ad_completions_since_interstitial": ad_completions_since_interstitial,
 		"ad_last_interstitial_unix": ad_last_interstitial_unix,
 		"ad_last_counted_level": ad_last_counted_level,
 		"entitlements": entitlements,
+		"age_group": age_group,
 		"play_time_seconds": play_time_seconds,
 		"saved_at": saved_at,
 	}
+
+
+## Stores the age range chosen on the neutral age screen. Returns false for an invalid value.
+func set_age_group(group: int) -> bool:
+	if group < AgeGroup.CHILD_12_OR_YOUNGER or group > AgeGroup.ADULT_18_PLUS:
+		return false
+	age_group = group
+	save_game()
+	return true
 
 
 func has_entitlement(product_id: String) -> bool:
@@ -495,12 +525,15 @@ func reset_main_progress_for_new_game() -> bool:
 		"procedural_resume_move_count": procedural_resume_move_count,
 		"procedural_resume_hint_used": procedural_resume_hint_used,
 		"procedural_best_stars": procedural_best_stars,
+		"procedural_best_moves": procedural_best_moves,
 		"ad_last_counted_level": ad_last_counted_level,
 	}
 	if procedural_current_level >= LevelManager.FUSION_TUTORIAL_UNLOCK_PROCEDURAL_LEVEL and tutorial_highest_unlocked_level < LevelManager.FUSION_TUTORIAL_FIRST:
 		tutorial_highest_unlocked_level = LevelManager.FUSION_TUTORIAL_FIRST
 	if procedural_current_level >= LevelManager.SELECTOR_TUTORIAL_UNLOCK_PROCEDURAL_LEVEL and tutorial_highest_unlocked_level < LevelManager.SELECTOR_TUTORIAL_FIRST:
 		tutorial_highest_unlocked_level = LevelManager.SELECTOR_TUTORIAL_FIRST
+	if procedural_current_level >= LevelManager.PHASE_TUTORIAL_UNLOCK_PROCEDURAL_LEVEL and tutorial_highest_unlocked_level < LevelManager.PHASE_TUTORIAL_FIRST:
+		tutorial_highest_unlocked_level = LevelManager.PHASE_TUTORIAL_FIRST
 	procedural_current_level = 1
 	procedural_resume_level_number = 0
 	procedural_resume_seed = 0
@@ -509,6 +542,7 @@ func reset_main_progress_for_new_game() -> bool:
 	procedural_resume_move_count = 0
 	procedural_resume_hint_used = false
 	procedural_best_stars = {}
+	procedural_best_moves = {}
 	ad_last_counted_level = 0
 	if save_game():
 		return true
@@ -516,6 +550,18 @@ func reset_main_progress_for_new_game() -> bool:
 	for key in snapshot:
 		set(key, snapshot[key])
 	return false
+
+
+## Forgets the resumable puzzle. Used when the FINAL level (4000) is completed: the progression pointer stays on it (there is no
+## Level 4001), so its solved board must not be "resumed" - PLAY / CONTINUE then start Level 4000 again as a fresh puzzle.
+func clear_procedural_resume() -> void:
+	procedural_resume_level_number = 0
+	procedural_resume_seed = 0
+	procedural_resume_generator_version = 0
+	procedural_resume_orientations = {}
+	procedural_resume_move_count = 0
+	procedural_resume_hint_used = false
+	save_game()
 
 
 ## Starts tracking a fresh (just-entered or just-reset) procedural level as
@@ -598,7 +644,24 @@ func record_procedural_stars(level_number: int, generator_version: int, stars: i
 		save_game()
 
 
+## LOWEST move count ever recorded for this (level, generator version); -1 = none yet.
+func get_procedural_best_moves(level_number: int, generator_version: int) -> int:
+	return int(procedural_best_moves.get(_procedural_star_key(level_number, generator_version), -1))
+
+
+## A completed level always has >= 1 move, so moves < 1 is ignored. A worse replay never raises the best.
+func record_procedural_best_moves(level_number: int, generator_version: int, moves: int) -> void:
+	if moves < 1:
+		return
+	var key := _procedural_star_key(level_number, generator_version)
+	if not procedural_best_moves.has(key) or moves < int(procedural_best_moves[key]):
+		procedural_best_moves[key] = moves
+		save_game()
+
+
 func record_procedural_level_result(level_number: int) -> void:
-	if level_number == procedural_current_level:
+	# The progression pointer never advances past the last level (V6, D125: Level 4000 is final - there is no Level 4001 to point at);
+	# completing the final level is recorded by its best stars / best moves (identity "level|generator_version"), not by the pointer.
+	if level_number == procedural_current_level and procedural_current_level < ProceduralLevelGenerator.MAX_LEVEL:
 		procedural_current_level += 1
 	save_game()

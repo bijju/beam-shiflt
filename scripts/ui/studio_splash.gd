@@ -7,6 +7,8 @@ extends Control
 ## else in the project references this scene's path).
 
 const NEXT_SCENE_PATH := "res://scenes/ui/main_menu.tscn"
+## Android only, until an age range was chosen (Google Play Families neutral age screen).
+const AGE_SCENE_PATH := "res://scenes/ui/age_selection.tscn"
 
 const FADE_DURATION := 0.35
 const HOLD_DURATION := 1.4
@@ -34,7 +36,7 @@ func _run_sequence() -> void:
 	await _show_logo(maclepro_logo)
 	await get_tree().create_timer(GAP_DURATION).timeout
 	await _show_logo(sagez_logo)
-	get_tree().change_scene_to_file(NEXT_SCENE_PATH)
+	get_tree().change_scene_to_file(AGE_SCENE_PATH if AgeGroup.screen_required(SaveManager.age_group) else NEXT_SCENE_PATH)
 
 
 func _show_logo(logo: TextureRect) -> void:

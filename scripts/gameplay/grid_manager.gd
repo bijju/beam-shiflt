@@ -58,6 +58,7 @@ const PRISM_SCENE := preload("res://scenes/tiles/prism.tscn")
 const ONE_WAY_REFLECTOR_SCENE := preload("res://scenes/tiles/one_way_reflector.tscn")
 const FUSION_SCENE := preload("res://scenes/tiles/fusion.tscn")
 const SPLITTER_SELECTOR_SCENE := preload("res://scenes/tiles/splitter_selector.tscn")
+const PHASE_SHIFTER_SCENE := preload("res://scenes/tiles/phase_shifter.tscn")
 const BEAM_RECEIVER_SCENE := preload("res://scenes/tiles/beam_receiver.tscn")
 const REMOTE_EMITTER_SCENE := preload("res://scenes/tiles/remote_emitter.tscn")
 const MIRROR_IMPACT_FX_SCENE := preload("res://scenes/gameplay/laser_mirror_impact_fx.tscn")
@@ -129,6 +130,7 @@ var _remote_emitter_link_id_by_position: Dictionary = {} # Vector2i -> String (E
 var _prism_positions: Dictionary = {} # Vector2i -> true (Era 2, VFX only)
 var _fusion_nodes: Dictionary = {} # Vector2i -> FusionTile (Fusion Phase 1)
 var _selector_nodes: Dictionary = {} # Vector2i -> SplitterSelectorTile (Selector Phase S1)
+var _phase_nodes: Dictionary = {} # Vector2i -> PhaseShifterTile (Phase Shifter Stage A)
 var _filter_positions: Dictionary = {} # Vector2i -> true (audio only - see _play_beam_interaction_audio())
 
 var cell_size: float = 64.0
@@ -233,6 +235,7 @@ func load_level(data: LevelData) -> void:
 	_prism_positions.clear()
 	_fusion_nodes.clear()
 	_selector_nodes.clear()
+	_phase_nodes.clear()
 	_filter_positions.clear()
 	_last_result = {}
 
@@ -367,6 +370,17 @@ func load_level(data: LevelData) -> void:
 				tile_orientations[tile.position] = tile.direction
 				_orientable_nodes[tile.position] = node
 				_selector_nodes[tile.position] = node
+
+			GridTypes.TileType.PHASE_SHIFTER:
+				var node: PhaseShifterTile = PHASE_SHIFTER_SCENE.instantiate()
+				node.grid_position = tile.position
+				node.orientation = tile.mirror_orientation
+				node.rotatable = tile.rotatable
+				node.tile_clicked.connect(_on_orientable_tile_clicked)
+				_tiles_root.add_child(node)
+				tile_orientations[tile.position] = tile.mirror_orientation
+				_orientable_nodes[tile.position] = node
+				_phase_nodes[tile.position] = node
 
 			GridTypes.TileType.BEAM_RECEIVER:
 				var node: BeamReceiverTile = BEAM_RECEIVER_SCENE.instantiate()
@@ -727,6 +741,11 @@ func _simulate_and_draw(play_impacts: bool = false) -> void:
 		var snode: SplitterSelectorTile = _selector_nodes[pos]
 		snode.active = selector_hits.has(pos)
 		snode.routed_color = selector_hits[pos].keys()[0] if selector_hits.has(pos) else -1
+
+	var phase_final: Dictionary = _last_result["phase_final"]
+	var phase_hits: Dictionary = _last_result["phase_hits"]
+	for pos in _phase_nodes:
+		(_phase_nodes[pos] as PhaseShifterTile).apply_result(int(phase_final.get(pos, GridTypes.PHASE_A)), int(phase_hits.get(pos, 0)), play_impacts)
 
 	_redraw_beams()
 	if play_impacts:

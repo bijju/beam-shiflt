@@ -45,6 +45,7 @@ func get_tiles_of_type(tile_type: GridTypes.TileType) -> Array[TilePlacement]:
 ## returns") pick up a new orientation-bearing tile type in one place.
 const _ORIENTABLE_TILE_TYPES: Array[GridTypes.TileType] = [
 	GridTypes.TileType.MIRROR, GridTypes.TileType.SPLITTER, GridTypes.TileType.ONE_WAY_REFLECTOR,
+	GridTypes.TileType.PHASE_SHIFTER,
 ]
 
 

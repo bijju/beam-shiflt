@@ -30,6 +30,14 @@ var _hint_glow: TextureRect
 var _hint_attention_tween: Tween
 var _hint_pulse_active := false
 var _hint_ad_open := false
+## Families: the "Watch a short ad to reveal a hint" disclosure that precedes every rewarded hint ad.
+var _hint_dialog: HintAdDialog = null
+## Repeated-Reset monetization: resets AUTHORIZED for the current level scope. Deliberately NOT cleared by
+## _load_current_level(true) (Reset itself calls that); only a different level scope zeroes it, or a solve.
+var _reset_count := 0
+var _reset_scope := ""
+var _reset_dialog: HintAdDialog = null
+var _reset_ad_pending := false
 ## Phase 4 (D102): a real gameplay Hint was GRANTED and shown during this attempt (caps stars at 2).
 ## Reset by every level load, persisted with the resume state (see SaveManager.mark_hint_used), never set by
 ## tutorial guidance, a V3/Fusion QA session or a Hint request that was not granted.
@@ -117,6 +125,9 @@ func _ready() -> void:
 	_hint.hint_shown.connect(_on_hint_granted)
 	_hint_button.pressed.connect(_on_hint_pressed)
 	_build_hint_glow()
+	# Back is a flat icon (no frame), so the frame-shaped glow would draw a stray square.
+	for b: Button in [_hint_button, _reset_button, _pause_button]:
+		BeamButtonGlow.attach(b)
 	AdManager.rewarded_opened.connect(_on_ad_rewarded_opened)
 	AdManager.rewarded_closed.connect(_on_ad_rewarded_closed)
 	_qa_next_button.text = "+%d" % LevelManager.PROCEDURAL_QA_JUMP_AMOUNT
@@ -138,6 +149,7 @@ func _ready() -> void:
 	_pause_menu.main_menu_pressed.connect(_on_pause_main_menu_pressed)
 
 	if GameManager.is_tutorial_mode:
+		_pause_menu.set_level_select_label("TUTORIALS")
 		_tutorial = TutorialManager.new()
 		_tutorial.active_grid = _grid
 		_hint.tutorial_state = _tutorial_hint_state
@@ -174,6 +186,14 @@ func _process(delta: float) -> void:
 func _notification(what: int) -> void:
 	if what != NOTIFICATION_WM_GO_BACK_REQUEST or InternetManager.is_blocking():
 		return
+	if _reset_ad_pending:
+		return
+	if _reset_dialog != null:
+		_reset_dialog.request_cancel()
+		return
+	if _hint_dialog != null:
+		_hint_dialog.request_cancel() # Back on the hint disclosure = CANCEL
+		return
 	if _complete_popup.visible or _tutorial_complete_popup.visible:
 		return
 	if _pause_menu.visible:
@@ -206,7 +226,7 @@ func _on_pause_resume_pressed() -> void:
 func _on_pause_restart_pressed() -> void:
 	get_tree().paused = false
 	_pause_menu.hide()
-	_load_current_level()
+	_request_reset() # shares the bottom RESET's allowance; a plain reload would resume the saved board
 
 
 func _on_pause_settings_pressed() -> void:
@@ -254,11 +274,17 @@ func _exit_tree() -> void:
 ## Select sessions (GameManager.entered_via_level_select) never read or
 ## write campaign_resume_* at all - see that flag's own doc comment.
 func _load_current_level(force_fresh: bool = false) -> void:
+	var scope := _reset_scope_key()
+	if scope != _reset_scope:
+		_reset_scope = scope
+		_reset_count = 0
 	moves_used = 0
 	_hint_used_this_attempt = false
 	_update_moves_label()
 	_completion_pending = false
 	_rewarded_this_level = false
+	_close_hint_dialog()
+	_close_reset_dialog()
 	_tutorial_complete_popup.hide()
 	_qa_next_button.visible = GameManager.is_procedural_mode and (LevelManager.SHOW_PROCEDURAL_QA_NEXT_BUTTON or _is_v3_session())
 	_qa_next_button.text = ("NEXT V5" if _is_v5_session() else "NEXT SELECTOR" if _is_selector_session() else "NEXT FUSION" if _is_fusion_session() else "NEXT V3") if _is_v3_session() else "+%d" % LevelManager.PROCEDURAL_QA_JUMP_AMOUNT
@@ -332,7 +358,7 @@ func _load_current_level(force_fresh: bool = false) -> void:
 				var frag: String = gen_result.get("fusion_fragment", "")
 				# Selector Phase S3 (D110): a V5 level also names its Selector family (SA-SP), e.g. "V5 SCQ F3 SL".
 				var sel_frag: String = gen_result.get("selector_fragment", "")
-				_level_label.text += "\n%s %s%s%s" % [qa_tag, ProceduralDifficultyContract.band_code(procedural_level_number), (" " + frag) if frag != "" else "", (" " + sel_frag) if sel_frag != "" else ""]
+				_level_label.text += "\n%s %s%s%s%s" % [qa_tag, _qa_band_code(generator_version, procedural_level_number), (" " + frag) if frag != "" else "", (" " + sel_frag) if sel_frag != "" else "", (" " + str(gen_result.get("v6_archetype", "")).substr(0, 3)) if generator_version >= ProceduralLevelGenerator.GENERATOR_VERSION_V6 else ""]
 		_apply_era_theme(EraTheme.get_era_for_level(procedural_level_number))
 		_grid.load_level(level_data)
 
@@ -462,6 +488,7 @@ func _on_level_solved() -> void:
 	if _completion_pending:
 		return
 	_completion_pending = true
+	_reset_count = 0 # a solved level starts its next attempt (Retry) with a fresh allowance
 	_hint_attention_stop()
 
 	var moves_snapshot := moves_used
@@ -469,6 +496,9 @@ func _on_level_solved() -> void:
 	var show_stars := true
 	var has_next := false
 	var best_moves := -1
+	# Presentation-only inputs for LevelCompletePopup (-1 = unknown/hidden); never fed back into scoring.
+	var target_moves := -1
+	var level_number := -1
 	# Era 2: must be read BEFORE record_campaign_level_result() below
 	# marks this level completed, or "first time completing Level 100"
 	# could never be detected (a replay would look identical to the
@@ -501,6 +531,7 @@ func _on_level_solved() -> void:
 		# level_id, so the threshold math is duplicated here on purpose
 		# (see LevelManager.TWO_STAR_MOVE_MARGIN for the source of truth).
 		stars = StarScoring.stars_for(GameManager.editor_level_data.optimal_moves, moves_snapshot, false)
+		target_moves = GameManager.editor_level_data.optimal_moves
 	elif GameManager.is_procedural_mode:
 		# Star scoring is centralized in StarScoring (D102). A V3/Fusion QA session shows NO stars and records
 		# nothing; a legitimate procedural completion scores against the authoritative optimal of the exact
@@ -509,16 +540,25 @@ func _on_level_solved() -> void:
 		if _is_v3_session():
 			show_stars = false
 			has_next = procedural_level_number < _qa_count()
+			level_number = -1
 		else:
 			var gen_result: Dictionary = LevelManager.get_procedural_generation_result(procedural_level_number, _procedural_generator_version)
 			var optimal := StarScoring.authoritative_optimal(gen_result["level_data"], gen_result)
 			stars = StarScoring.stars_for(optimal, moves_snapshot, _hint_used_this_attempt)
+			target_moves = optimal
+			level_number = procedural_level_number
 			SaveManager.record_procedural_stars(procedural_level_number, _procedural_generator_version, stars)
+			SaveManager.record_procedural_best_moves(procedural_level_number, _procedural_generator_version, moves_snapshot)
+			best_moves = SaveManager.get_procedural_best_moves(procedural_level_number, _procedural_generator_version)
 			SaveManager.record_procedural_level_result(procedural_level_number)
+			if procedural_level_number >= LevelManager.get_procedural_level_count():
+				SaveManager.clear_procedural_resume() # Level 4000 is final: its solved board is never resumed
 			AdManager.register_completion(procedural_level_number)
 			has_next = procedural_level_number < LevelManager.get_procedural_level_count()
 	else:
 		stars = LevelManager.calculate_campaign_stars(current_level_id, moves_snapshot, _hint_used_this_attempt)
+		target_moves = StarScoring.authoritative_optimal(LevelManager.get_campaign_level(current_level_id))
+		level_number = current_level_id
 		SaveManager.record_campaign_level_result(current_level_id, moves_snapshot, stars, LevelManager.get_campaign_level_count())
 		has_next = current_level_id < LevelManager.get_campaign_level_count()
 		best_moves = SaveManager.get_campaign_best_moves(current_level_id)
@@ -529,11 +569,87 @@ func _on_level_solved() -> void:
 		return # scene gone, or a Reset/Retry/Next Level already superseded this
 	_completion_pending = false
 	AudioManager.play_level_complete()
-	_complete_popup.show_result(moves_snapshot, stars, has_next, best_moves, era_transition, _hint_used_this_attempt and show_stars, show_stars)
+	_complete_popup.show_result(moves_snapshot, stars, has_next, best_moves, era_transition, _hint_used_this_attempt and show_stars, show_stars, target_moves, level_number)
 
 
 func _on_reset_pressed() -> void:
+	_request_reset()
+
+
+# --- Repeated Reset (first free, then a rewarded ad) -------------------------------------------
+# Bottom RESET and Pause -> Restart both end here, so there is ONE allowance per level scope.
+# A reset is counted only when it is authorized (free, or reward earned), never on the request.
+
+func _reset_scope_key() -> String:
+	if GameManager.is_tutorial_mode:
+		return "t%d" % GameManager.current_tutorial_id
+	if GameManager.is_editor_playtest:
+		return "e"
+	if GameManager.is_procedural_mode:
+		return "p%d" % GameManager.current_procedural_level
+	return "c%d" % current_level_id
+
+
+## Only normal procedural play is gated. Tutorials, QA sandbox sessions, campaign QA, editor playtest,
+## desktop / ads-off builds and No Forced Ads owners always reset free.
+func _reset_needs_ad() -> bool:
+	return _reset_count >= 1 and _interstitial_eligible_session() and AdManager.reset_requires_ad()
+
+
+func _request_reset() -> void:
+	if _reset_dialog != null or _reset_ad_pending:
+		return
+	if not _reset_needs_ad():
+		_perform_reset()
+		return
+	if _complete_popup.visible or _tutorial_complete_popup.visible or _completion_pending or _hint_dialog != null:
+		return
+	if AdManager.is_showing():
+		return
+	if not AdManager.is_rewarded_ready():
+		AdManager.load_rewarded()
+		_open_reset_dialog("AD NOT AVAILABLE", "Please try again shortly.", true)
+		return
+	_open_reset_dialog("RESET LEVEL?", "You've already used your free reset.\n\nWatch a short ad to reset again.", false)
+
+
+func _perform_reset() -> void:
+	_reset_count += 1
 	_load_current_level(true)
+
+
+func _open_reset_dialog(title: String, body: String, info_only: bool) -> void:
+	_reset_dialog = HintAdDialog.new()
+	_reset_dialog.title_text = title
+	_reset_dialog.body_text = body
+	_reset_dialog.info_only = info_only
+	add_child(_reset_dialog)
+	_reset_dialog.cancelled.connect(_close_reset_dialog)
+	_reset_dialog.confirmed.connect(_on_reset_ad_confirmed)
+
+
+func _close_reset_dialog() -> void:
+	if _reset_dialog != null:
+		_reset_dialog.queue_free()
+		_reset_dialog = null
+
+
+func _on_reset_ad_confirmed() -> void:
+	_close_reset_dialog()
+	_reset_ad_pending = true
+	var status := AdManager.show_rewarded_action(_on_reset_ad_result)
+	if status != "started":
+		_reset_ad_pending = false
+		if status == "not_ready":
+			_open_reset_dialog("AD NOT AVAILABLE", "Please try again shortly.", true)
+
+
+## granted is true ONLY from the reward callback; closed-without-reward and failure both leave the board alone.
+func _on_reset_ad_result(granted: bool) -> void:
+	_reset_ad_pending = false
+	if granted and is_inside_tree():
+		_perform_reset()
+		_rewarded_this_level = true # keep the no-back-to-back-full-screen-ads rule; counters are untouched
 
 
 func _on_back_pressed() -> void:
@@ -568,7 +684,7 @@ func _advance_to_next_level() -> void:
 
 
 func _on_retry_pressed() -> void:
-	_load_current_level(true)
+	_load_current_level(true) # post-solve replay: free, never counted (a solve already zeroed the allowance)
 
 
 ## Phase 3 (Procedural Generator V1) - TEMPORARY QA-only skip button, see
@@ -811,7 +927,7 @@ func _hint_attention_restart() -> void:
 
 
 func _hint_attention_allowed() -> bool:
-	if not _hint_button.visible or _hint_button.disabled or _hint_ad_open or _completion_pending:
+	if not _hint_button.visible or _hint_button.disabled or _hint_ad_open or _hint_dialog != null or _completion_pending:
 		return false
 	if _complete_popup.visible or _tutorial_complete_popup.visible or _pause_menu.visible:
 		return false
@@ -892,6 +1008,27 @@ func _configure_hint_permission() -> void:
 
 
 func _hint_permission(hm: HintManager) -> void:
+	if _hint_dialog != null:
+		return # a disclosure is already open: never a second dialog or ad
+	if AdManager.is_showing() or not AdManager.is_rewarded_ready():
+		_start_rewarded_hint(hm) # no ad would start: nothing to disclose (busy / not-ready feedback is unchanged)
+		return
+	_hint_dialog = HintAdDialog.new()
+	add_child(_hint_dialog) # last child: above the HUD, popups and pause menu
+	_hint_dialog.cancelled.connect(_close_hint_dialog)
+	_hint_dialog.confirmed.connect(func() -> void:
+		_close_hint_dialog()
+		_start_rewarded_hint(hm))
+
+
+func _close_hint_dialog() -> void:
+	if _hint_dialog != null:
+		_hint_dialog.queue_free()
+		_hint_dialog = null
+
+
+## The EXISTING rewarded flow, reached only through WATCH AD (or directly when no ad could start).
+func _start_rewarded_hint(hm: HintManager) -> void:
 	var status := AdManager.show_rewarded_hint(func(granted: bool) -> void:
 		if granted:
 			hm.grant_hint())
@@ -909,3 +1046,10 @@ func _on_ad_rewarded_closed() -> void:
 	_hint_ad_open = false
 	_hint_attention_restart()
 	_hint.rearm()
+
+
+## QA-only HUD tag helper: the band code of the generator that built the level (V6 has its own band table).
+func _qa_band_code(generator_version: int, level_number: int) -> String:
+	if generator_version >= ProceduralLevelGenerator.GENERATOR_VERSION_V6:
+		return ProceduralContractV6.band_code(level_number)
+	return ProceduralDifficultyContract.band_code(level_number)

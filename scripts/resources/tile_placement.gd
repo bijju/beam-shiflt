@@ -199,3 +199,15 @@ static func make_fusion(pos: Vector2i, output_dir: GridTypes.Direction, is_rotat
 	t.direction = output_dir
 	t.rotatable = is_rotatable
 	return t
+
+
+## PHASE_SHIFTER (Phase Shifter Stage A): rotatable exactly like a mirror (same mirror_orientation
+## field, 2-state tap toggle). The orientation is the PHASE-B reflection ("/" or "\\"); phase A always
+## passes the beam straight. The runtime phase is simulation state and is never stored here.
+static func make_phase_shifter(pos: Vector2i, orientation: GridTypes.MirrorOrientation, is_rotatable: bool = true) -> TilePlacement:
+	var t := TilePlacement.new()
+	t.tile_type = GridTypes.TileType.PHASE_SHIFTER
+	t.position = pos
+	t.mirror_orientation = orientation
+	t.rotatable = is_rotatable
+	return t

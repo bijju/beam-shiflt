@@ -207,19 +207,6 @@ script = ExtResource("8")
 art = ExtResource("12")
 content_rect = Rect2(0.0147, 0.0884, 0.9480, 0.7997)
 
-[node name="QuitSpacer" type="Control" parent="SafeMargin/Root/ButtonGroup"]
-layout_mode = 2
-custom_minimum_size = Vector2(0, 12)
-
-[node name="QuitButton" type="Button" parent="SafeMargin/Root/ButtonGroup"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 4
-custom_minimum_size = Vector2(420, 112)
-theme_type_variation = &"DangerButton"
-theme_override_font_sizes/font_size = 32
-text = "QUIT"
-
 [node name="QASpacer" type="Control" parent="SafeMargin/Root/ButtonGroup"]
 unique_name_in_owner = true
 layout_mode = 2

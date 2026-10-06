@@ -469,7 +469,7 @@ combining mechanics, not by inflating grid size.
   `GridTypes`, implement the real, reusable mechanic (consistent with
   rules 1–5 above) or leave that tutorial slot explicitly pending and
   say why — never invent tutorial-only gameplay behavior.
-- Don't create Tutorial levels beyond T34 (T21-T28 = Fusion pack, T29-T34 = Splitter Selector pack), and don't add mechanics to
+- Don't create Tutorial levels beyond T39 (T21-T28 = Fusion, T29-T34 = Selector, T35-T39 = Phase), and don't add mechanics to
   an existing tutorial that aren't the one it's meant to teach, without
   being explicitly asked — same standing scope discipline as Campaign
   stages.
@@ -1296,8 +1296,7 @@ Details: `ADS_MONETIZATION.md`, `DECISIONS.md` D98.
 ## Store release rules (store-release pass, 2026-09-26)
 
 Details: `STORE_RELEASE.md`, `ADS_MONETIZATION.md` 6a-6c.
-- **Bundle id is `com.foursagez.beamshift` on every preset, forever.** Build codes are `major*10000+minor*100+patch` (1.0.0 = 10000),
-  stamped by `tools/ci/stamp_version.sh`; never hand-edit a lower code in.
+- **Bundle id is `com.foursagez.beamshift` on every preset, forever.** Android versionCode is an independent monotonic counter (currently 10006 for 1.0.2; 10004 and a local 10005 are used), NOT derived from versionName: the preset value is kept by `tools/ci/stamp_version.sh`, and raised only with `ANDROID_VERSION_CODE=<n>` (refused if lower; covered by `test_ci_version_stamp.gd`). The iOS build number still derives from the version. Never hand-edit a lower code in.
 - **Every ad request is child-directed** (`AdConfig.CHILD_DIRECTED`: the audience includes under-13). Never add ATT/IDFA,
   `NSUserTrackingUsageDescription` or personalised ads without an explicit owner decision - it is a Families/COPPA policy change.
 - **Store SDKs only behind `StoreManager` + per-platform backends loaded by path.** iOS plugins via `ClassDB`, every
@@ -1540,5 +1539,39 @@ reintroduce any of it without an explicit owner decision.
 ## Privacy Policy rules (2026-10-03)
 
 - **One canonical text: `PrivacyPolicyText` (`scripts/ui/privacy_policy_text.gd`).** The in-game screen renders it; `docs/privacy-policy/index.html` is GENERATED from it (`tools/privacy/build_policy_html.gd`) and a test fails on drift. Never hand-edit the HTML.
+- **Official public URL: `StoreConfig.PRIVACY_POLICY_URL` = https://abhilashdeva.github.io/beamshift-privacy/ (live; for store consoles only).**
 - **Settings > Privacy Policy opens the native screen (`GameManager.go_to_privacy_policy()`), never `OS.shell_open`.** Back -> Settings. Keep every node inside its ScrollContainer `mouse_filter = IGNORE` (touch-drag/wheel) and the Back button outside the scroll.
 - Any change to what the game stores, sends or integrates (SDKs, permissions, analytics, accounts, ads config) needs the policy text, "Last updated" and `PRIVACY_AUDIT.md` updated in the same change. Audit table + open WARNINGS (AD_ID permission, store-console URL) live in `PRIVACY_AUDIT.md`.
+
+## Families hardening: age screen + rewarded-hint disclosure (2026-10-03, branch dev_abhilas, uncommitted)
+
+- **Neutral age screen (Android only)**: `scenes/ui/age_selection.tscn` / `age_selection.gd`, shown by `studio_splash.gd` while `AgeGroup.screen_required(SaveManager.age_group)` (Android + UNKNOWN). Three identical buttons, no default, no exact age. `AgeGroup` (`scripts/managers/age_group.gd`) = UNKNOWN/CHILD_12_OR_YOUNGER/TEEN_13_TO_17/ADULT_18_PLUS, stored only in `SaveManager.age_group` (local, additive, survives NEW GAME, never transmitted - a test allow-lists every script that may mention it). Immutable in this pass: no Settings control (a later one must never touch ad targeting).
+- **`PlatformAccount.apply_age_group()` is the ONLY thing that may start Play Games** (`AgeGroup.play_games_allowed`: TEEN/ADULT only). UNKNOWN and CHILD never run `GodotPlayGameServices.initialize()` / `is_authenticated()` / `load_current_player()`; `is_supported()` is false there, so the Account screen is the local profile. Play Games stays optional for 13+. Residual (unverified, SDK-controlled): the `play-services-games-v2` library registers its own `PlayGamesInitProvider` at process start; GDScript cannot gate it.
+- **The age range never changes ads**: `AdConfig.CHILD_DIRECTED` stays true for every group (TFCD+TFUA+G); ad scripts must not reference `AgeGroup` (tested).
+- **Rewarded hint disclosure**: `HintAdDialog` (`scripts/ui/hint_ad_dialog.gd`, "GET A HINT?" / CANCEL / WATCH AD) is opened by `game.gd._hint_permission` only when an ad is READY and none is showing; WATCH AD calls the existing `_start_rewarded_hint` -> `AdManager.show_rewarded_hint` (no second rewarded path). Not-ready/busy keep their old handling without a dialog; free contexts (desktop, tutorials, QA) have no permission provider and no dialog. Android Back on the dialog = CANCEL. Every handler refuses under `InternetManager.is_blocking()`.
+- **Privacy policy updated for this feature (2026-10-03, uncommitted)**: `PrivacyPolicyText` sections 1, 2, 3, 5, 6, 7, 8, 10 describe the age range, Play Games gating, the rewarded confirmation and child-directed ads for all players; HTML regenerated; `test_privacy_policy.gd::test_policy_covers_age_screen_play_games_and_rewarded_hint` guards the concepts. The policy must NOT claim Play Games "never initializes" for children (the Google library registers `PlayGamesInitProvider` at process start) and must not imply an in-game age editor (there is none). Play Console target audience being prepared: 9-12, 13-15, 16-17, 18+; the Families declaration is NOT submitted and the public GitHub Pages copy is NOT published until the owner commits/pushes the `beamshift-privacy` repo.
+
+
+## Phase Shifter rules (Phase Shifter Stages A+B, D124)
+
+Details: `DECISIONS.md` D124, `ARCHITECTURE.md` "Phase Shifter", `TUTORIAL_SYSTEM.md` section 16.
+- **Phase logic lives only in `LaserSystem.simulate()`**: `TileType.PHASE_SHIFTER` (appended, never renumber). PHASE_A = straight, PHASE_B = reflect by the tile's
+  `MirrorOrientation`, every interaction flips it, every pass restarts in PHASE_A (no timers, nothing persisted, nothing in saves). The loop guard's state key
+  includes the shared phase mask ONLY on boards with a Phase Shifter (other boards keep their exact keys). Beam order is the documented LIFO-over-tile-order work list; never reorder it.
+- `PhaseShifterTile` only draws the END-OF-PASS phase (the next beam's behaviour). Input is the standard mirror toggle (one tap = one move). Only the four
+  `assets/gameplay/phase_shifter/` PNGs are referenced.
+- **Not generated yet**: V1-V5 and `ProceduralComplexity` do not know the Phase Shifter; generator V6 / `MAX_LEVEL` 4000 / the new difficulty curve are NOT built (D124 "Not built / plan").
+  Do not edit the shared `ProceduralDifficultyContract` tables for the new curve - V3-V5 read them; V6 needs its own version-gated contract.
+- Tutorials T35-T39 are the Phase pack (unlock procedural Level 680, `LevelManager.PHASE_TUTORIAL_*`). Do not create T40+ without being asked.
+
+
+## V6 generator rules (Stages C-E, D125) - SUPERSEDES the "Not generated yet" / "3000" / "T35+" scope lines above where they conflict
+
+Details: `DECISIONS.md` D125, `PROCEDURAL_GENERATION.md` section 21.
+- **V6 = generator version 6 = Levels 1-4000, the generator of ALL new procedural play** (`LevelManager.procedural_generator_version_for_new_play()` is the ONE routing point). A resumed puzzle regenerates under its SAVED version (V1-V5 stay FROZEN). `MAX_LEVEL` = 4000 (`ProceduralLevelGenerator`); the pointer never passes 4000; completing 4000 clears the resume state. Do not expose Level 4001+ without being asked.
+- **`ProceduralContractV6` is the ONE V6 numbers table** (bands, introduction table, Fusion/Selector/Phase policy, budget, archetypes, challenge/relief, Level 4000). Never edit `ProceduralDifficultyContract` for V6 (V3-V5 read it). V6-only branches in shared code must stay keyed on `req.has("v6")` / `version >= 6`.
+- **After ANY change under `scripts/procedural/`**: run `generator_fingerprint.tscn version=N check=tools/tests/golden/generator_vN.json` (and `_wide`) for N=1..5 - they MUST be identical (a diff is a stop, never a golden refresh). V6 goldens (`generator_v6.json`) are re-captured only for a deliberate V6 retune. Then `v6_sample.tscn` windows (parallel processes, each under its own budget); a bulk 1-4000 pass is ~20 min on 9 processes - run it only for contract/pipeline changes.
+- **Phase generation** = the gadget in `ProceduralComposerV3._place_phase` (fixed splitter + rotatable Phase Shifter + fixed loop; T38 geometry). Keep the splitter FIXED, keep consecutive `PH` atoms separated by a receiver->remote hop, never add a second Phase beam model - the real `LaserSystem` verifies every level (A then B).
+- Selector+Phase from 2401, Selector+Fusion from 2601, all three from 2801; Phase from 701, Selector from 2001, Fusion from 401; Medium (switch/gate) starts at Level 50. Introduction windows (first 3 levels of an introducing band) stay isolated.
+- **Tutorial unlocks (never hard gates)**: Fusion 380, Phase 680, Selector 1980 (`LevelManager`); saves that earned a pack under the old 150/1900 keep it. T40+ / a new mechanic still need an explicit request.
+- Level editor palette intentionally NOT extended for Phase (see D125). QA flags are unchanged and still must be reviewed before production; no APK/AAB was built for V6.
